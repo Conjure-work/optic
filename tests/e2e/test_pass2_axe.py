@@ -15,7 +15,7 @@ import re
 import pytest
 
 from tests.e2e.test_pass1_journeys import DESKTOP, PHONE, open_page
-from tests.e2e.test_pass2_place import PERIOD_KEY, statements_payload
+from tests.e2e.test_pass2_milo_view import PERIOD_KEY, statements_payload
 from tests.e2e.visual_fixtures import route_company
 
 TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
