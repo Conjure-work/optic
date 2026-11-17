@@ -42,7 +42,8 @@ def test_layout_controls_show_only_while_customizing():
     assert "let EDIT = false;" in ws
     assert "locked = !EDIT" in _fn(ws, "function panelShell")
     assert "is-editing" in ws and "data-ws-edit" in ws
-    assert re.search(r"Reset", _fn(ws, "function bar(")), "Reset lives in the Customize menu"
+    # the editing actions moved into editBar (Pass 2), which only the Customize state draws
+    assert re.search(r"Reset", _fn(ws, "function editBar(")) and "${EDIT ? editBar(hidden) : ''}" in _fn(ws, "function bar("), "Reset lives in the Customize menu"
     assert _fn(ws, "function bar(").count("data-ws-edit") == 1, "one Customize / Done toggle, not a second Done in the edit bar"
 
 

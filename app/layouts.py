@@ -47,11 +47,11 @@ def check_body(body: Any) -> Dict[str, Any]:
         if span not in (3, 4, 6, 8, 12):
             raise HTTPException(status_code=400, detail="A panel's width is not one Optic offers.")
         h = p.get("h") if p.get("h") in ("s", "m", "l") else "m"
-        grp = p.get("grp") if p.get("grp") in ("blue", "gold", "violet", "none") else None
+        grp = p.get("grp") if p.get("grp") in ("blue", "gold", "teal", "none") else None
         panels.append({"id": p["id"], "span": span, "h": h, "hidden": bool(p.get("hidden")), **({"grp": grp} if grp else {})})
     groups = {}
     for k, v in (body.get("groups") or {}).items() if isinstance(body.get("groups"), dict) else []:
-        if k in ("blue", "gold", "violet") and isinstance(v, str) and re.fullmatch(r"[A-Z0-9.^=\-]{1,12}", v):
+        if k in ("blue", "gold", "teal") and isinstance(v, str) and re.fullmatch(r"[A-Z0-9.^=\-]{1,12}", v):
             groups[k] = v
     out = {"panels": panels, "groups": groups}
     if len(json.dumps(out)) > MAX_BODY:

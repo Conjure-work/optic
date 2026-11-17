@@ -84,8 +84,8 @@ WS = (V2 / "js" / "pages" / "workspace.js").read_text()
 
 
 def test_link_groups_move_only_their_own_panels():
-    assert "const LINK_GROUPS = [['blue', 'Blue'], ['gold', 'Gold'], ['violet', 'Violet']];" in WS
-    assert "grpOf(id) !== 'blue' && S.groups[grpOf(id)]" in WS, "a Gold or Violet panel shows its group's ticker"
+    assert "const LINK_GROUPS = [['blue', 'Blue'], ['gold', 'Gold'], ['teal', 'Teal']];" in WS
+    assert "grpOf(id) !== 'blue' && S.groups[grpOf(id)]" in WS, "a Gold or Teal panel shows its group's ticker"
     gl = WS[WS.index("function setGroupLink(sym, grp) {"):WS.index("function cycleGroup(id) {")]
     assert "grpOf(x.id) === grp" in gl and "the other panels are unchanged" in gl
     assert "grpOf(x.id) === 'blue'" in WS[WS.index("function setLink(sym, grp = 'blue') {"):WS.index("function setGroupLink")]

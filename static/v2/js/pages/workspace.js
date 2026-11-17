@@ -61,7 +61,7 @@ export const PRESETS = {
   longterm: { label: 'Long-Term Investing', panels: [['quote', 8, 'm'], ['watch', 4, 's'], ['biz', 6, 'm'], ['value', 6, 'm'], ['fin', 6, 'm'], ['own', 6, 'm'], ['cnews', 12, 's'], ['portfolio', 12, 'm']] },
   mine: { label: 'My Desk', panels: null },     // the reader's own; starts as a copy of Market Overview
   // A company's panels (Pass 2, #/SYM/workspace): Home's grid on the stock page, every panel following that company
-  // in the Blue group; Gold and Violet still work for a second or third ticker beside it. Not one of Home's tabs.
+  // in the Blue group; Gold and Teal still work for a second or third ticker beside it. Not one of Home's tabs.
   stock: { label: 'Company panels', company: true, panels: [['quote', 8, 'm'], ['tearn', 4, 'm'], ['value', 6, 'm'], ['fin', 6, 'm'], ['cnews', 6, 's'], ['own', 6, 'm'], ['vol', 6, 'm'], ['gex', 6, 'm'], ['biz', 12, 'm']] },
 };
 
@@ -252,9 +252,9 @@ const KEEP = { sectors: ['period'], quote: ['span'], contracts: ['side', 'sort']
 const keepOf = (id) => [...(KEEP[id] || []), ...(PANELS[id] && PANELS[id].linked ? ['pin', 'grp'] : [])];
 // Colour-coded link groups (Pass 2, 2026-11-17): every linked panel belongs to one, Blue by default; a ticker chosen in
 // a panel changes every panel of its group and leaves the others alone. Blue is the ticker the box above the panels
-// sets (S.link, as before); Gold and Violet keep their own (S.groups). A panel kept on its own ticker (`pin`) is in no
+// sets (S.link, as before); Gold and Teal keep their own (S.groups). A panel kept on its own ticker (`pin`) is in no
 // group, as before.
-const LINK_GROUPS = [['blue', 'Blue'], ['gold', 'Gold'], ['violet', 'Violet']];
+const LINK_GROUPS = [['blue', 'Blue'], ['gold', 'Gold'], ['teal', 'Teal']];
 const GROUP_NAME = Object.fromEntries(LINK_GROUPS);
 const grpOf = (id) => (GROUP_NAME[ps(id).grp] ? ps(id).grp : 'blue');
 function load() {
@@ -900,11 +900,13 @@ function bar() {
   const layouts = lvl() === 'advanced' || EDIT;
   // at Intermediate Customize alone made a row of its own at y 288; it joins the level control's row (customizeBtn)
   if (!layouts) return '';
-  if (STOCK) return html`<div class="ws-layoutbar"><p class="ws-sub">Every panel follows ${STOCK} unless you move it to another link group.</p><button type="button" class="btn btn-sm ws-edit ${EDIT ? 'btn-primary' : ''}" data-ws-edit aria-pressed="${EDIT}">${EDIT ? 'Done' : 'Customize'}</button></div>${EDIT ? editBar(hidden) : ''}`;
+  // one Customize / Done toggle, on Home and on a company's panels alike
+  const toggle = html`<button type="button" class="btn btn-sm ws-edit ${EDIT ? 'btn-primary' : ''}" data-ws-edit aria-pressed="${EDIT}">${EDIT ? 'Done' : 'Customize'}</button>`;
+  if (STOCK) return html`<div class="ws-layoutbar"><p class="ws-sub">Every panel follows ${STOCK} unless you move it to another link group.</p>${toggle}</div>${EDIT ? editBar(hidden) : ''}`;
   return html`<div class="ws-layoutbar">
     ${layouts ? html`<div class="ws-presets" role="tablist" aria-label="Layout">${Object.entries(PRESETS).filter(([, p]) => !p.company).map(([k, p]) => html`<button type="button" role="tab" aria-selected="${S.preset === k}" data-ws-preset="${k}">${p.label}</button>`)}</div>
     <label class="tabsel ws-presetsel"><span class="tabsel-k">Layout</span><select data-ws-presetsel aria-label="Layout">${Object.entries(PRESETS).filter(([, p]) => !p.company).map(([k, p]) => html`<option value="${k}" ${S.preset === k ? 'selected' : ''}>${p.label}</option>`)}</select></label>` : html`<span></span>`}
-    <button type="button" class="btn btn-sm ws-edit ${EDIT ? 'btn-primary' : ''}" data-ws-edit aria-pressed="${EDIT}">${EDIT ? 'Done' : 'Customize'}</button>
+    ${toggle}
   </div>
   ${EDIT ? editBar(hidden) : ''}
 `;
@@ -959,7 +961,7 @@ function openNamed(name) {
   S.layouts.mine = got; S.custom.mine = true; S.preset = 'mine';
   ((l.layout || {}).panels || []).forEach((x) => { if (!PANELS[x.id] || !PANELS[x.id].linked) return; if (x.grp === 'none') return; if (GROUP_NAME[x.grp]) ps(x.id).grp = x.grp; });
   const g = (l.layout || {}).groups || {};
-  ['gold', 'violet'].forEach((k) => { if (typeof g[k] === 'string') S.groups[k] = g[k]; });
+  ['gold', 'teal'].forEach((k) => { if (typeof g[k] === 'string') S.groups[k] = g[k]; });
   save(); paintAll();
   if (typeof g.blue === 'string' && g.blue !== S.link) setLink(g.blue);
   toast(`${name} is open as My Desk.`);
@@ -1406,7 +1408,7 @@ function setLink(sym, grp = 'blue') {
   say(`Linked panels now follow ${sym}.`);
   provideContext(miloContext);
 }
-// A ticker chosen inside a Gold or Violet panel: that group follows it, and Blue and the rest stay as they are
+// A ticker chosen inside a Gold or Teal panel: that group follows it, and Blue and the rest stay as they are
 function setGroupLink(sym, grp) {
   if (S.groups[grp] === sym) return;
   S.groups[grp] = sym; save();
@@ -1420,7 +1422,7 @@ function setGroupLink(sym, grp) {
   say(`The ${GROUP_NAME[grp]} group now follows ${sym}; the other panels are unchanged.`);
   provideContext(miloContext);
 }
-// Move a panel to the next link group: Blue, Gold, Violet, then Blue again. It shows its new group's ticker at once.
+// Move a panel to the next link group: Blue, Gold, Teal, then Blue again. It shows its new group's ticker at once.
 function cycleGroup(id) {
   const order = LINK_GROUPS.map((x) => x[0]), was = grpOf(id), next = order[(order.indexOf(was) + 1) % order.length];
   const before = symOf(id);

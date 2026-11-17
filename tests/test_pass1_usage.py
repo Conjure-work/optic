@@ -294,4 +294,5 @@ def test_a_readers_rows_go_with_the_account_on_the_delete_account_path():
 
 def test_the_migration_is_recorded():
     assert 21 in db.applied()
-    assert db.MIGRATIONS[-1][:2] == (21, "usage_signals")
+    # Pass 2 added the named layouts after it (22); this one stays where it was
+    assert (21, "usage_signals") in [m[:2] for m in db.MIGRATIONS]
