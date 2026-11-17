@@ -196,6 +196,12 @@ function statements(sym) {
         <div class="chart-slot" data-chart="cashflow"></div>${latestBridge ? html`<p class="t-label fv-bridge-h">${Y.said(0)}: from operating cash flow to free cash flow</p><div class="chart-slot" data-chart="bridge"></div>` : ''}</figure>` : ''}
       ${hasBal ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash and debt</h3><p class="fv-take">${FV.netCashLine(bh.cash, bh.total_debt, yat, usd)}</p>
         ${key([['s1', 'Cash and equivalents'], ['s2', 'Total debt']])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}At each fiscal year end, ${ccyWords()}</p></figcaption><div class="chart-slot" data-chart="balance"></div></figure>` : ''}
+      ${shapeOk(bh) ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Balance sheet</h3><p class="fv-take">${shapeLine(bh, ysaid)}</p>
+        ${key([['s2', 'Total liabilities'], ['s1', "Shareholders' equity"]])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}At each fiscal year end, ${ccyWords()}; the bar's height is total assets</p></figcaption><div class="chart-slot" data-chart="shape"></div></figure>` : ''}
+      ${V.q && ((f.quarterly_cash || {}).operating_cash_flow || []).some(isNum) ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash flow by quarter</h3>
+        ${key([['s1', 'Operating cash flow'], ['s2', 'Capital spending, shown as cash out'], ['s3', 'Free cash flow, non-GAAP']])}<p class="fv-unit">Quarters, ${ccyWords()}</p></figcaption><div class="chart-slot" data-chart="qcash"></div></figure>` : ''}
+      ${V.q && ((f.quarterly_balance || {}).cash || []).some(isNum) ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash and debt by quarter</h3>
+        ${key([['s1', 'Cash and equivalents'], ['s2', 'Total debt']])}<p class="fv-unit">At each quarter end, ${ccyWords()}</p></figcaption><div class="chart-slot" data-chart="qbal"></div></figure>` : ''}
       ${(a.diluted_eps || []).some(isNum) ? html`<figure class="fv fv-wide" data-v2-metric=""><figcaption><h3>Per share</h3><p class="fv-take">${FV.perShareLine(a.diluted_eps, shares, labels, C.back, C.against)}</p>
         <p class="fv-unit">${unit}. Diluted EPS (GAAP) in ${ccyWords()} a share; the share count is the weighted diluted average each EPS divides by.</p></figcaption>
         <div class="fv-pair"><div><p class="t-label">Diluted EPS</p><div class="chart-slot" data-chart="eps"></div></div>${shares.some(isNum) ? html`<div><p class="t-label">Diluted shares</p><div class="chart-slot" data-chart="shares"></div></div>` : ''}</div></figure>` : ''}
@@ -216,6 +222,13 @@ function colHead(d, extra = '') {
   const sub = [d && d.short ? `to ${PER.endText(d)}` : '', extra].filter(Boolean).join(', ');
   return html`${PER.short(d)}${sub || long ? html`<small class="t-muted fin-end">${sub}${long}</small>` : ''}`;
 }
+const shapeOk = (bh) => (bh.total_liabilities || []).some(isNum) && (bh.total_equity || []).some(isNum) && !(bh.total_equity || []).some((v) => isNum(v) && v < 0);
+// The balance sheet in one sentence, from the latest fiscal year end: how much of what it holds is owed
+function shapeLine(bh, said) {
+  const l = (bh.total_liabilities || [])[0], e = (bh.total_equity || [])[0];
+  if (!isNum(l) || !isNum(e) || l + e <= 0) return '';
+  return `In ${said[0]}, ${num(l / (l + e) * 100, 0)}% of what it holds was owed (liabilities of ${usd(l)}) and ${num(e / (l + e) * 100, 0)}% belonged to shareholders (equity of ${usd(e)}).`;
+}
 function statementCharts() {
   const f = ((D.t || {}).company || {}).financials || {};
   if (!f.available) return {};
@@ -234,6 +247,13 @@ function statementCharts() {
   }
   const bh = f.balance_history || {};
   if ((bh.cash || []).some(isNum)) out.balance = (w) => groupedBars(GY, [{ name: 'Cash and equivalents', cls: 's1', values: col(bh.cash, yn) }, { name: 'Total debt', cls: 's2', values: col(bh.total_debt, yn) }], { w, h: 200, labelWidth: lw, label: 'Cash and debt at each fiscal year end', fmt: usd, note: (i) => { const k = yn - 1 - i, nc = FV.netCash((bh.cash || [])[k], (bh.total_debt || [])[k]); return nc ? `${nc.net < 0 ? 'Net debt' : 'Net cash'} ${usd(Math.abs(nc.net))}` : ''; } });
+  // the balance sheet's shape (Pass 2): what it owes and what is left for shareholders, stacked to what it holds;
+  // only when both are read from the statement and equity is not negative (a stack from zero cannot draw a deficit)
+  if (shapeOk(bh)) out.shape = (w) => stackedBars(GY, [{ name: 'Total liabilities', cls: 's2', values: col(bh.total_liabilities, yn) }, { name: "Shareholders' equity", cls: 's1', values: col(bh.total_equity, yn) }], { w, h: 210, labelWidth: lw, label: 'Total liabilities and shareholders\' equity at each fiscal year end; together they are total assets', fmt: usd });
+  // by quarter, where the feed carries the quarterly statements (Pass 2: the series the free update held back)
+  const qc = f.quarterly_cash || {}, qb = f.quarterly_balance || {};
+  if (V.q && (qc.operating_cash_flow || []).some(isNum)) out.qcash = (w) => groupedBars(G, [{ name: 'Operating cash flow', cls: 's1', values: col(qc.operating_cash_flow) }, { name: 'Capital spending', cls: 's2', values: col(qc.capital_expenditure) }, { name: 'Free cash flow', cls: 's3', values: col(qc.free_cash_flow) }], { w, h: 220, labelWidth: lw, label: 'Operating cash flow, capital spending and free cash flow by quarter', fmt: usd });
+  if (V.q && (qb.cash || []).some(isNum)) out.qbal = (w) => groupedBars(G, [{ name: 'Cash and equivalents', cls: 's1', values: col(qb.cash) }, { name: 'Total debt', cls: 's2', values: col(qb.total_debt) }], { w, h: 200, labelWidth: lw, label: 'Cash and debt at each quarter end', fmt: usd });
   if ((a.diluted_eps || []).some(isNum)) out.eps = (w) => groupedBars(G, [{ name: 'Diluted EPS', cls: 's1', values: col(a.diluted_eps) }], { w, h: 170, labelWidth: lw, label: `Diluted EPS ${V.q ? 'by quarter' : 'by fiscal year'}`, fmt: (v) => num(v, 2), axisFmt: (v) => num(v, Math.abs(v) < 1 && v !== 0 ? 2 : 1) });
   if ((a.diluted_shares || []).some(isNum)) out.shares = (w) => periodLines(G, [{ name: 'Diluted shares', cls: 's2', values: col(a.diluted_shares) }], { w, h: 170, zero: false, labelWidth: lw, label: `Diluted share count ${V.q ? 'by quarter' : 'by fiscal year'}`, fmt: (v) => compact(v), axisFmt: (v) => compact(v) });
   return out;

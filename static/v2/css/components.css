@@ -1518,4 +1518,20 @@ th .pbadge, dt .pbadge, .k .pbadge { margin-left: 6px; vertical-align: 1px; }
 
 /* Pass 2 (2026-11-17): a figure Milo quotes with its source is a reported fact, set apart from Milo's reading */
 .milo-fact { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; text-decoration-color: var(--c-ink-3); }
-.milo-key { margin-top: 8px; font-size: 13px; color: var(--c-ink-2); }
+.milo-key { margin-top: 8px; font-size: var(--t-sm); color: var(--c-ink-2); }
+
+/* Pass 2 (2026-11-17): the live dot beside a line's status: green and pulsing while live, amber while delayed, grey
+   when the market is closed. The pulse stops for readers who ask for less motion. */
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: var(--c-ink-3); }
+.live-dot.is-live { background: var(--c-up, #1f9d55); animation: live-pulse 2s ease-out infinite; }
+.live-dot.is-delayed { background: var(--c-warn, #c58a00); }
+.live-dot.is-closed { background: var(--c-ink-3); }
+@keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgba(31, 157, 85, .5); } 100% { box-shadow: 0 0 0 8px rgba(31, 157, 85, 0); } }
+@media (prefers-reduced-motion: reduce) { .live-dot.is-live { animation: none; } }
+
+/* Pass 2 (2026-11-17): analysts' price targets drawn as a range */
+.target-range { display: block; max-width: 100%; height: auto; margin: 8px 0 4px; }
+.target-range .tr-span { stroke: var(--c-ink-3); stroke-width: 4; stroke-linecap: round; }
+.target-range .tr-end, .target-range .tr-mid { stroke: var(--c-ink-2); stroke-width: 2; }
+.target-range .tr-now { fill: var(--c-accent, var(--c-ink)); stroke: var(--c-surface, #fff); stroke-width: 2; }
+.target-range .tr-l { fill: var(--c-ink-2); font: 500 var(--t-xs)/1 var(--f-label); }
