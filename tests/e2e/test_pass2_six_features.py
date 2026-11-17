@@ -64,13 +64,15 @@ def test_the_index_read_is_asked_from_the_board_and_answers_in_place(chrome, ser
                lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(BOARD)))
     try:
         page.goto(server["base"] + "/#/indices", wait_until="domcontentloaded")
-        b = page.wait_for_selector("[data-v2-sread='SPY']", timeout=30000)
+        # a locator, not a handle: the board redraws as its rows arrive, and a button found once could be gone by the
+        # click (it failed so from a clean clone in Pass 2 round two, "Element is not attached to the DOM")
+        b = page.locator("[data-v2-sread='SPY']")
+        b.wait_for(timeout=30000)
         with page.expect_response(lambda r: "/api/sectors/SPY/read" in r.url, timeout=90000) as resp:
             b.click()
         assert resp.value.status in (200, 503)
         # it answers in place with a read, or says in the shared look why there is none; never a blank or a spinner
-        page.wait_for_selector(".sread h3, .sread + .state, .state.err, .state", timeout=90000)
-        assert not page.query_selector(".sread[role='status']"), "the read is still loading"
+        page.wait_for_function("() => !document.querySelector(\".sread[role='status']\") && !!document.querySelector('.sread h3, .sread + .state, .state.err, .state')", timeout=90000)
         assert not page.errors
     finally:
         ctx.close()
