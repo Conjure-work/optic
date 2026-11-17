@@ -2544,3 +2544,5 @@ details.whose > p { margin: 4px 0 6px; }
 .ws-named label { font-size: var(--t-sm); color: var(--c-ink-2); }
 .ws-named input { width: 12em; min-height: 32px; }
 .ws-named-row { display: flex; gap: 6px; justify-content: space-between; }
+/* the saved list's own slot, so it can redraw without the name box beside it (pages/workspace.js paintNamedList) */
+.ws-named-saved { display: contents; }

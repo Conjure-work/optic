@@ -79,18 +79,24 @@ def test_the_index_read_is_asked_from_the_board_and_answers_in_place(chrome, ser
 # ------------------------------------------------------------------ 3. Export: the printable research sheet
 
 def test_the_research_sheet_exports_as_a_pdf_with_the_company_and_its_tags(chrome, server):
+    """Waits on the sheet itself. It waited on "Apple" in #main, which the Overview it came from already showed, so it
+    read the Overview when it passed and the page between the two when it failed (gauntlet, Pass 2 round one, D2)."""
     ctx, page = open_page(chrome, server, level="advanced", viewport=DESKTOP)
     route_price_history(page)
     try:
         stock(page, server)
         page.goto(server["base"] + "/#/AAPL/sheet", wait_until="domcontentloaded")
-        page.wait_for_selector("#main .page-view")
-        page.wait_for_function("() => document.querySelector('#main').textContent.includes('Apple')", timeout=30000)
+        # ready: the print button enabled and the sheet drawn, which the page does only once its figures are in
+        page.wait_for_selector("#main [data-sheet-print]:not([disabled])", timeout=60000)
+        sheet = page.locator("#main article.sheet")
+        sheet.wait_for(timeout=30000)
+        assert "AAPL" in sheet.inner_text() and "Apple" in sheet.inner_text()
+        # every figure the sheet asked for has answered, so no later redraw lands between the print and the read
+        page.wait_for_load_state("networkidle")
         page.emulate_media(media="print")
         pdf = page.pdf(format="Letter", print_background=True)
         assert pdf[:5] == b"%PDF-" and len(pdf) > 20000, "a real PDF came out of print"
-        text = page.inner_text("#main")
-        assert "AAPL" in text
+        assert "AAPL" in page.locator("#main article.sheet").inner_text(), "the sheet is what prints"
         assert not page.errors
     finally:
         ctx.close()
@@ -100,6 +106,10 @@ def test_the_research_sheet_exports_as_a_pdf_with_the_company_and_its_tags(chrom
 
 @pytest.mark.parametrize("server", [{"_HOST": "localhost"}], indirect=True)
 def test_a_passkey_is_added_in_settings_and_signs_in_on_its_own(chrome, server):
+    """Each step waits on what the page shows. Two waits were wrong before (gauntlet, Pass 2 round one, D2): Settings
+    redraws as its sections arrive, so a button found once could be gone by the click; and the sign-in page was opened
+    by changing only the address's #, in the same document, where the app still held the signed-in account and sent
+    the reader Home, so the passkey button never appeared. The cookies are cleared and the sign-in page loads afresh."""
     _, jar = make_account(server)
     ctx, page = open_page(chrome, server, level="intermediate", cookies=jar)
     try:
@@ -109,18 +119,22 @@ def test_a_passkey_is_added_in_settings_and_signs_in_on_its_own(chrome, server):
             "protocol": "ctap2", "transport": "internal", "hasResidentKey": True, "hasUserVerification": True,
             "isUserVerified": True, "automaticPresenceSimulation": True}})
         page.goto(server["base"] + "/#/settings", wait_until="domcontentloaded")
-        add = page.wait_for_selector("[data-v2-sec-arm^='passkey'], button:has-text('Add a passkey')", timeout=30000)
+        page.wait_for_selector("[data-v2-account].avatar", timeout=30000)
+        add = page.locator("[data-v2-pk-add]:not([disabled])")
+        add.wait_for(timeout=30000)
         with page.expect_response(lambda r: r.url.endswith("/passkeys/register/verify"), timeout=30000) as resp:
             add.click()
-            confirm = page.query_selector("button:has-text('Add a passkey'):not([data-v2-sec-arm])")
-            if confirm:
-                confirm.click()
         assert resp.value.status == 200, resp.value.text()
+        page.wait_for_selector("[data-v2-sec-arm^='passkey:']", timeout=30000)
         # signed out, the passkey alone signs back in
         ctx.clear_cookies()
+        page.goto("about:blank")
         page.goto(server["base"] + "/#/signin", wait_until="domcontentloaded")
+        page.wait_for_selector("form[data-v2-auth='in']", timeout=30000)
+        signin = page.locator("[data-v2-pk-signin]:not([disabled])")
+        signin.wait_for(timeout=30000)
         with page.expect_response(lambda r: r.url.endswith("/passkeys/login/verify"), timeout=30000) as resp2:
-            page.click("[data-v2-pk-signin]")
+            signin.click()
         assert resp2.value.status == 200, resp2.value.text()
         page.wait_for_selector("[data-v2-account].avatar", timeout=30000)
         assert not page.errors

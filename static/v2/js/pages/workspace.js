@@ -927,11 +927,19 @@ function editBar(hidden) {
  * why not; Reset is the layout menu's, as before. Signed out, the layout lives in this browser, and the toolbar says
  * so. The body is built so a layout can later be shared with a group (round 6). */
 let NAMED = { items: null, busy: false, failed: false };
+// The name being typed, kept apart from the box: the saved list arrives a moment after Customize opens, and redrawing
+// the bar then wiped a name typed in that moment (gauntlet, Pass 2 round one). The list now redraws in its own slot,
+// and any whole-bar redraw puts the typed name and the caret back.
+let namedDraft = '';
 function loadNamed(force = false) {
   if (!store.signedIn() || NAMED.busy || (NAMED.items && !force)) return;
   NAMED.busy = true;
   api.get('/api/layouts', { ttl: 0, force: true, timeout: 15000 }).then((r) => { NAMED = { items: (r && r.layouts) || [], busy: false, failed: false }; }, () => { NAMED = { items: [], busy: false, failed: true }; })
-    .finally(() => { if (live && EDIT) paintAll(); });
+    .finally(() => { if (live && EDIT) paintNamedList(); });
+}
+function paintNamedList() {
+  const slot = root && root.querySelector('[data-ws-named-saved]');
+  if (slot) draw(slot, namedList()); else paintAll();
 }
 function layoutBody() {
   return { panels: layout().map((x) => Object.assign({ id: x.id, span: x.span, h: x.h || 'm', hidden: !!x.hidden }, PANELS[x.id] && PANELS[x.id].linked ? { grp: ps(x.id).pin ? 'none' : grpOf(x.id) } : {})),
@@ -940,9 +948,12 @@ function layoutBody() {
 function namedLayouts() {
   if (!store.signedIn()) return html`<p class="ws-sub ws-named-note">Sign in to name a layout and keep it on your account; until then it is kept in this browser.</p>`;
   loadNamed();
+  return html`<form class="ws-named" data-ws-named><label for="ws-named-name">Save this layout as</label><input id="ws-named-name" name="name" maxlength="40" required placeholder="Earnings week" autocomplete="off" value="${namedDraft}"><button type="submit" class="btn btn-sm">Save to my account</button></form>
+    <div class="ws-named-saved" data-ws-named-saved>${namedList()}</div>`;
+}
+function namedList() {
   const list = NAMED.items || [];
-  return html`<form class="ws-named" data-ws-named><label for="ws-named-name">Save this layout as</label><input id="ws-named-name" name="name" maxlength="40" required placeholder="Earnings week" autocomplete="off"><button type="submit" class="btn btn-sm">Save to my account</button></form>
-    ${list.length ? html`<details class="ws-menu menu ws-named-list"><summary class="btn btn-sm">Saved layouts (${list.length})</summary><div class="ws-menu-body">${list.map((l) => html`<div class="ws-named-row"><button type="button" data-ws-open-named="${l.name}">Open ${l.name}</button><button type="button" class="ws-named-del" data-ws-del-named="${l.name}" aria-label="Delete the saved layout ${l.name}">Delete</button></div>`)}</div></details>`
+  return html`${list.length ? html`<details class="ws-menu menu ws-named-list"><summary class="btn btn-sm">Saved layouts (${list.length})</summary><div class="ws-menu-body">${list.map((l) => html`<div class="ws-named-row"><button type="button" data-ws-open-named="${l.name}">Open ${l.name}</button><button type="button" class="ws-named-del" data-ws-del-named="${l.name}" aria-label="Delete the saved layout ${l.name}">Delete</button></div>`)}</div></details>`
       : NAMED.failed ? html`<span class="ws-sub">Your saved layouts did not load.</span>` : ''}`;
 }
 async function saveNamed(name) {
@@ -951,6 +962,7 @@ async function saveNamed(name) {
   try {
     const r = await api.put(`/api/layouts/${encodeURIComponent(name)}`, { layout: layoutBody() }, { timeout: 15000 });
     NAMED = { items: r.layouts || [], busy: false, failed: false };
+    namedDraft = '';
     toast(r.replaced ? `${r.name} is updated on your account.` : `${r.name} is saved on your account. Open it from any browser.`);
     if (live && EDIT) paintAll();
   } catch (e) { toast(e && e.message && e.kind !== 'server' ? e.message : api.explain(e, 'Saving the layout'), { kind: 'bad' }); }
@@ -1088,6 +1100,8 @@ function paintAll() {
   const ses = ((DATA.indices || {}).session) || {};
   // Customize is Intermediate's and Advanced's: at Beginner Home is the level's panels and nothing to arrange
   const showBar = level !== 'beginner' || EDIT;
+  const naming = document.activeElement && document.activeElement.id === 'ws-named-name' && root.contains(document.activeElement) ? document.activeElement : null;
+  const caret = naming ? [naming.selectionStart, naming.selectionEnd] : null;
   draw(root, html`<div class="ws-page" data-v2-level-now="${level}">
     <header class="ws-pagehead page-lead"><h1 class="t-h2" tabindex="-1">${hello()}</h1>
       <div class="ws-dateline"><p class="ws-sub" id="ws-date">${etDate(ses.now_et)}${ses.label ? `. ${clean(ses.label)}.` : ''}</p>${level === 'intermediate' && !EDIT ? html`<button type="button" class="btn btn-sm btn-quiet ws-edit ws-edit-lone" data-ws-edit aria-pressed="false">Customize</button>` : ''}${levelControl({ id: 'home-lc' })}</div></header>
@@ -1097,6 +1111,7 @@ function paintAll() {
     ${showBar ? bar() : ''}
     <div class="ws-grid ${EDIT ? 'is-editing' : 'is-locked'}">${shown.length ? shown.map((x, i) => html`${!EDIT && level === 'advanced' && i === shown.findIndex((y) => PANELS[y.id].linked) ? linkRow() : ''}${panelShell(x, i, shown.length)}`) : html`<p class="ws-note">Every panel is hidden. Use Add panel, or Reset.</p>`}</div>
     ${moreList(leftOut(), { heading: 'More on Home', screen: 'home' })}</div>`);
+  if (naming) { const box = root.querySelector('#ws-named-name'); if (box) { box.focus({ preventScroll: true }); try { box.setSelectionRange(caret[0], caret[1]); } catch (e) { /* not a text box */ } } }
   shown.forEach((x) => { if (DATA[x.id] !== undefined || ERR[x.id]) paintBody(x.id); if (!folded(x.id)) loadPanel(x.id, { quiet: DATA[x.id] !== undefined }); });
   fillRows();
   provideContext(miloContext);
@@ -1617,6 +1632,7 @@ function wire() {
     if (e.target.matches('[data-ws-presetsel]')) { const k = e.target.value; if (k === 'mine' && !S.layouts.mine.some((x) => !x.hidden)) S.layouts.mine = JSON.parse(JSON.stringify(S.layouts.market)); S.preset = k; save(); paintAll(); say(`${PRESETS[S.preset].label} layout.`); const again = root.querySelector('[data-ws-presetsel]'); if (again && matchMedia('(pointer: fine)').matches) again.focus(); }   // iOS reopens a select's menu on focus
   });
   // the box takes a ticker or a name (core/resolve.js); one that names nothing is said, where it used to do nothing
+  root.addEventListener('input', (e) => { if (e.target.id === 'ws-named-name') namedDraft = e.target.value; });
   root.addEventListener('submit', async (e) => {
     const nf = e.target.closest('[data-ws-named]'); if (nf) { e.preventDefault(); saveNamed((nf.elements.name || {}).value); return; }
     const f = e.target.closest('[data-ws-linkform]'); if (!f) return; e.preventDefault();
