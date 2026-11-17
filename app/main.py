@@ -9252,6 +9252,8 @@ async def research(request: Request,
 app.include_router(auth_routes.router)
 app.include_router(account_mod.router)
 app.include_router(library_mod.router)
+from . import layouts as layouts_mod  # noqa: E402 - named layouts on the account (Pass 2)
+app.include_router(layouts_mod.router)
 app.include_router(valuation_store.router)
 app.include_router(billing_mod.router)
 app.include_router(brokerage_routes.router)

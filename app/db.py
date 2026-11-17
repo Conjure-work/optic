@@ -1000,6 +1000,28 @@ MIGRATION_21 = [
 ]
 
 
+# Named workspace layouts kept on the account (Pass 2, 2026-11-17). `owner_kind` and `owner_id` say whose a layout is:
+# today always ('user', the user's id); the organization round (round 6) adds ('org', ...) for layouts shared with a
+# group, without a second table. The body is the workspace's own JSON (panels, spans, heights, link groups), checked
+# and capped by app/layouts.py before it is written.
+MIGRATION_22 = [
+    """
+    CREATE TABLE IF NOT EXISTS workspace_layouts (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        owner_kind  TEXT NOT NULL DEFAULT 'user' CHECK (owner_kind IN ('user', 'org')),
+        owner_id    TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        UNIQUE (owner_kind, owner_id, name)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS workspace_layouts_user ON workspace_layouts (user_id, updated_at)",
+]
+
+
 MIGRATIONS: List[Tuple[int, str, List[str]]] = [
     (1, "accounts", MIGRATION_1),
     (2, "oauth_pkce", MIGRATION_2),
@@ -1022,6 +1044,7 @@ MIGRATIONS: List[Tuple[int, str, List[str]]] = [
     (19, "knowledge_level", MIGRATION_19),
     (20, "research_library", MIGRATION_20),
     (21, "usage_signals", MIGRATION_21),
+    (22, "workspace_layouts", MIGRATION_22),
 ]
 
 

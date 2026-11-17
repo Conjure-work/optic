@@ -11,6 +11,7 @@
 import { $, $$, html, raw, render as draw, announce } from '../core/dom.js';
 import * as api from '../core/api.js';
 import * as store from '../core/store.js';
+import * as LIB from '../core/library.js';
 import * as prefs from '../core/prefs.js';
 import { num, signed, money, compact, dir, isNum, ago, clean, shortDate, longDate, capFirst, plural } from '../core/format.js';
 import * as RP from '../core/reports.js';
@@ -59,13 +60,16 @@ export const PRESETS = {
   // Long-Term Investing: the business, its valuation, its financial trends, who owns it, what is happening.
   longterm: { label: 'Long-Term Investing', panels: [['quote', 8, 'm'], ['watch', 4, 's'], ['biz', 6, 'm'], ['value', 6, 'm'], ['fin', 6, 'm'], ['own', 6, 'm'], ['cnews', 12, 's'], ['portfolio', 12, 'm']] },
   mine: { label: 'My Desk', panels: null },     // the reader's own; starts as a copy of Market Overview
+  // A company's panels (Pass 2, #/SYM/workspace): Home's grid on the stock page, every panel following that company
+  // in the Blue group; Gold and Violet still work for a second or third ticker beside it. Not one of Home's tabs.
+  stock: { label: 'Company panels', company: true, panels: [['quote', 8, 'm'], ['tearn', 4, 'm'], ['value', 6, 'm'], ['fin', 6, 'm'], ['cnews', 6, 's'], ['own', 6, 'm'], ['vol', 6, 'm'], ['gex', 6, 'm'], ['biz', 12, 'm']] },
 };
 
 // Open on a phone without asking: what a reader checks first. The rest fold to
 // their title and one line, and load only when opened.
 // The visual update (2026-11-11) opens the heat map, the Desk's bottom line and the market panels' figures on a phone too,
 // as the confirmed prototype's phone render draws them: each is a picture and a line, not a list to scroll.
-const ESSENTIAL = { market: ['indices', 'regime', 'sentiment', 'expected', 'sectors', 'desk', 'quote', 'watch'], options: ['quote', 'contracts', 'vol'], longterm: ['quote', 'biz', 'value'], mine: ['indices', 'regime', 'sentiment', 'expected', 'sectors', 'desk', 'quote', 'watch'] };
+const ESSENTIAL = { stock: ['quote', 'tearn', 'value'], market: ['indices', 'regime', 'sentiment', 'expected', 'sectors', 'desk', 'quote', 'watch'], options: ['quote', 'contracts', 'vol'], longterm: ['quote', 'biz', 'value'], mine: ['indices', 'regime', 'sentiment', 'expected', 'sectors', 'desk', 'quote', 'watch'] };
 const PHONE = '(max-width: 860px)';
 const isPhone = () => { try { return matchMedia(PHONE).matches; } catch (e) { return false; } };
 const folded = (id) => isPhone() && ((S.fold[S.preset] || {})[id] ?? !(ESSENTIAL[S.preset] || []).includes(id));
@@ -196,7 +200,7 @@ const ownLayout = () => S.preset !== 'market' || !!S.custom[S.preset];
 /** The panels Home shows at this level, in order, with any the reader opened by Show more after them. */
 function shownPanels() {
   const level = lvl();
-  if (level === 'advanced' || EDIT || (level === 'intermediate' && ownLayout())) return layout().filter((x) => !x.hidden);
+  if (STOCK || level === 'advanced' || EDIT || (level === 'intermediate' && ownLayout())) return layout().filter((x) => !x.hidden);
   const base = (LEVEL_PANELS[level] || PRESETS.market.panels).map(([id, span, h]) => ({ id, span, h, hidden: false }));
   const have = new Set(base.map((x) => x.id));
   const extra = OPEN.list().filter((id) => PANELS[id] && !have.has(id)).map((id) => ({ id, span: PANELS[id].span || 6, h: 'm', hidden: false, opened: true }));
@@ -205,7 +209,7 @@ function shownPanels() {
 /** The panels this level leaves out (each listed with Show more), never the optional ones with nothing to show. */
 function leftOut() {
   const level = lvl();
-  if (level === 'advanced' || EDIT || (level === 'intermediate' && ownLayout())) return [];
+  if (STOCK || level === 'advanced' || EDIT || (level === 'intermediate' && ownLayout())) return [];
   const shown = new Set(shownPanels().map((x) => x.id));
   // the market layout's panels first, then the company and options ones the Advanced layouts add
   const order = [...PRESETS.market.panels.map((x) => x[0]), ...Object.keys(PANELS)];
@@ -245,11 +249,18 @@ function standard(list, preset) {
 // sort, a calendar's impact, an economy series). Per-ticker ones (an expiry, implied moves) are not kept.
 const KEEP = { sectors: ['period'], quote: ['span'], contracts: ['side', 'sort'], calendar: ['imp'], economy: ['group', 'code'], priority: ['filter'] };
 // a linked panel the reader unlinked keeps its own ticker (`pin`, 2026-10-24), kept with the panel's other settings
-const keepOf = (id) => [...(KEEP[id] || []), ...(PANELS[id] && PANELS[id].linked ? ['pin'] : [])];
+const keepOf = (id) => [...(KEEP[id] || []), ...(PANELS[id] && PANELS[id].linked ? ['pin', 'grp'] : [])];
+// Colour-coded link groups (Pass 2, 2026-11-17): every linked panel belongs to one, Blue by default; a ticker chosen in
+// a panel changes every panel of its group and leaves the others alone. Blue is the ticker the box above the panels
+// sets (S.link, as before); Gold and Violet keep their own (S.groups). A panel kept on its own ticker (`pin`) is in no
+// group, as before.
+const LINK_GROUPS = [['blue', 'Blue'], ['gold', 'Gold'], ['violet', 'Violet']];
+const GROUP_NAME = Object.fromEntries(LINK_GROUPS);
+const grpOf = (id) => (GROUP_NAME[ps(id).grp] ? ps(id).grp : 'blue');
 function load() {
   let v = null;
   try { v = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { v = null; }
-  S = { v: VERSION, preset: 'market', layouts: {}, custom: {}, locked: false, link: '', linkChosen: false, fold: {}, settings: {} };
+  S = { v: VERSION, preset: 'market', layouts: {}, custom: {}, locked: false, link: '', linkChosen: false, fold: {}, settings: {}, groups: {} };
   if (v && typeof v === 'object') {
     // Any earlier version with a readable shape carries over: the folds, My Desk and every layout the reader
     // changed (before 2026-10-20 a version change kept only My Desk and the link). The ticker in the linked panels
@@ -257,6 +268,7 @@ function load() {
     // company someone opened, which Home then showed on every visit ("Follows INTC" at the investor demo).
     if (typeof v.link === 'string' && v.linkChosen === true) { S.link = v.link; S.linkChosen = true; }
     if (v.fold && typeof v.fold === 'object') S.fold = v.fold;
+    if (v.groups && typeof v.groups === 'object') Object.entries(v.groups).forEach(([g, sym]) => { if (g !== 'blue' && GROUP_NAME[g] && typeof sym === 'string' && /^[A-Z0-9.^=-]{1,12}$/.test(sym)) S.groups[g] = sym; });
     if (v.settings && typeof v.settings === 'object') S.settings = v.settings;
     S.locked = !!v.locked;
     S.preset = PRESETS[v.preset] ? v.preset : 'market';
@@ -281,7 +293,8 @@ function load() {
 function save() {
   S.settings = {};
   Object.keys(PANELS).forEach((id) => { const keys = keepOf(id); if (PS[id] && keys.length) S.settings[id] = Object.fromEntries(keys.filter((k) => k in PS[id] && PS[id][k] !== undefined).map((k) => [k, PS[id][k]])); });
-  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* private mode: the layout lasts this visit */ }
+  const out = STOCK && HOME ? Object.assign({}, S, { preset: HOME.preset, link: HOME.link, linkChosen: HOME.linkChosen }) : S;
+  try { localStorage.setItem(KEY, JSON.stringify(out)); } catch (e) { /* private mode: the layout lasts this visit */ }
 }
 const layout = () => S.layouts[S.preset];
 
@@ -386,7 +399,9 @@ export const PANELS = {
     body: (d) => {
       const md = (d || {}).morning_desk;
       if (!md || !md.available) return html`<p class="ws-note">${clean((md && md.reason) || 'No Desk edition is available right now.')}</p>`;
-      return deskBody(md);   // Classic's Desk in full (parity B8.1), in pages/home.js
+      // Classic's Desk in full (parity B8.1, pages/home.js), with its right side (Pass 2): what it is built from,
+      // the reader's saved research, and questions for Milo, beside the edition rather than under it
+      return html`<div class="desk-grid"><div class="desk-main">${deskBody(md)}</div>${deskSide(md, d)}</div>`;
     },
     // the time the shown words were written (a model's) or compiled (the rules'), not when the page was assembled (H-2)
     foot: (d) => { const md = (d || {}).morning_desk || {}, written = md.voice === 'written' && md.written_at; return { source: 'Optic Desk', at: written ? md.written_at : (d || {}).generated_at, verb: written ? 'Written' : 'Compiled' }; },
@@ -868,13 +883,16 @@ export const PANEL_WAIT = 10000, BACKOFF = [5000, 15000, 45000], BUILD_POLLS = 1
 const LATE = {}, INFLIGHT = {}, TRIES = {}, AUTO = {}, POLLS = {};
 const ps = (id) => (PS[id] || (PS[id] = JSON.parse(JSON.stringify(PANELS[id].state || {}))));
 /** The ticker a panel shows: its own when the reader unlinked it, else the linked one (S.link). */
-const symOf = (id) => (PANELS[id] && PANELS[id].linked && ps(id).pin) || S.link;
+const symOf = (id) => (PANELS[id] && PANELS[id].linked && ps(id).pin) || (PANELS[id] && PANELS[id].linked && grpOf(id) !== 'blue' && S.groups[grpOf(id)]) || S.link;
 const isNew = () => !store.allSymbols().length && !(DATA.portfolio && !DATA.portfolio.absent);
 
 // Three levels, each in its own place (owner, 2026-10-19): the sidebar holds destinations; this row holds
 // Home's layouts, with Customize at its right; the toolbar under it holds the linked ticker, or, while
 // customizing, the editing actions. Normal Home shows no editing controls at all.
 let EDIT = false;
+// The company mode (Pass 2): the symbol the page is about, or null on Home. Its link and layout choice are this
+// page's and are never written over Home's (save() keeps Home's), so leaving it leaves Home as it was.
+let STOCK = null, HOME = null;
 function bar() {
   const hidden = layout().filter((x) => x.hidden && !(PANELS[x.id].optional && (DATA[x.id] || {}).absent));
   const recent = [...new Set([...(store.recent() || []), ...((store.activeList() || {}).symbols || [])])].filter((x) => x !== S.link).slice(0, 5);
@@ -882,20 +900,79 @@ function bar() {
   const layouts = lvl() === 'advanced' || EDIT;
   // at Intermediate Customize alone made a row of its own at y 288; it joins the level control's row (customizeBtn)
   if (!layouts) return '';
+  if (STOCK) return html`<div class="ws-layoutbar"><p class="ws-sub">Every panel follows ${STOCK} unless you move it to another link group.</p><button type="button" class="btn btn-sm ws-edit ${EDIT ? 'btn-primary' : ''}" data-ws-edit aria-pressed="${EDIT}">${EDIT ? 'Done' : 'Customize'}</button></div>${EDIT ? editBar(hidden) : ''}`;
   return html`<div class="ws-layoutbar">
-    ${layouts ? html`<div class="ws-presets" role="tablist" aria-label="Layout">${Object.entries(PRESETS).map(([k, p]) => html`<button type="button" role="tab" aria-selected="${S.preset === k}" data-ws-preset="${k}">${p.label}</button>`)}</div>
-    <label class="tabsel ws-presetsel"><span class="tabsel-k">Layout</span><select data-ws-presetsel aria-label="Layout">${Object.entries(PRESETS).map(([k, p]) => html`<option value="${k}" ${S.preset === k ? 'selected' : ''}>${p.label}</option>`)}</select></label>` : html`<span></span>`}
+    ${layouts ? html`<div class="ws-presets" role="tablist" aria-label="Layout">${Object.entries(PRESETS).filter(([, p]) => !p.company).map(([k, p]) => html`<button type="button" role="tab" aria-selected="${S.preset === k}" data-ws-preset="${k}">${p.label}</button>`)}</div>
+    <label class="tabsel ws-presetsel"><span class="tabsel-k">Layout</span><select data-ws-presetsel aria-label="Layout">${Object.entries(PRESETS).filter(([, p]) => !p.company).map(([k, p]) => html`<option value="${k}" ${S.preset === k ? 'selected' : ''}>${p.label}</option>`)}</select></label>` : html`<span></span>`}
     <button type="button" class="btn btn-sm ws-edit ${EDIT ? 'btn-primary' : ''}" data-ws-edit aria-pressed="${EDIT}">${EDIT ? 'Done' : 'Customize'}</button>
   </div>
-  ${EDIT ? html`<div class="ws-toolbar ws-editbar" role="group" aria-label="Customize ${PRESETS[S.preset].label}">
-      <p class="ws-sub">Customizing ${PRESETS[S.preset].label}. ${isPhone() ? 'Use a panel\'s menu to move or hide it. Order and hidden panels are shared with larger screens; heights and folds are this size\'s own.' : 'Drag a panel by its grip or its corner, or use its menu.'}</p>
-      <details class="ws-add menu"><summary class="btn btn-sm">Add panel${hidden.length ? ` (${hidden.length})` : ''}</summary><div class="ws-menu-body">${hidden.length ? hidden.map((x) => html`<button type="button" data-ws-show="${x.id}">${PANELS[x.id].title}</button>`) : html`<p class="ws-rule">Every panel is showing.</p>`}</div></details>
-      ${S.preset === 'mine' ? '' : html`<button type="button" class="btn btn-sm" data-ws-save>Save as My Desk</button>`}
-      <details class="ws-menu menu"><summary class="ws-hbtn" aria-label="More layout actions">${icon('more')}</summary><div class="ws-menu-body"><button type="button" data-ws-reset>Reset ${PRESETS[S.preset].label} to its standard panels</button></div></details>
-    </div>`
-  : ''}
+  ${EDIT ? editBar(hidden) : ''}
 `;
 }
+// the editing actions while customizing, Home's layouts and the company page's alike
+function editBar(hidden) {
+  return html`<div class="ws-toolbar ws-editbar" role="group" aria-label="Customize ${PRESETS[S.preset].label}">
+      <p class="ws-sub">Customizing ${PRESETS[S.preset].label}. ${isPhone() ? 'Use a panel\'s menu to move or hide it. Order and hidden panels are shared with larger screens; heights and folds are this size\'s own.' : 'Drag a panel by its grip or its corner, or use its menu.'}</p>
+      <details class="ws-add menu"><summary class="btn btn-sm">Add panel${hidden.length ? ` (${hidden.length})` : ''}</summary><div class="ws-menu-body">${hidden.length ? hidden.map((x) => html`<button type="button" data-ws-show="${x.id}">${PANELS[x.id].title}</button>`) : html`<p class="ws-rule">Every panel is showing.</p>`}</div></details>
+      ${S.preset === 'mine' || STOCK ? '' : html`<button type="button" class="btn btn-sm" data-ws-save>Save as My Desk</button>`}
+      ${STOCK ? '' : namedLayouts()}
+      <details class="ws-menu menu"><summary class="ws-hbtn" aria-label="More layout actions">${icon('more')}</summary><div class="ws-menu-body"><button type="button" data-ws-reset>Reset ${PRESETS[S.preset].label} to its standard panels</button></div></details>
+    </div>`;
+}
+/* ---------------- named layouts on the account (Pass 2, 2026-11-17) ----------------
+ * A reader signed in can name the layout on screen and keep it on the account (app/layouts.py), then open it from
+ * any browser, where it becomes My Desk with its panels, sizes and link groups. Each save says that it landed, or
+ * why not; Reset is the layout menu's, as before. Signed out, the layout lives in this browser, and the toolbar says
+ * so. The body is built so a layout can later be shared with a group (round 6). */
+let NAMED = { items: null, busy: false, failed: false };
+function loadNamed(force = false) {
+  if (!store.signedIn() || NAMED.busy || (NAMED.items && !force)) return;
+  NAMED.busy = true;
+  api.get('/api/layouts', { ttl: 0, force: true, timeout: 15000 }).then((r) => { NAMED = { items: (r && r.layouts) || [], busy: false, failed: false }; }, () => { NAMED = { items: [], busy: false, failed: true }; })
+    .finally(() => { if (live && EDIT) paintAll(); });
+}
+function layoutBody() {
+  return { panels: layout().map((x) => Object.assign({ id: x.id, span: x.span, h: x.h || 'm', hidden: !!x.hidden }, PANELS[x.id] && PANELS[x.id].linked ? { grp: ps(x.id).pin ? 'none' : grpOf(x.id) } : {})),
+    groups: Object.assign({ blue: S.link }, S.groups) };
+}
+function namedLayouts() {
+  if (!store.signedIn()) return html`<p class="ws-sub ws-named-note">Sign in to name a layout and keep it on your account; until then it is kept in this browser.</p>`;
+  loadNamed();
+  const list = NAMED.items || [];
+  return html`<form class="ws-named" data-ws-named><label for="ws-named-name">Save this layout as</label><input id="ws-named-name" name="name" maxlength="40" required placeholder="Earnings week" autocomplete="off"><button type="submit" class="btn btn-sm">Save to my account</button></form>
+    ${list.length ? html`<details class="ws-menu menu ws-named-list"><summary class="btn btn-sm">Saved layouts (${list.length})</summary><div class="ws-menu-body">${list.map((l) => html`<div class="ws-named-row"><button type="button" data-ws-open-named="${l.name}">Open ${l.name}</button><button type="button" class="ws-named-del" data-ws-del-named="${l.name}" aria-label="Delete the saved layout ${l.name}">Delete</button></div>`)}</div></details>`
+      : NAMED.failed ? html`<span class="ws-sub">Your saved layouts did not load.</span>` : ''}`;
+}
+async function saveNamed(name) {
+  name = String(name || '').replace(/\s+/g, ' ').trim();
+  if (!name) return;
+  try {
+    const r = await api.put(`/api/layouts/${encodeURIComponent(name)}`, { layout: layoutBody() }, { timeout: 15000 });
+    NAMED = { items: r.layouts || [], busy: false, failed: false };
+    toast(r.replaced ? `${r.name} is updated on your account.` : `${r.name} is saved on your account. Open it from any browser.`);
+    if (live && EDIT) paintAll();
+  } catch (e) { toast(e && e.message && e.kind !== 'server' ? e.message : api.explain(e, 'Saving the layout'), { kind: 'bad' }); }
+}
+function openNamed(name) {
+  const l = (NAMED.items || []).find((x) => x.name === name); if (!l) return;
+  const got = norm((l.layout || {}).panels || []); if (!got) { toast(`${name} could not be opened: its panels are not ones this version has.`, { kind: 'bad' }); return; }
+  S.layouts.mine = got; S.custom.mine = true; S.preset = 'mine';
+  ((l.layout || {}).panels || []).forEach((x) => { if (!PANELS[x.id] || !PANELS[x.id].linked) return; if (x.grp === 'none') return; if (GROUP_NAME[x.grp]) ps(x.id).grp = x.grp; });
+  const g = (l.layout || {}).groups || {};
+  ['gold', 'violet'].forEach((k) => { if (typeof g[k] === 'string') S.groups[k] = g[k]; });
+  save(); paintAll();
+  if (typeof g.blue === 'string' && g.blue !== S.link) setLink(g.blue);
+  toast(`${name} is open as My Desk.`);
+}
+async function deleteNamed(name) {
+  try {
+    const r = await api.del(`/api/layouts/${encodeURIComponent(name)}`, { timeout: 15000 });
+    NAMED = { items: r.layouts || [], busy: false, failed: false };
+    toast(`${name} is deleted from your account.`);
+    if (live && EDIT) paintAll();
+  } catch (e) { toast(api.explain(e, 'Deleting the layout'), { kind: 'bad' }); }
+}
+
 // "Company or fund shown in linked panels", placed right above the first panel that follows it, so what it changes
 // is in view and the market-wide panels above it plainly do not (beginner brief item 3: "Linked ticker" and
 // "Link" asked a newcomer to understand dashboard linking before using Home)
@@ -911,7 +988,10 @@ function linkRow() {
 // A company panel names the ticker it shows, as plain text where a market panel names its scope. The "Follows
 // <ticker>" button that stood here is gone (Phase 03, 2026-10-29: the investor demo's "Follows INTC"); keeping a
 // panel on its own ticker is in the panel's menu.
-const linkLabel = (id) => html`<span class="ws-scope" data-ws-sym="${id}">${ps(id).pin ? `${ps(id).pin}, kept here` : S.link}</span>`;
+const linkLabel = (id) => {
+  const g = grpOf(id), pinned = !!ps(id).pin;
+  return html`<span class="ws-scope" data-ws-sym="${id}">${pinned ? '' : html`<button type="button" class="ws-grp is-${g}" data-ws-grp="${id}" aria-label="${(PANELS[id] || {}).title} is in the ${GROUP_NAME[g]} link group. Press to move it to the next group" title="${GROUP_NAME[g]} group"></button>`}${pinned ? `${ps(id).pin}, kept here` : symOf(id)}</span>`;
+};
 const pinWords = (id) => (ps(id).pin ? `Show ${S.link} here again, the company chosen above` : `Keep ${symOf(id)} here when the company above changes`);
 function panelShell(x, i, n) {
   const p = PANELS[x.id], locked = !EDIT, link = symOf(x.id), fold = folded(x.id), P = ps(x.id);
@@ -1001,6 +1081,7 @@ function fillRows() {
 }
 
 function paintAll() {
+  if (STOCK) { paintStock(); return; }
   const shown = shownPanels(), level = lvl();
   const ses = ((DATA.indices || {}).session) || {};
   // Customize is Intermediate's and Advanced's: at Beginner Home is the level's panels and nothing to arrange
@@ -1018,6 +1099,17 @@ function paintAll() {
   fillRows();
   provideContext(miloContext);
   mountFeature(); loadFeature();
+}
+
+function paintStock() {
+  const shown = shownPanels();
+  draw(root, html`<div class="ws-page ws-stock" data-v2-level-now="${lvl()}">
+    <header class="ws-pagehead page-lead"><h1 class="t-h2" tabindex="-1">${STOCK} panels</h1><p class="ws-sub"><a class="textlink" href="#/${encodeURIComponent(STOCK)}">${STOCK}'s stock page</a></p></header>
+    ${bar()}
+    <div class="ws-grid ${EDIT ? 'is-editing' : 'is-locked'}">${shown.map((x, i) => panelShell(x, i, shown.length))}</div></div>`);
+  shown.forEach((x) => { if (DATA[x.id] !== undefined || ERR[x.id]) paintBody(x.id); if (!folded(x.id)) loadPanel(x.id, { quiet: DATA[x.id] !== undefined }); });
+  fillRows();
+  provideContext(miloContext);
 }
 
 /* ---------------- the day's one figure (visual hierarchy review, 2026-11-10, change 1) ----------------
@@ -1130,6 +1222,40 @@ function deskTrim(d) {
   if (!md || !md.available) return html`<p class="ws-note">${clean((md && md.reason) || 'No Desk edition is available right now.')}</p>`;
   // its bottom line in two sentences below Advanced (visual update, 2026-11-11, change 8); The whole desk opens the rest
   return deskGlance(md, moreButton('desk:full', 'Optic Desk', { label: 'The whole desk' }));
+}
+
+/* ---------------- the Desk's right side (Pass 2, 2026-11-17) ----------------
+ * Sources: what the edition is built from, each named, the stories linked to their publishers. Saved research: the
+ * reader's three latest, from the account (signed out: where saving lives). Ask Milo: questions about this edition,
+ * pressed into Milo's box with the edition as context; nothing is sent until the reader presses Send. */
+let DESK_SAVED = { at: 0, items: null, busy: false };
+function loadDeskSaved() {
+  if (!store.signedIn() || DESK_SAVED.busy || (DESK_SAVED.items && Date.now() - DESK_SAVED.at < 300000)) return;
+  DESK_SAVED.busy = true;
+  get('/api/library?limit=3', { ttl: 60000, timeout: 15000 }).then((r) => { DESK_SAVED = { at: Date.now(), items: (r && r.items) || [], busy: false }; }, () => { DESK_SAVED = { at: Date.now(), items: [], busy: false, failed: true }; })
+    .finally(() => { if (live && !folded('desk')) paintBody('desk'); });
+}
+function deskQuestions(md) {
+  const out = ['What would change today\'s bottom line?'];
+  (md.scenarios || []).slice(0, 1).forEach((x) => { if (x && x.label) out.push(`What happens to my names if ${clean(x.label).replace(/\.$/, '').toLowerCase()}?`); });
+  if ((md.calendar || []).length) out.push('Which of today\'s reports matters most, and why?');
+  return out.slice(0, 3);
+}
+function deskSide(md, d) {
+  loadDeskSaved();
+  const stories = (md.stories || []).filter((x) => x && (x.title || x.headline)).slice(0, 3);
+  const built = [md.tape ? 'Index futures, cash indices, the VIX, the 10-year yield, crude, gold and the dollar: Yahoo Finance, delayed' : '',
+    md.rate_path && md.rate_path.available !== false ? 'The rate path: fed funds futures' : '', (md.releases || []).length || (md.calendar || []).length ? "Today's reports: the agencies' published calendars" : ''].filter(Boolean);
+  const saved = !store.signedIn() ? html`<p class="ws-note">Sign in to keep research on your account. <a href="#/research">Saved research</a></p>`
+    : DESK_SAVED.items === null ? html`<p class="ws-note">Reading your saved research</p>`
+      : DESK_SAVED.items.length ? html`<ul class="plain desk-saved">${DESK_SAVED.items.map((it) => { const href = LIB.routeOf(it); return html`<li>${href ? html`<a href="${href}">${clean(it.name || '')}</a>` : clean(it.name || '')} <span class="t-muted">${LIB.WORD[it.kind] || ''}</span></li>`; })}</ul><p><a class="textlink" href="#/research">All saved research</a></p>`
+        : html`<p class="ws-note">${DESK_SAVED.failed ? 'Your saved research did not load.' : 'Nothing saved yet.'} <a href="#/research">Saved research</a></p>`;
+  return html`<aside class="desk-side" aria-label="Sources, saved research and questions for Milo">
+    <section><h3 class="t-label">Built from</h3><ul class="plain desk-src">${built.map((b) => html`<li>${b}</li>`)}${stories.map((x) => html`<li>${x.url ? html`<a href="${x.url}" target="_blank" rel="noopener">${clean(x.title || x.headline)}</a>` : clean(x.title || x.headline)}${x.publisher || x.source ? html` <span class="t-muted">${clean(x.publisher || x.source)}</span>` : ''}</li>`)}</ul>
+      <p class="asof">${md.voice === 'written' && md.written_at ? `Written ${ago(md.written_at)}` : `Compiled ${ago((d || {}).generated_at || Date.now())}`}.</p></section>
+    <section><h3 class="t-label">Your saved research</h3>${saved}</section>
+    <section><h3 class="t-label">Ask Milo</h3><div class="desk-ask">${deskQuestions(md).map((q) => miloButton(q, { ask: q, cls: 'btn-sm btn-quiet' }))}</div></section>
+  </aside>`;
 }
 
 /* ---------------- the Milo prompt (2026-11-09) ----------------
@@ -1260,15 +1386,17 @@ async function loadPanel(id, { force = false, quiet = false, auto = false } = {}
 }
 
 /* ---------------- linking ---------------- */
-function setLink(sym) {
+function setLink(sym, grp = 'blue') {
   sym = String(sym || '').trim().toUpperCase().replace(/^\$/, '');
-  if (!/^[A-Z0-9.^=-]{1,12}$/.test(sym) || sym === S.link) return;
+  if (!/^[A-Z0-9.^=-]{1,12}$/.test(sym)) return;
+  if (grp !== 'blue' && GROUP_NAME[grp]) { setGroupLink(sym, grp); return; }
+  if (sym === S.link) return;
   S.link = sym; S.linkChosen = true; save();
   try { store.pushRecent(sym); } catch (e) { /* recent is a convenience */ }
   $$('[data-ws-pick]', root).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.wsPick === sym)));
   layout().filter((x) => !x.hidden && PANELS[x.id].linked).forEach((x) => { const c = $(`[data-ws-panel="${x.id}"] [data-ws-sym]`, root); if (c) { const tmp = document.createElement('div'); draw(tmp, linkLabel(x.id)); c.replaceWith(tmp.firstElementChild); } const mb = $(`[data-ws-panel="${x.id}"] .ws-menu [data-ws-pin]`, root); if (mb) mb.textContent = pinWords(x.id); });
   const inp = $('#ws-link', root); if (inp) inp.value = sym;
-  layout().filter((x) => !x.hidden && PANELS[x.id].linked && !ps(x.id).pin).forEach((x) => {
+  layout().filter((x) => !x.hidden && PANELS[x.id].linked && !ps(x.id).pin && grpOf(x.id) === 'blue').forEach((x) => {
     const p = PANELS[x.id];
     // the header's Ask Milo and the phone menu's both ask about the new ticker
     $$(`[data-ws-panel="${x.id}"] [data-v2-milo]`, root).forEach((a) => { a.dataset.v2MiloSym = sym; if (typeof p.milo === 'function') a.dataset.v2Milo = p.milo(sym); });
@@ -1277,6 +1405,32 @@ function setLink(sym) {
   });
   say(`Linked panels now follow ${sym}.`);
   provideContext(miloContext);
+}
+// A ticker chosen inside a Gold or Violet panel: that group follows it, and Blue and the rest stay as they are
+function setGroupLink(sym, grp) {
+  if (S.groups[grp] === sym) return;
+  S.groups[grp] = sym; save();
+  try { store.pushRecent(sym); } catch (e) { /* recent is a convenience */ }
+  layout().filter((x) => !x.hidden && PANELS[x.id].linked && !ps(x.id).pin && grpOf(x.id) === grp).forEach((x) => {
+    const c = $(`[data-ws-panel="${x.id}"] [data-ws-sym]`, root); if (c) { const tmp = document.createElement('div'); draw(tmp, linkLabel(x.id)); c.replaceWith(tmp.firstElementChild); }
+    $$(`[data-ws-panel="${x.id}"] [data-v2-milo]`, root).forEach((a) => { a.dataset.v2MiloSym = sym; if (typeof PANELS[x.id].milo === 'function') a.dataset.v2Milo = PANELS[x.id].milo(sym); });
+    if (folded(x.id)) { DATA[x.id] = undefined; return; }
+    loadPanel(x.id, { force: true });
+  });
+  say(`The ${GROUP_NAME[grp]} group now follows ${sym}; the other panels are unchanged.`);
+  provideContext(miloContext);
+}
+// Move a panel to the next link group: Blue, Gold, Violet, then Blue again. It shows its new group's ticker at once.
+function cycleGroup(id) {
+  const order = LINK_GROUPS.map((x) => x[0]), was = grpOf(id), next = order[(order.indexOf(was) + 1) % order.length];
+  const before = symOf(id);
+  ps(id).grp = next;
+  if (next !== 'blue' && !S.groups[next]) S.groups[next] = before;   // a new group starts on the ticker the panel shows
+  save();
+  const c = $(`[data-ws-panel="${id}"] [data-ws-sym]`, root); if (c) { const tmp = document.createElement('div'); draw(tmp, linkLabel(id)); c.replaceWith(tmp.firstElementChild); }
+  const b = $(`[data-ws-grp="${id}"]`, root); if (b) b.focus();
+  if (symOf(id) !== before && !folded(id)) loadPanel(id, { force: true });
+  say(`${PANELS[id].title} is in the ${GROUP_NAME[next]} group, showing ${symOf(id)}.`);
 }
 // one live region for the whole app (core/dom.js): a region redrawn with the page is often not read
 const say = (t) => announce(t);
@@ -1378,7 +1532,9 @@ function wire() {
     }
     if ((b = t('[data-hm-span]'))) { featSpan = b.dataset.hmSpan; paintFeature(); loadFeature(true); return; }
     if ((b = t('[data-ws-preset]'))) { if (b.dataset.wsPreset === 'mine' && !S.layouts.mine.some((x) => !x.hidden)) S.layouts.mine = JSON.parse(JSON.stringify(S.layouts.market)); S.preset = b.dataset.wsPreset; save(); paintAll(); say(`${PRESETS[S.preset].label} layout.`); return; }
-    if ((b = t('[data-ws-pick]'))) { setLink(b.dataset.wsPick); return; }
+    if ((b = t('[data-ws-grp]'))) { cycleGroup(b.dataset.wsGrp); return; }
+    // a ticker pressed inside a linked panel moves that panel's group; anywhere else, Blue (the box above the panels)
+    if ((b = t('[data-ws-pick]'))) { const sec = b.closest('[data-ws-panel]'), pid = sec && sec.dataset.wsPanel; setLink(b.dataset.wsPick, pid && PANELS[pid] && PANELS[pid].linked && !ps(pid).pin ? grpOf(pid) : 'blue'); return; }
     if ((b = t('[data-ws-fold]'))) { setFold(b.dataset.wsFold, b.getAttribute('aria-expanded') === 'true'); return; }
     const menu = e.target.closest('.ws-menu-body button'); if (menu) { const dd = menu.closest('details'); if (dd) dd.open = false; }
     if ((b = t('[data-ws-how]'))) { const id = b.dataset.wsHow, w = $(`#wsw-${id}`, root); const open = w.hidden; w.hidden = !open; $$(`[data-ws-how="${id}"]`, root).forEach((x) => x.setAttribute('aria-expanded', String(open))); if (open && menu) w.setAttribute('tabindex', '-1'), w.focus(); return; }
@@ -1434,6 +1590,8 @@ function wire() {
     }
     if (t('[data-ws-edit]')) { EDIT = !EDIT; paintAll(); say(EDIT ? `Customizing ${PRESETS[S.preset].label}.` : 'Done customizing.'); const b = $('[data-ws-edit]', root); if (b) b.focus(); return; }
     if (t('[data-ws-onboard-done]')) { try { localStorage.setItem(ONBOARD_KEY, 'done'); localStorage.setItem('optic.knowledge.asked.v1', '1'); } catch (err) { /* private mode */ } paintAll(); say('Welcome dismissed. How Optic explains things is in Settings.'); return; }
+    if ((b = t('[data-ws-open-named]'))) { openNamed(b.dataset.wsOpenNamed); return; }
+    if ((b = t('[data-ws-del-named]'))) { deleteNamed(b.dataset.wsDelNamed); return; }
     if (t('[data-ws-reset]')) {
       const k = S.preset, was = { layout: JSON.parse(JSON.stringify(layout())), fold: S.fold[k], custom: !!S.custom[k] };
       S.layouts[k] = defaults(k); S.fold[k] = {}; delete S.custom[k]; save(); paintAll();
@@ -1458,6 +1616,7 @@ function wire() {
   });
   // the box takes a ticker or a name (core/resolve.js); one that names nothing is said, where it used to do nothing
   root.addEventListener('submit', async (e) => {
+    const nf = e.target.closest('[data-ws-named]'); if (nf) { e.preventDefault(); saveNamed((nf.elements.name || {}).value); return; }
     const f = e.target.closest('[data-ws-linkform]'); if (!f) return; e.preventDefault();
     const q = String(f.link.value || '').trim(); if (!q) { f.link.focus(); return; }
     const r = await resolve(q);
@@ -1516,7 +1675,7 @@ const MARKET_PANELS = ['indices', 'regime', 'sentiment', 'expected', 'sectors', 
 // Quoted footers follow the top bar's session when it arrives or changes phase (the layout may have no
 // Indices panel to carry it).
 let sessionHooked = false;
-export async function render(main) {
+export async function render(main, route) {
   if (!sessionHooked) {
     sessionHooked = true;
     window.addEventListener('optic:session', () => { if (live && !(DATA.indices || {}).session) QUOTED.forEach((id) => { if (DATA[id] !== undefined) paintBody(id); }); });
@@ -1529,12 +1688,15 @@ export async function render(main) {
     window.addEventListener('storage', (e) => { if ((e.key === KEY || e.key === 'optic.mode.v1') && live && !EDIT) { load(); paintAll(); } });
   }
   root = main; live = true; load(); OPEN.clear();
+  STOCK = route && route.view === 'stockgrid' && route.symbol ? route.symbol : null;
+  HOME = STOCK ? { preset: S.preset, link: S.link, linkChosen: S.linkChosen } : null;
+  if (STOCK) { S.preset = 'stock'; S.link = STOCK; Object.keys(DATA).forEach((k) => { if (PANELS[k] && PANELS[k].linked) DATA[k] = undefined; }); }
   // the level, from this page's control, Settings, Milo or another tab: Home draws the new level's panels, and what
   // Show more opened closes again (it was opened past the old level)
   if (unLevel) unLevel();
   unLevel = prefs.onChange((what) => { if (!live || (what !== 'knowledge' && what !== 'knowledge-synced')) return; OPEN.clear(); paintAll(); });
   Object.keys(TRIES).forEach((k) => delete TRIES[k]); Object.keys(POLLS).forEach((k) => delete POLLS[k]);
-  document.title = 'Home, Optic';
+  document.title = STOCK ? `${STOCK} panels, Optic` : 'Home, Optic';
   wire(); paintAll();
   try { mq = matchMedia(PHONE); mq.onchange = () => { if (live) paintAll(); }; } catch (e) { mq = null; }
   try { mq2 = matchMedia('(max-width: 1100px)'); mq2.onchange = () => { if (live) fillRows(); }; } catch (e) { mq2 = null; }

@@ -129,7 +129,7 @@ function overviewActions(sym, s, mid, all) {
     ${watchButton(sym, { compact: !!s })}
     <details class="menu acts-more"><summary class="btn btn-quiet ${s}" aria-label="More actions for ${sym}">${icon('more')}</summary><div class="menu-body menu-end">
       ${mid ? html`<a href="#/alerts?symbol=${e}">Set an alert</a><a href="#/compare?t=${e}">Compare</a>${saveButton('company', keyOf('company', [sym]), { cls: 'acts-save' })}` : ''}
-      ${all ? html`<a href="#/${e}/sheet">Export research sheet</a>` : ''}
+      ${all ? html`<a href="#/${e}/sheet">Export research sheet</a><a href="#/${e}/workspace">Open as panels</a>` : ''}
       ${tickerMenu(sym, { phone: false })}</div></details>
   </div>`;
 }
