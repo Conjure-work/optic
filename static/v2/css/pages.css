@@ -1617,7 +1617,8 @@ html[data-milo="off"] .ws-ask { opacity: .55; }
 .ws-kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .ws-kv dt { font: 500 var(--t-xs)/1.2 var(--f-label); color: var(--c-ink-3); }
 .ws-kv dd { margin: 4px 0 0; font: 600 var(--t-lead)/1.15 var(--f-sans); font-variant-numeric: tabular-nums; }
-.ws-kv small { display: block; margin-top: 3px; font: 400 var(--t-xs)/1.3 var(--f-sans); color: var(--c-ink-3); }
+/* a figure's note is a second dd in its group: a dl's groups hold only dt and dd (axe definition-list, Pass 2 round two) */
+.ws-kv small, .ws-kv dd.ws-kv-note { display: block; margin-top: 3px; font: 400 var(--t-xs)/1.3 var(--f-sans); color: var(--c-ink-3); }
 
 /* sector heat map: colour carries direction and size, the figure with its arrow and sign carries the value. The tint
    runs from 14% to 55% of the chart pair since the visual update (2026-11-11; it was capped at 28%), still scaled to a

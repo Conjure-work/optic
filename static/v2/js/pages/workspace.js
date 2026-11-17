@@ -765,9 +765,9 @@ export const PANELS = {
       const vs = t.vol_surface || {}, r30 = row30(vs), iv = vs.iv30 || {}, rk = t.iv_rank || {};
       if (!vs.available && !iv.available) return html`<p class="ws-note">${optionsReason(t, link)}</p>`;
       return html`<dl class="ws-kv">
-        ${r30 ? html`<div><dt>Implied move to ${shortDate(r30.expiry)}</dt><dd>±${num(r30.straddle_move_pct, 1)}%</dd><small>${plural(r30.dte, 'day')}${r30.contains_event ? ', includes earnings' : ''}</small></div>` : ''}
-        <div><dt>Implied volatility, 30 days</dt><dd>${iv.available ? `${num(iv.iv_pct, 1)}%` : 'n/a'}</dd><small>${rk.available ? `Rank ${num(rk.rank, 0)} of 100 over a year` : 'No rank yet: history still building'}</small></div>
-        ${r30 ? html`<div><dt>Skew, ${shortDate(r30.expiry)}</dt><dd>${skewWords(r30.rr25_pts)}</dd><small>25-delta risk reversal ${signed(r30.rr25_pts, 1, ' pts')}</small></div>` : ''}</dl>
+        ${r30 ? html`<div><dt>Implied move to ${shortDate(r30.expiry)}</dt><dd>±${num(r30.straddle_move_pct, 1)}%</dd><dd class="ws-kv-note">${plural(r30.dte, 'day')}${r30.contains_event ? ', includes earnings' : ''}</dd></div>` : ''}
+        <div><dt>Implied volatility, 30 days</dt><dd>${iv.available ? `${num(iv.iv_pct, 1)}%` : 'n/a'}</dd><dd class="ws-kv-note">${rk.available ? `Rank ${num(rk.rank, 0)} of 100 over a year` : 'No rank yet: history still building'}</dd></div>
+        ${r30 ? html`<div><dt>Skew, ${shortDate(r30.expiry)}</dt><dd>${skewWords(r30.rr25_pts)}</dd><dd class="ws-kv-note">25-delta risk reversal ${signed(r30.rr25_pts, 1, ' pts')}</dd></div>` : ''}</dl>
         <p><a class="textlink" href="#/${enc(link)}/options">${link} options in full ${icon('arrow')}</a></p>`;
     },
     foot: (t) => ({ source: 'Yahoo Finance option chain; Optic\'s volatility surface', at: (t || {}).generated_at }),
@@ -782,7 +782,7 @@ export const PANELS = {
       if (g.error || !g.regime) return html`<p class="ws-note">${optionsReason(t, link)}</p>`;
       const reg = g.regime || {}, lv = g.levels || {}, w = (x) => (x && isNum(x.strike) ? html`${num(x.strike, 0)} <small>${signed(x.distance_pct, 1)}</small>` : 'n/a');
       return html`<dl class="ws-kv">
-        <div><dt>Dealer gamma</dt><dd>${capFirst(reg.state || 'n/a')}</dd><small>${reg.state === 'positive' ? 'Hedging tends to damp moves' : reg.state === 'negative' ? 'Hedging tends to extend moves' : ''}</small></div>
+        <div><dt>Dealer gamma</dt><dd>${capFirst(reg.state || 'n/a')}</dd><dd class="ws-kv-note">${reg.state === 'positive' ? 'Hedging tends to damp moves' : reg.state === 'negative' ? 'Hedging tends to extend moves' : ''}</dd></div>
         <div><dt>Call wall</dt><dd>${w(lv.call_wall)}</dd></div><div><dt>Put wall</dt><dd>${w(lv.put_wall)}</dd></div>
         <div><dt>Flip point</dt><dd>${isNum(reg.flip_point) ? num(reg.flip_point) : 'None within 12%'}</dd></div></dl>
         <p class="ws-read">${clean(reg.note || '')}</p>`;
@@ -798,10 +798,10 @@ export const PANELS = {
       if (e.not_applicable) return html`<p class="ws-note">${clean(e.reason || `${link} does not report earnings.`)}</p>`;
       const nr = e.next_report || {}, pr = e.pricing || {}, su = e.surprise || {};
       return html`<dl class="ws-kv">
-        <div><dt>Next report</dt><dd>${nr.date ? longDate(nr.date) : 'No date yet'}</dd><small>${nr.date ? `${nr.days_away} days, ${RP.dateStatus(nr)}` : ''}</small></div>
-        <div><dt>Options price for it</dt><dd>${pr.available && isNum(pr.implied_move_pct) ? `±${num(pr.implied_move_pct, 2)}%` : 'n/a'}</dd><small>${pr.available && isNum(pr.ratio) ? `${num(pr.ratio, 2)}× its usual move` : ''}</small></div>
-        <div><dt>Average report-day move</dt><dd>${isNum(pr.event_day_avg_pct) ? `±${num(pr.event_day_avg_pct, 1)}%` : 'n/a'}</dd><small>${su.quarters ? `Last ${su.quarters} reports` : ''}</small></div>
-        <div><dt>Beat rate</dt><dd>${isNum(su.beat_rate_pct) ? `${num(su.beat_rate_pct, 0)}%` : 'n/a'}</dd><small>${isNum(su.beat_count) ? `${su.beat_count} of ${su.quarters}` : ''}</small></div></dl>
+        <div><dt>Next report</dt><dd>${nr.date ? longDate(nr.date) : 'No date yet'}</dd><dd class="ws-kv-note">${nr.date ? `${nr.days_away} days, ${RP.dateStatus(nr)}` : ''}</dd></div>
+        <div><dt>Options price for it</dt><dd>${pr.available && isNum(pr.implied_move_pct) ? `±${num(pr.implied_move_pct, 2)}%` : 'n/a'}</dd><dd class="ws-kv-note">${pr.available && isNum(pr.ratio) ? `${num(pr.ratio, 2)}× its usual move` : ''}</dd></div>
+        <div><dt>Average report-day move</dt><dd>${isNum(pr.event_day_avg_pct) ? `±${num(pr.event_day_avg_pct, 1)}%` : 'n/a'}</dd><dd class="ws-kv-note">${su.quarters ? `Last ${su.quarters} reports` : ''}</dd></div>
+        <div><dt>Beat rate</dt><dd>${isNum(su.beat_rate_pct) ? `${num(su.beat_rate_pct, 0)}%` : 'n/a'}</dd><dd class="ws-kv-note">${isNum(su.beat_count) ? `${su.beat_count} of ${su.quarters}` : ''}</dd></div></dl>
         <p><a class="textlink" href="#/${enc(link)}/earnings">${link} earnings in full ${icon('arrow')}</a></p>`;
     },
     foot: (e) => ({ source: 'Company calendars and consensus via Yahoo Finance; the option chain', at: (e || {}).generated_at }),
@@ -850,9 +850,9 @@ export const PANELS = {
       if (!o.available) return html`<p class="ws-note">No ownership data for ${link} in the feed.</p>`;
       const i6 = o.insider_6m || {};
       return html`<dl class="ws-kv">
-        <div><dt>Insiders, 6 months</dt><dd>${capFirst(o.insider_signal || 'n/a')}</dd><small>${num(i6.purchase_count, 0)} buys, ${num(i6.sale_count, 0)} sales</small></div>
+        <div><dt>Insiders, 6 months</dt><dd>${capFirst(o.insider_signal || 'n/a')}</dd><dd class="ws-kv-note">${num(i6.purchase_count, 0)} buys, ${num(i6.sale_count, 0)} sales</dd></div>
         <div><dt>Held by institutions</dt><dd>${isNum(o.institutional_pct_held) ? `${num(o.institutional_pct_held * 100, 0)}%` : 'n/a'}</dd></div>
-        <div><dt>Largest holders</dt><dd>${o.holders_adding} raised, ${o.holders_trimming} cut</dd><small>of ${o.holders_counted || (o.top_holders || []).length}, by more than ${num(o.holder_change_threshold_pct || 2, 0)}%</small></div></dl>`;
+        <div><dt>Largest holders</dt><dd>${o.holders_adding} raised, ${o.holders_trimming} cut</dd><dd class="ws-kv-note">of ${o.holders_counted || (o.top_holders || []).length}, by more than ${num(o.holder_change_threshold_pct || 2, 0)}%</dd></div></dl>`;
     },
     foot: (t) => ({ source: 'SEC Form 4 and 13F via Yahoo Finance', at: (t || {}).generated_at }),
     milo: (link) => `What does recent insider and institutional activity in ${link} suggest, if anything?`,
