@@ -76,11 +76,13 @@ function account() {
 function billing() {
   const b = D.billing;
   if (b === undefined) return html`<span class="t-muted">Checking plans...</span>`;
-  if (!b || !b.available) return html`<span class="set-row-note">${billingOff((b || {}).reason, !!(store.state.me && store.state.me.admin))}</span>`;
+  // billing off (nothing set on the platform): a reader sees no billing at all; the owner sees which variables are
+  // missing, by name (Pass 2: "with nothing set, nothing shows")
+  if (!b || !b.available) return store.state.me && store.state.me.admin ? html`<span class="set-row-note">${billingOff((b || {}).reason, true)}</span>` : '';
   const pro = ((b.subscription || me().subscription || {}).plan || '') === 'pro';
   const test = b.mode === 'test' ? tag(false, 'Test mode') : '';
   if (pro) return b.can_manage ? html`<button type="button" class="btn btn-sm" data-v2-billing="portal">Manage billing</button>${test}` : html`<span class="set-row-note">Pro, granted by the operator.</span>`;
-  return html`<button type="button" class="btn btn-sm btn-primary" data-v2-billing="checkout">Upgrade to Pro, ${b.price_label || ''}</button>${b.can_manage ? html`<button type="button" class="btn btn-sm" data-v2-billing="portal">Billing history</button>` : ''}${test}`;
+  return html`<button type="button" class="btn btn-sm btn-primary" data-v2-billing="checkout">Upgrade to Pro${b.price_label ? `, ${b.price_label}` : ''}</button>${b.can_manage ? html`<button type="button" class="btn btn-sm" data-v2-billing="portal">Billing history</button>` : ''}${test}`;
 }
 
 function security() {
