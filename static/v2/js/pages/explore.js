@@ -5,7 +5,7 @@
 import { html, render as draw } from '../core/dom.js';
 import * as api from '../core/api.js';
 import { num, signed, compact, clean, isNum, dir } from '../core/format.js';
-import { skeleton, empty, asOfLine, simpleFold } from '../ui/states.js';
+import { skeleton, empty, failed, asOfLine, simpleFold } from '../ui/states.js';
 import { icon } from '../ui/icons.js';
 import { button as miloButton, provideContext } from '../ui/milo.js';
 import { sectionHead } from './tabs.js';
@@ -92,7 +92,7 @@ function paint() {
   const missing = [D.scans === null && 'the screen catalogue', D.board === null && 'the sector board', D.home === null && 'the cross-asset instruments'].filter(Boolean);
   draw(mainEl, html`<header class="page-head">${sectionHead('discover', 'explore')}</header>
     ${missing.length === 3 ? '' : html`${guided()}${readings()}${screens()}${sectors()}${crossAsset()}`}
-    ${missing.length === 3 ? html`<div class="state err" role="alert"><p class="t-h3">Explore did not load</p><p>None of its sources answered: ${missing.join(', ')}.</p><button type="button" class="btn btn-sm" data-v2-retry="explore">Try again</button></div>`
+    ${missing.length === 3 ? failed('Explore', null, { body: `None of its sources answered: ${missing.join(', ')}.`, retry: 'explore' })
       : missing.length ? html`<p class="stale">Unavailable right now: ${missing.join(', ')}. Everything else on this page still works.</p>` : ''}`);
 }
 

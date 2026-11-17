@@ -68,7 +68,7 @@ function pickRow(c, i, d) {
 
 function results(S) {
   // a 404 here is the feed listing no expiries (Yahoo refusing requests did this on 2026-10-22), not a missing page
-  if (S.error && S.error.kind === 'notfound') return html`<div class="state err" role="alert"><p class="t-h3">No option expiries came back</p><p>${clean(S.error.message || '')} The data feed may be refusing requests for a moment; nothing is wrong with your plan.</p><button type="button" class="btn btn-sm" data-v2-retry="picker">Try again</button></div>`;
+  if (S.error && S.error.kind === 'notfound') return failed('Option expiries', null, { title: 'No option expiries came back', body: `${clean(S.error.message || '')} The data feed may be refusing requests for a moment; nothing is wrong with your plan.`, retry: 'picker' });
   if (S.error) return failed('The contract picker', S.error, { retry: 'picker' });
   if (S.loading) return skeleton('lines', 5, 'Reading the chain for contracts that match');
   const d = S.data;

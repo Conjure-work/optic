@@ -86,7 +86,7 @@ function billing() {
 function security() {
   const s = D.sec;
   if (s === undefined) return skeleton('lines', 3, 'Loading your sign-in methods');
-  if (s && s.error) return html`<p class="stale">Could not load your sign-in methods: ${api.explain(s.error, 'The list')}</p>`;
+  if (s && s.error) return html`<p class="stale">Your sign-in methods did not load: ${api.explain(s.error, 'The list')}</p>`;
   const ids = s.identities || {}, methods = ids.methods || me().methods || {}, only = (methods.count || 0) <= 1;
   const lastTitle = 'This is the only way into this account. Add another method before removing it.';
   const pw = !!methods.password, provs = me().providers || {}, connected = (ids.identities || []);

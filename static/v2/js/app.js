@@ -3,6 +3,7 @@
 import { keepDeviceSession, bringGuestThings, keepGuestThingsOut, switchedSaid, askIsPending } from './core/device.js';
 import { CLASSIC } from './core/classic.js';
 import { $, html, render, announce } from './core/dom.js';
+import { failed } from './ui/states.js';
 import * as api from './core/api.js';
 import * as store from './core/store.js';
 import * as router from './core/router.js';
@@ -189,7 +190,7 @@ async function show(route) {
     try { page = await load(); }
     catch (e) {
       if (my !== SHOW) return;
-      const v = $('#main'); render(v, html`<div class="page-view"><div class="state err" role="alert"><p class="t-h3">This page did not load</p><p>Its code could not be fetched. Check the connection and try again.</p><button type="button" class="btn" data-v2-reload>Try again</button></div></div>`);
+      const v = $('#main'); render(v, html`<div class="page-view">${failed('This page', null, { body: 'Its code could not be fetched. Check the connection and try again.', retryAttr: 'data-v2-reload', size: '' })}</div>`);
       return;
     }
     if (my !== SHOW) return;
@@ -240,7 +241,7 @@ async function show(route) {
   rendered.catch((e) => {
     console.error(e);
     // a button that draws the page again: a link to the address already open did nothing (BUG-046)
-    render(view, html`<div class="state err" role="alert"><p class="t-h3">This page did not load</p><p>${e.message || 'An error stopped it.'}</p><button type="button" class="btn" data-v2-retry="page">Try again</button></div>`);
+    render(view, failed('This page', null, { body: 'An error stopped it from drawing. Try again; if it happens again, Report a problem in Settings tells us.', retry: 'page', size: '' }));
   });
   // a tab strip's bar slides (if the press has not moved it already) and the content fades in, once drawn (ui/motion.js)
   if (tabsWere) whenDrawn(view, 'nav.tabs', () => motion.tabsAfter(view, tabsWere));

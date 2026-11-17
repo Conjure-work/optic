@@ -29,7 +29,11 @@ def test_the_app_level_try_again_retries():
     """BUG-046: both cards were links to the address already open, so pressing them did nothing."""
     src = read("static/v2/js/app.js")
     assert not re.search(r"<a class=\"btn\" href=\"\$\{hrefFor\(route\.view, route\.symbol\)\}\">Try again</a>", src)
-    assert 'data-v2-reload>Try again</button>' in src and 'data-v2-retry="page">Try again</button>' in src
+    # both drawn by states.failed since Pass 2 (one look for every failed block): a button, never a link
+    assert "retryAttr: 'data-v2-reload'" in src and "retry: 'page'" in src
+    states = read("static/v2/js/ui/states.js")
+    assert '<button type="button" class="btn ${size}" data-v2-retry="${retry}">Try again</button>' in states
+    assert '<button type="button" class="btn ${size}" ${raw(retryAttr)}>Try again</button>' in states
     assert "if (t('[data-v2-reload]')) { location.reload(); return; }" in src
 
 

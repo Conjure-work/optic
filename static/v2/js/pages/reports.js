@@ -30,7 +30,7 @@ function notOwner() {
 // as "These are not yours to read" to the owner (BUG-194, Phase 11)
 const refused = (e) => e && (e.status === 401 || e.status === 403);
 function errorBlock(e, what) {
-  if (refused(e)) return html`<div class="state err" role="alert"><p class="t-h3">${view === 'reports' ? 'These are not yours to read' : 'This is not yours to read'}</p><p>${clean(e.message)}</p></div>`;
+  if (refused(e)) return failed('This page', null, { title: view === 'reports' ? 'These are not yours to read' : 'This is not yours to read', body: clean(e.message) });
   return failed(what, e, { retry: 'load' });
 }
 
