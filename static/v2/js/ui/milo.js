@@ -32,7 +32,7 @@ import * as router from '../core/router.js';
 import { holds } from '../core/device.js';
 import { esc, compact } from '../core/format.js';
 import { GROUPS, SETTINGS } from '../nav.js';
-import { renderAnswer, splitFollowUps, streamingHTML, settledEnd, FOLLOW_AT, sourcesAsText, STUDIES, SECTIONS as ACT_SECTIONS } from '../core/milo-text.js';
+import { renderAnswer, FACT_KEY, splitFollowUps, streamingHTML, settledEnd, FOLLOW_AT, sourcesAsText, STUDIES, SECTIONS as ACT_SECTIONS } from '../core/milo-text.js';
 import { lineChart, mountCharts } from './chart.js';
 import * as FF from './finfigs.js';
 import { CLASSIC } from '../core/classic.js';
@@ -490,7 +490,9 @@ function msgHTML(it) {
   const live = S.live && S.live.i === it.i;
   // an answer still arriving, when the whole log is drawn (the panel opened again mid-answer): as the live drawing has
   // it, so no half-written tag shows for the frame before paintLive takes it over
-  const { html: body, ups } = live ? { html: streamingHTML(shown, info.symbol || null), ups: [] } : renderAnswer(shown, info.symbol || null);
+  const drawn = live ? { html: streamingHTML(shown, info.symbol || null), ups: [] } : renderAnswer(shown, info.symbol || null);
+  // a finished answer with reported figures says once what the underline means (Pass 2)
+  const { html: body, ups } = !live && drawn.html.includes('class="milo-fact"') ? { html: drawn.html + FACT_KEY, ups: drawn.ups } : drawn;
   // an answer sits on the panel's own surface: its name, what it was about, the text; sources and actions after it
   return html`<article class="milo-msg milo-bot" data-v2-milo-i="${it.i}" aria-label="Milo's answer"><p class="milo-who">Milo</p>
     ${aboutLine(info)}
@@ -1121,6 +1123,7 @@ function paintFinished(i, live, ok) {
   if (body.length > live.cut) settled.insertAdjacentHTML('beforeend', renderAnswer(body.slice(live.cut), live.symbol, live.seen || {}).html);
   settled.replaceWith(...settled.childNodes);
   const tailNode = $('.milo-tail', old); if (tailNode) tailNode.remove();
+  if (old.querySelector('.milo-fact') && !old.querySelector('.milo-key')) old.insertAdjacentHTML('beforeend', FACT_KEY);
   // The streaming notices go with the stream. He does not: he is in the header and stays there, which is the
   // whole point of the companion, so nothing here touches him.
   const linesNode = $('.milo-live-lines', old); if (linesNode) linesNode.remove();

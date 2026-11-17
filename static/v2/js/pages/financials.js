@@ -265,6 +265,39 @@ function ownership(sym) {
     <p class="asof">${clean(ow.insider_method || '')}${(ow.yahoo_tally_6m || {}).acquired_count ? ` Yahoo Finance's own tally, every acquisition and disposal counted: ${num(ow.yahoo_tally_6m.acquired_count, 0)} acquired and ${num(ow.yahoo_tally_6m.disposed_count, 0)} disposed.` : ''} ${clean(ow.caveat || '')}</p></section>`;
 }
 
+// The full insider history (Pass 2, 2026-11-17): open-market purchases and sales over 2, 5 or 10 years, Yahoo's
+// latest rows and, before them, the SEC's own Form 4 filings; every row says which, and the line under the table says
+// how far each reaches and how many filings are still being read (they are read in the background, so the page asks
+// again a few times while any are).
+const IH_YEARS = [2, 5, 10], IH_POLLS = 8, IH_EVERY = 15000;
+let ihYears = 5;
+function insiderHistory(sym) {
+  const h = D.ih;
+  const pick = html`<div class="seg" role="group" aria-label="Years of insider history">${IH_YEARS.map((y) => html`<button type="button" data-fin-ih="${y}" aria-pressed="${ihYears === y}">${y} years</button>`)}</div>`;
+  const head = html`<div class="section-head"><h2 class="t-h2" id="ih-h">Insider trades, full history</h2>${pick}</div>`;
+  if (h === undefined) return html`<section class="section" id="fin-ih" data-v2-metric="" aria-labelledby="ih-h">${head}${skeleton('rows', 4, 'Reading the insider history')}</section>`;
+  if (h === null) return html`<section class="section" id="fin-ih" data-v2-metric="" aria-labelledby="ih-h">${head}${failed('The insider history', D.ihErr, { retry: 'ih' })}</section>`;
+  const rows = h.rows || [], cov = h.coverage || {};
+  const buys = rows.filter((r) => r.action === 'purchase').length, sells = rows.length - buys;
+  const reading = cov.sec_unread > 0;
+  const line = `${rows.length ? `${num(buys, 0)} open-market purchase${buys === 1 ? '' : 's'} and ${num(sells, 0)} sale${sells === 1 ? '' : 's'} since ${fullDate(h.since)}.` : `No open-market purchases or sales found since ${fullDate(h.since)}.`}`;
+  const src = (r) => (r.source === 'sec' ? (r.accession ? html`<a class="textlink" href="https://www.sec.gov/Archives/edgar/data/${encodeURIComponent((cov.cik || ''))}/${String(r.accession).replace(/-/g, '')}/" target="_blank" rel="noopener">SEC Form 4</a>` : 'SEC Form 4') : 'Yahoo Finance');
+  return html`<section class="section" id="fin-ih" data-v2-metric="" aria-labelledby="ih-h">${head}
+    <p>${line}</p>
+    ${rows.length ? html`<div class="tscroll"><table class="t"><thead><tr><th>Date</th><th>Insider</th><th>Trade</th><th>Shares</th><th>Value</th><th>Source</th></tr></thead><tbody>
+      ${rows.slice(0, 25).map((r) => html`<tr><td>${fullDate(r.date)}</td><td>${clean(r.insider || '')}<br><small class="t-muted">${clean(r.position || '')}</small></td><td>${r.action === 'purchase' ? 'Purchase' : 'Sale'}</td><td>${compact(r.shares)}</td><td>${isNum(r.value) ? usd(r.value) : 'Not reported'}</td><td>${src(r)}</td></tr>`)}</tbody></table></div>
+      ${rows.length > 25 ? html`<p class="t-muted">The latest 25 of ${num(rows.length, 0)} shown.</p>` : ''}` : ''}
+    <p class="asof" role="${reading ? 'status' : 'note'}">Yahoo Finance lists the latest ${num(cov.yahoo_rows || 0, 0)} rows${cov.yahoo_from ? `, back to ${fullDate(cov.yahoo_from)}` : ''}; before that, ${num(cov.sec_rows || 0, 0)} trades come from Form 4 filings read from SEC EDGAR. ${reading ? `${num(cov.sec_unread, 0)} filings are still being read; this table fills in as they are.` : cov.complete === false ? 'The SEC list could not be read in full this time.' : 'Complete for the period.'} Awards, option exercises, tax withholding and gifts are not trades and are left out.</p></section>`;
+}
+async function loadInsiderHistory(sym, round = 0) {
+  try {
+    const h = await api.get(`/api/insiders/${encodeURIComponent(sym)}/history?years=${ihYears}`, { ttl: 0, force: round > 0, timeout: 60000 });
+    if (D.sym !== sym || !live) return;
+    D.ih = h; paint();
+    if (h && (h.coverage || {}).sec_unread > 0 && round < IH_POLLS) setTimeout(() => { if (D.sym === sym && live) loadInsiderHistory(sym, round + 1); }, IH_EVERY);
+  } catch (e) { if (D.sym === sym && live) { D.ih = null; D.ihErr = e; paint(); } }
+}
+
 function filings() {
   const fl = (D.t || {}).filings || {};
   if (!fl.available) return '';
@@ -409,7 +442,7 @@ function paint() {
   if (D.na) body = notApplicable(sym, D.na);
   else if (D.tErr) body = failed('The financial statements', D.tErr, { retry: 'ticker' });
   else if (!D.t) body = skeleton('lines', 6, 'Loading the statements');
-  else body = html`${readings()}${jumpList()}${statements(sym)}${segments()}${record('earnings')}${ownership(sym)}${record('short')}${extras()}${filings()}${congress()}`;
+  else body = html`${readings()}${jumpList()}${statements(sym)}${segments()}${record('earnings')}${ownership(sym)}${insiderHistory(sym)}${record('short')}${extras()}${filings()}${congress()}`;
   // a section heading the reader was taken to (a jump, a link's ?section=) keeps focus while later figures redraw the page
   const was = document.activeElement, onHead = was && was.tagName === 'H2' && mainEl.contains(was) && was.closest('section[id]');
   draw(mainEl, html`<div class="dstick">${header(sym, D, 'financials')}${tabs(sym, 'financials', { fund: isFund(D) })}</div><div class="fin">${body}</div>`);
@@ -461,6 +494,7 @@ export async function render(main, route) {
     const jump = (id) => jumpTo(main, id);
     main.addEventListener('click', (e) => {
       const b = e.target.closest('[data-fin-jump]'); if (b) { jump(b.dataset.finJump); return; }
+      const yb = e.target.closest('[data-fin-ih]'); if (yb) { ihYears = Number(yb.dataset.finIh) || 5; D.ih = undefined; paint(); loadInsiderHistory(D.sym); return; }
       const p = e.target.closest('[data-fin-period]');
       if (p) { period = p.dataset.finPeriod; try { localStorage.setItem(PERIOD_KEY, period); } catch (err) { /* private mode */ } const at = p.closest('section'); const id = at && at.id; paint(); const again = id && document.querySelector(`#${id} [data-fin-period="${period}"]`); if (again) again.focus(); }
     });
@@ -480,6 +514,7 @@ export async function render(main, route) {
   step(api.get(`/api/extras/${enc}?benchmark=SPY`, { ttl: 600000, timeout: 30000 }), (d) => { D.x = d; }, () => { D.x = null; });
   step(api.get(`/api/congress?ticker=${enc}&limit=40`, { ttl: 600000, timeout: 30000 }), (d) => { D.cg = d; }, () => { D.cg = null; });
   loadSegments(sym);
+  loadInsiderHistory(sym);
 }
 /** The Summary, Statements and Segments blocks drawn from one payload ({ sym, t, sg }) and a period view, for a check
  * that needs no browser (tests/test_fiscal_periods.py); the page's own state is put back as it was. */
@@ -489,5 +524,5 @@ export function blocksFor(d, view = 'year') {
   try { return html`${readings()}${statements(d.sym)}${segments()}`; } finally { [D, period] = was; }
 }
 export function dispose() { if (lp) { lp.stop(); lp = null; } if (seen) { seen.stop(); seen = null; } live = false; }
-export const retry = { ticker: (m, r) => render(m, r) };
+export const retry = { ticker: (m, r) => render(m, r), ih: () => { D.ih = undefined; paint(); loadInsiderHistory(D.sym); } };
 void empty;

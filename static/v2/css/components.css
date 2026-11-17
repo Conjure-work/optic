@@ -1515,3 +1515,7 @@ th .pbadge, dt .pbadge, .k .pbadge { margin-left: 6px; vertical-align: 1px; }
 .dn-key { display: grid; gap: 6px; min-width: 150px; margin: 0; padding: 0; list-style: none; font-size: var(--t-md); color: var(--c-ink-2); }
 .dn-key li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; } .dn-key b { color: var(--c-ink); font-variant-numeric: tabular-nums; }
 .donut .sw { display: block; width: 10px; height: 10px; border-radius: 2px; }
+
+/* Pass 2 (2026-11-17): a figure Milo quotes with its source is a reported fact, set apart from Milo's reading */
+.milo-fact { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; text-decoration-color: var(--c-ink-3); }
+.milo-key { margin-top: 8px; font-size: 13px; color: var(--c-ink-2); }

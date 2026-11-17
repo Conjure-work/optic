@@ -7201,6 +7201,29 @@ async def segments_panel(ticker: str,
     return await _run(segments_mod.build, sym, force, sec=lambda: figures_mod.load_via(YF_PROVIDER, sym))
 
 
+@app.get("/api/insiders/{ticker}/history")
+async def insider_history(ticker: str, years: int = Query(5, description="2, 5 or 10")) -> Dict[str, Any]:
+    """One company's open-market insider purchases and sales over 2, 5 or 10 years: Yahoo's latest rows and, before
+    them, the SEC's own Form 4 filings (Pass 2). Makes no SEC request on the reader's time: what is not yet read is
+    read in the background, and `coverage` says how much is still to come."""
+    from . import insider_fill
+    sym = ticker.upper().strip()
+    if not re.fullmatch(r"[A-Z0-9.\-]{1,10}", sym):
+        raise HTTPException(status_code=400, detail="Not a ticker symbol.")
+    if years not in insider_fill.HISTORY_YEARS:
+        raise HTTPException(status_code=422, detail="years must be 2, 5 or 10.")
+
+    def build() -> Dict[str, Any]:
+        try:
+            raw = YF_PROVIDER.insiders(sym)
+        except Exception:                                    # noqa: BLE001 - the feed down; the SEC may still answer
+            raw = {}
+        out = insider_fill.history(sym, raw or {}, years)
+        out["yahoo_answered"] = bool((raw or {}).get("transactions"))
+        return out
+    return await _run(build)
+
+
 @app.get("/api/insiders/latest")
 async def insiders_latest(limit: int = Query(40, ge=1, le=200),
                           purchases: bool = Query(True),
