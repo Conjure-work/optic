@@ -33,4 +33,4 @@ every workflow. The loaded case of "research a company" is walked with the recor
 
 - Earnings week, first build: "Gathering report dates for about 150 companies. The first scan takes a minute or two."
   with a placeholder under it. A truthful building state, kept; the walker accepts it.
-- Earnings week: a lone "." appears under the page's notice. Cause not yet traced; next on the list.
+- Earnings week: the lone "." reported under the notice is not on the page; it was pytest's progress dot after the probe's printed output (traced 2026-11-17).
