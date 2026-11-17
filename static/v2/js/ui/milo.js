@@ -158,6 +158,11 @@ export function buildContext(scope, prevTicker, now = new Date()) {
   const cmpNames = scope === 'auto' && r.view === 'compare' && ctx.compare && Array.isArray(ctx.compare.tickers) ? ctx.compare.tickers.slice(0, 4) : [];
   if (cmpNames.length >= 2) { focus.compare = { tickers: cmpNames, focus: cmpNames.includes(S.pick) ? S.pick : null }; if (!own) focus.ticker = focus.compare.focus; }
   if (prevTicker && focus.ticker && prevTicker !== focus.ticker) focus.previous_ticker = prevTicker;
+  // what on the page is in view (Pass 2: a Financials chart and its period), so "this" in a question means it
+  if (scope === 'auto' && focus.ticker && ctx.in_view && typeof ctx.in_view === 'object' && ctx.in_view.metric) {
+    focus.in_view = { metric: String(ctx.in_view.metric).slice(0, 60), period: ctx.in_view.period ? String(ctx.in_view.period).slice(0, 60) : null };
+  }
+  delete ctx.in_view;
   delete ctx.focus_label; delete ctx.focus;
   if (scope === 'none') return { focus };
   if (scope === 'market') { const out = { focus }; ['macro', 'sectors', 'indices', 'read'].forEach((k) => { if (ctx[k]) out[k] = ctx[k]; }); return out; }
