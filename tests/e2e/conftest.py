@@ -61,7 +61,7 @@ def stub():
 
 
 @pytest.fixture
-def server(stub, tmp_path_factory):
+def server(stub, tmp_path_factory, request):
     """A server per journey. One server for the whole run built a queue: every Home load asks the market feeds, which
     are refused at the closed port but are read one at a time behind the provider lock (app/providers/yf.py), and by
     the twentieth journey a page waited behind the earlier ones' refusals. Measured: 9 of 28 journeys timed out on a
@@ -84,10 +84,16 @@ def server(stub, tmp_path_factory):
         "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost",
         "APP_URL": "http://127.0.0.1:{}".format(port), "OPTIC_OVERNIGHT_FEED": "off", "PYTHONUNBUFFERED": "1",
     })
+    # a journey may ask for its own settings by indirect parametrisation, e.g. the passkey journey, which must reach
+    # the server at localhost (an IP address is not a valid WebAuthn RP id, app/auth/config.py rp_id)
+    extra = dict(getattr(request, "param", None) or {})
+    host = extra.pop("_HOST", "127.0.0.1")
+    env["APP_URL"] = "http://{}:{}".format(host, port)
+    env.update(extra)
     log = open(data / "server.log", "w")
     proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port)],
                             cwd=str(ROOT), env=env, stdout=log, stderr=subprocess.STDOUT)
-    base = "http://127.0.0.1:{}".format(port)
+    base = "http://{}:{}".format(host, port)
     deadline = time.time() + 60
     while time.time() < deadline:
         try:
