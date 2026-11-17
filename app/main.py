@@ -4898,6 +4898,29 @@ def intraday_bars(symbol: str, spec: Dict[str, Any]) -> pd.DataFrame:
     return out
 
 
+@app.get("/api/sparklines")
+async def sparklines(symbols: str = Query("", description="Up to 30 symbols, comma separated")) -> Dict[str, Any]:
+    """Home's ticker rows' lines in one request (Pass 2): five-minute closes since the open in session, else the last
+    30 daily closes, through the intraday source app/sparklines.py chooses, so a licensed feed slots in there."""
+    from . import sparklines as sparklines_mod
+    want = [s.strip().upper() for s in (symbols or "").split(",") if s.strip()]
+    want = [s for s in dict.fromkeys(want) if re.fullmatch(r"[A-Z0-9.^=\-]{1,12}", s)][:sparklines_mod.MAX_SYMBOLS]
+    if not want:
+        raise HTTPException(status_code=422, detail="Name at least one symbol.")
+
+    def build() -> Dict[str, Any]:
+        src = sparklines_mod.source(YF_PROVIDER)
+        prev: Dict[str, Optional[float]] = {}
+        for s in want:
+            try:
+                q = YF_PROVIDER.quote(s) or {}
+                prev[s] = q.get("previous_close")
+            except Exception:                                # noqa: BLE001 - the row draws without its direction
+                prev[s] = None
+        return sparklines_mod.build(src, want, session_mod.state(), prev)
+    return await _run(build)
+
+
 @app.get("/api/intraday/{ticker}")
 async def intraday(ticker: str, range: str = Query("1d"),
                    window: str = Query("", description="One of the size's windows"),

@@ -135,9 +135,10 @@ def test_homes_level_matrix_is_the_prototypes():
     # the first-visit card stays, smaller, with its Follow buttons (decision 3)
     ob = WS[WS.index("function onboard() {"):WS.index("// A row the next panel cannot join ends early")]
     assert "is-compact" in ob and "${STARTERS.map((sym) => followBtn(sym))}" in ob
-    # no 1-day line on Home: no intraday read (decision 1); 3M, 6M and 1Y of the closes take-chart already serves
+    # the 1-day line was held for Pass 2 (decision 1, 2026-11-11) and came with it: 1D reads the intraday source of
+    # the ticker rows (/api/sparklines), never the chart's /api/intraday; 3M, 6M and 1Y are the closes take-chart serves
     assert "/api/intraday" not in WS
-    assert "const FEAT_SPANS = [['3m', '3M', 'past 3 months'], ['6m', '6M', 'past 6 months'], ['1y', '1Y', 'past year']];" in WS
+    assert "const FEAT_SPANS = [['1d', '1D', 'today'], ['3m', '3M', 'past 3 months'], ['6m', '6M', 'past 6 months'], ['1y', '1Y', 'past year']];" in WS
     assert "get(`/api/take-chart/${enc(sym)}?span=${span}`" in WS
 
 

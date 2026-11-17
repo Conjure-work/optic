@@ -46,7 +46,8 @@ def test_home_draws_its_figures(chrome, server, level):
     svg = page.locator("#hm-feature svg.chart")
     assert "tone-up" in svg.get_attribute("class") and page.locator("#hm-feature svg.chart line.base").count() == 1
     assert (svg.get_attribute("aria-label") or "").startswith("AAPL daily closes, past 6 months")
-    assert page.locator("#hm-feature [data-hm-span]").all_inner_texts() == ["3M", "6M", "1Y"], "no 1-day line on Home"
+    # the 1-day line, held for Pass 2 on 2026-11-11, came with it (today's five-minute closes)
+    assert page.locator("#hm-feature [data-hm-span]").all_inner_texts() == ["1D", "3M", "6M", "1Y"]
     # 3M asks take-chart for its own span, nothing intraday
     with page.expect_request(lambda r: "/api/take-chart/" in r.url and "span=3m" in r.url):
         page.click("[data-hm-span='3m']")

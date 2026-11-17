@@ -361,7 +361,8 @@ export function spark(values, label = '', opts = {}) {
   const W = opts.w || 112, H = opts.h || 32, lo = Math.min(...v), hi = Math.max(...v), s = hi - lo || 1;
   const X = (i) => 2 + (i / (v.length - 1)) * (W - 6), Yv = (x) => 3 + (1 - (x - lo) / s) * (H - 6);
   const d = v.map((x, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Yv(x).toFixed(1)}`).join('');
-  const tone = spanTone(v);
+  // a line can be coloured by something other than its own span: Home's intraday rows by the day's move (Pass 2)
+  const tone = opts.tone != null ? opts.tone : spanTone(v);
   return `<svg class="spark ${tone}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" ${label ? `role="img" aria-label="${esc(label)}"` : 'aria-hidden="true"'}><path d="${d}"/><circle cx="${X(v.length - 1).toFixed(1)}" cy="${Yv(v[v.length - 1]).toFixed(1)}" r="2"/></svg>`;
 }
 
@@ -424,3 +425,20 @@ window.addEventListener('resize', () => {
   clearTimeout(rt);
   rt = setTimeout(() => slots.forEach((el) => { if (!document.contains(el)) slots.delete(el); else el._draw(); }), 140);
 });
+
+/** Analysts' price targets as a range (Pass 2, the series the free update held back): the lowest to the highest
+ *  target, the average marked, today's price as a dot. The analysts' figures, drawn; Optic adds none of its own. */
+export function targetRange({ lo, mid, hi, price, w = 320 } = {}) {
+  if (![lo, hi].every(Number.isFinite) || hi <= lo) return '';
+  const W = w, H = 58, l = 10, r = W - 10;
+  const min = Math.min(lo, Number.isFinite(price) ? price : lo), max = Math.max(hi, Number.isFinite(price) ? price : hi);
+  const X = (v) => l + (v - min) / ((max - min) || 1) * (r - l);
+  const lab = (v, y, anchor) => `<text class="tr-l" x="${Math.min(r, Math.max(l, X(v))).toFixed(1)}" y="${y}" text-anchor="${anchor}">${num(v)}</text>`;
+  const said = `Analysts' price targets from ${num(lo)} to ${num(hi)}${Number.isFinite(mid) ? `, averaging ${num(mid)}` : ''}${Number.isFinite(price) ? `; the price now is ${num(price)}` : ''}`;
+  return `<svg class="target-range" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(said)}">
+    <line class="tr-span" x1="${X(lo).toFixed(1)}" x2="${X(hi).toFixed(1)}" y1="30" y2="30"/>
+    <line class="tr-end" x1="${X(lo).toFixed(1)}" x2="${X(lo).toFixed(1)}" y1="24" y2="36"/><line class="tr-end" x1="${X(hi).toFixed(1)}" x2="${X(hi).toFixed(1)}" y1="24" y2="36"/>
+    ${Number.isFinite(mid) ? `<line class="tr-mid" x1="${X(mid).toFixed(1)}" x2="${X(mid).toFixed(1)}" y1="20" y2="40"/>${lab(mid, 14, 'middle')}` : ''}
+    ${Number.isFinite(price) ? `<circle class="tr-now" cx="${X(price).toFixed(1)}" cy="30" r="5"/>` : ''}
+    ${lab(lo, 54, 'start')}${lab(hi, 54, 'end')}</svg>`;
+}

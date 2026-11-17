@@ -594,7 +594,15 @@ export const PANELS = {
   watch: {
     title: 'Watchlist', span: 4,
     how: 'Your open watchlist, with the day\'s move and what changed. Choose a ticker to link it to the chart, news and options panels.',
-    load: async () => { const syms = (store.activeList() || {}).symbols || []; if (!syms.length) return { empty: true }; const d = await get(`/api/watchlist?symbols=${enc(syms.slice(0, 30).join(','))}`, { ttl: 30000 }); return Object.assign({}, d, { total: syms.length }); },
+    // the rows and, beside them, today's line for each (Pass 2): one request for all of them, cached five minutes, so
+    // the 20 s market refresh asks for new bars at the five-minute pace the free feed's bars come at; a line that
+    // does not load leaves the 30-session line /api/watchlist already sent
+    load: async () => {
+      const syms = (store.activeList() || {}).symbols || []; if (!syms.length) return { empty: true };
+      const list = enc(syms.slice(0, 30).join(','));
+      const [d, sl] = await Promise.all([get(`/api/watchlist?symbols=${list}`, { ttl: 30000 }), get(`/api/sparklines?symbols=${list}`, { ttl: 300000, timeout: 30000 }).catch(() => null)]);
+      return Object.assign({}, d, { total: syms.length, lines: sl });
+    },
     body: (d) => {
       // while the first-visit card is up it carries the same four Follow buttons; one set on the first screen, not two
       if (d.empty && showOnboard()) return html`<p class="ws-note">Your open watchlist is empty. Follow a company from the card above, or press Watch on any company.</p>`;
@@ -602,9 +610,19 @@ export const PANELS = {
         <div class="ws-starters" role="group" aria-label="Follow a company to start">${STARTERS.map((sym) => followBtn(sym))}</div>`;
       // a 30-session line beside each row (visual update, 2026-11-11, change 7): the closes /api/watchlist already
       // returns per row, coloured by that span; today's move is the figure with its arrow, so the two can disagree
-      return html`<table class="ws-t ws-watch"><caption class="sr">Watchlist</caption><thead><tr><th scope="col">Ticker</th><th scope="col" class="n">Price</th><th scope="col" class="n">Today</th><th scope="col" class="ws-sparkh">30 sessions</th></tr></thead><tbody>
-        ${(d.rows || []).map((r) => { const sp = (r.spark || []).filter(isNum);
-          return html`<tr><td>${tickBtn(r.symbol)}</td><td class="n">${r.available === false ? '' : num(r.price)}</td><td class="n">${r.available === false ? 'n/a' : mv(r.change_pct)}</td><td class="ws-sparkc">${sp.length > 1 ? raw(spark(sp, `${r.symbol}, past ${sp.length} sessions, ${spanWords(sp)}`, { w: 96, h: 26 })) : html`<span class="ws-rule">No line</span>`}</td></tr>`; })}</tbody></table>
+      // in session each row draws today's five-minute line, red or green by the day's move; otherwise, or where no
+      // intraday bars came back, the 30-session line (Pass 2, item 5)
+      const L = d.lines || null, byS = {}; ((L || {}).rows || []).forEach((x) => { byS[x.symbol] = x; });
+      const today = !!L && L.status !== 'closed' && Object.values(byS).some((x) => x.kind === 'intraday');
+      const cell = (r) => {
+        const x = byS[r.symbol];
+        if (x && x.kind === 'intraday' && (x.closes || []).length > 1) return raw(spark(x.closes, `${r.symbol}, today since the open, ${x.direction === 'up' ? 'up' : x.direction === 'down' ? 'down' : 'flat'} on the day`, { w: 96, h: 26, tone: x.direction || 'flat' }));
+        const sp = (r.spark || []).filter(isNum);
+        return sp.length > 1 ? raw(spark(sp, `${r.symbol}, past ${sp.length} sessions, ${spanWords(sp)}`, { w: 96, h: 26 })) : html`<span class="ws-rule">No line</span>`;
+      };
+      return html`<table class="ws-t ws-watch"><caption class="sr">Watchlist</caption><thead><tr><th scope="col">Ticker</th><th scope="col" class="n">Price</th><th scope="col" class="n">Today</th><th scope="col" class="ws-sparkh">${today ? 'Today' : '30 sessions'}</th></tr></thead><tbody>
+        ${(d.rows || []).map((r) => html`<tr><td>${tickBtn(r.symbol)}</td><td class="n">${r.available === false ? '' : num(r.price)}</td><td class="n">${r.available === false ? 'n/a' : mv(r.change_pct)}</td><td class="ws-sparkc">${cell(r)}</td></tr>`)}</tbody></table>
+        ${today ? html`<p class="ws-note ws-linestatus" data-status="${L.status}"><span class="live-dot is-${L.status}" aria-hidden="true"></span>${L.status_text}. Lines are today's five-minute closes, red or green by the day's move; refreshed every five minutes.</p>` : ''}
         ${d.total > 30 ? html`<p class="ws-note">The first 30 of ${d.total}. <a href="#/watchlist">The whole list is on Watchlist</a>.</p>` : ''}`;
     },
     foot: () => ({ source: `${(store.activeList() || {}).name || 'Your open list'}; prices from Yahoo Finance` }),
@@ -1011,7 +1029,8 @@ function paintAll() {
 const MARKET_FIGURE = '^GSPC';
 // The figure's line: 3M, 6M or 1Y of daily closes, the spans take-chart already serves (no 1-day line on Home: it needs
 // an intraday read Home does not make, operator decision 1 of 2026-11-11). Kept for the visit.
-const FEAT_SPANS = [['3m', '3M', 'past 3 months'], ['6m', '6M', 'past 6 months'], ['1y', '1Y', 'past year']];
+// 1D (Pass 2): today's five-minute closes since the open, from the same intraday source as the ticker rows
+const FEAT_SPANS = [['1d', '1D', 'today'], ['3m', '3M', 'past 3 months'], ['6m', '6M', 'past 6 months'], ['1y', '1Y', 'past year']];
 let featSpan = '6m';
 let FEAT = { sym: null, q: null, c: null, failed: false, seq: 0 };
 function featureSym() {
@@ -1059,8 +1078,9 @@ function featureBody() {
     <p class="hm-feat-fig"><a class="hm-feat-v" href="${f.href}">${f.value}</a>${f.chgText ? html`<span class="hm-feat-d">${mv(f.chg, f.chgText)} <span class="hm-feat-t">today</span></span>` : ''}</p></div>${spans}</div>
     ${say ? html`<p class="hm-feat-say">${say}</p>` : ''}
     ${pts.length > 1 ? html`<div class="chart-slot hm-feat-chart" data-chart="hm-feature"></div>
-      <p class="hm-feat-leg"><span>Daily closes, ${words}. ${tone === 'down' ? 'Red: ends below its start (dashed).' : tone === 'up' ? 'Green: ends above its start (dashed).' : 'Ends at its start (dashed).'}</span><span>Yahoo Finance, delayed ${delays.upTo()}</span></p>`
-      : FEAT.pending ? skeleton('chart', 1, 'Loading the line') : html`<p class="ws-note">The line did not load; the figure above is current.</p>`}`;
+      ${FEAT.c && FEAT.c.intraday ? html`<p class="hm-feat-leg"><span>Five-minute closes since today's open. ${tone === 'down' ? 'Red: below its start (dashed).' : tone === 'up' ? 'Green: above its start (dashed).' : 'At its start (dashed).'}</span><span class="hm-feat-status" data-status="${FEAT.c.status}"><span class="live-dot is-${FEAT.c.status}" aria-hidden="true"></span>${FEAT.c.status_text}; ${FEAT.c.source}</span></p>`
+        : html`<p class="hm-feat-leg"><span>Daily closes, ${words}. ${tone === 'down' ? 'Red: ends below its start (dashed).' : tone === 'up' ? 'Green: ends above its start (dashed).' : 'Ends at its start (dashed).'}</span><span>Yahoo Finance, delayed ${delays.upTo()}</span></p>`}`
+      : FEAT.pending ? skeleton('chart', 1, 'Loading the line') : featSpan === '1d' ? html`<p class="ws-note">No line for today: ${clean(FEAT.why || 'no intraday bars came back')}. 3M, 6M and 1Y draw the daily closes.</p>` : html`<p class="ws-note">The line did not load; the figure above is current.</p>`}`;
 }
 const featureBlock = () => html`<section class="hm-feature" id="hm-feature" aria-labelledby="hm-feat-k">${featureBody()}</section>`;
 function mountFeature() {
@@ -1084,11 +1104,21 @@ function loadFeature(force = false) {
   // still draws it, since the block shows the figure whenever there is one
   setTimeout(() => { if (live && FEAT.seq === seq && !featureFigure()) { FEAT.waited = true; paintFeature(); } }, PANEL_WAIT);
   const quote = sym === MARKET_FIGURE ? Promise.resolve(null) : get(`/api/quote/${enc(sym)}`, { ttl: 20000 });
-  Promise.allSettled([quote, get(`/api/take-chart/${enc(sym)}?span=${span}`, { ttl: 600000, timeout: 30000 })]).then(([q, c]) => {
+  // 1D draws today's line from the intraday source, shaped as the daily chart is, and says its status; outside the
+  // session the source answers with daily closes, which are said as what they are
+  const line = span === '1d'
+    ? get(`/api/sparklines?symbols=${enc(sym)}`, { ttl: 300000, timeout: 30000 }).then((d) => {
+      const r = ((d || {}).rows || [])[0] || {};
+      if (!r.available || r.kind !== 'intraday') return { available: false, reason: r.note || r.reason || d.status_text };
+      return { available: true, ticker: sym, intraday: true, status: d.status, status_text: d.status_text, source: d.source, chart: { dates: r.times, close: r.closes } };
+    })
+    : get(`/api/take-chart/${enc(sym)}?span=${span}`, { ttl: 600000, timeout: 30000 });
+  Promise.allSettled([quote, line]).then(([q, c]) => {
     if (!live || FEAT.seq !== seq) return;
     FEAT.pending = false;
     FEAT.q = q.status === 'fulfilled' ? q.value : null;
     FEAT.c = c.status === 'fulfilled' && c.value && c.value.available ? c.value : null;
+    FEAT.why = c.status === 'fulfilled' && c.value && !c.value.available ? String(c.value.reason || '').replace(/\.$/, '').replace(/^./, (x) => x.toLowerCase()) : '';
     FEAT.failed = sym !== MARKET_FIGURE && !featureFigure();
     paintFeature();
   });
