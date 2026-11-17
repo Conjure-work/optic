@@ -744,7 +744,10 @@ export async function render(main, route) {
     D.ticker = d; if (d.quote) D.quote = fresher(D.quote, d.quote);
     if (d.data_caveat) D.freshText = clean(String(d.data_caveat).split(/(?<=\.)\s/)[0]);   // the delay; Greeks and Black-Scholes belong to Options
     startTimeline(sym);
-  }, (e) => { D.tickerError = e; if (e.kind !== 'notfound') startTimeline(sym); });
+  // started on every answer: a 404 here is the price feed saying "No price data found" (an outage on a listed symbol;
+  // an unknown one never reaches this page), and skipping the start left "Loading company events" on screen for good
+  // (Pass 2 workflow walk, 2026-11-17)
+  }, (e) => { D.tickerError = e; startTimeline(sym); });
   fresh(`/api/framework/${enc}?mode=combined`, { ttl: 300000, timeout: 60000 }, (d) => { D.fwRaw = d; D.framework = d.available === false ? null : d; if (d.available === false) D.fwError = new api.ApiError('notfound', 404, d.reason || 'No framework read'); }, (e) => { D.fwError = e; D.fwNetError = e; D.fwRaw = null; D.framework = {}; });
   fresh(`/api/fair-value/${enc}`, { ttl: 600000, timeout: 30000 }, (d) => { D.fairValue = d; }, (e) => { D.fvError = e; D.fairValue = {}; });
   fresh(`/api/longterm/${enc}?indices=false`, { ttl: 600000, timeout: 45000 }, (d) => { D.longterm = d; }, () => { D.longterm = {}; });

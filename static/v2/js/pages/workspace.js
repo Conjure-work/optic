@@ -1045,7 +1045,11 @@ function featureBody() {
   const head = (label, sub) => html`<p class="hm-feat-k" id="hm-feat-k">${label}${sub ? html` <span class="hm-feat-u">${sub}</span>` : ''}</p>`;
   const spans = html`<div class="seg hm-feat-seg" role="group" aria-label="Range">${FEAT_SPANS.map(([k, l]) => html`<button type="button" data-hm-span="${k}" aria-pressed="${featSpan === k}">${l}</button>`)}</div>`;
   if (!f) {
-    const off = FEAT.failed || ERR.indices;
+    // the market figure is off once Home's answer is in and carries no S&P 500 level (the feeds refused: /api/home
+    // answers at once with indices unavailable; this branch runs only while there is no figure), not only when the request itself fails; before, the placeholder
+    // stayed for good (Pass 2 workflow walk, 2026-11-17)
+    const marketOff = (FEAT.sym === MARKET_FIGURE || !FEAT.sym) && DATA.indices !== undefined;
+    const off = FEAT.failed || ERR.indices || marketOff || FEAT.waited;
     return html`<div class="hm-feat-top"><div>${head(FEAT.sym && FEAT.sym !== MARKET_FIGURE ? FEAT.sym : 'S&P 500', '')}</div></div>${off ? html`<p class="ws-note">The day's figure did not load. The strip below has the markets.</p>` : skeleton('lines', 1, "Loading the day's figure")}`;
   }
   // The visual update (2026-11-11, change 3): the line larger, green or red by the span it draws with its start level
@@ -1075,7 +1079,10 @@ function loadFeature(force = false) {
   const sym = featureSym();
   if (!force && FEAT.sym === sym && FEAT.span === featSpan && (FEAT.c || FEAT.pending)) return;
   const seq = ++FEAT.seq, span = featSpan;
-  FEAT = { sym, span, q: FEAT.sym === sym ? FEAT.q : null, c: null, failed: false, pending: true, seq };
+  FEAT = { sym, span, q: FEAT.sym === sym ? FEAT.q : null, c: null, failed: false, pending: true, seq, waited: false };
+  // loading that always ends, as the panels do (PANEL_WAIT): still no figure by then says so, and a late answer
+  // still draws it, since the block shows the figure whenever there is one
+  setTimeout(() => { if (live && FEAT.seq === seq && !featureFigure()) { FEAT.waited = true; paintFeature(); } }, PANEL_WAIT);
   const quote = sym === MARKET_FIGURE ? Promise.resolve(null) : get(`/api/quote/${enc(sym)}`, { ttl: 20000 });
   Promise.allSettled([quote, get(`/api/take-chart/${enc(sym)}?span=${span}`, { ttl: 600000, timeout: 30000 })]).then(([q, c]) => {
     if (!live || FEAT.seq !== seq) return;

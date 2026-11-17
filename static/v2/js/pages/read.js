@@ -115,7 +115,10 @@ function overnight() {
 function priority() {
   const p = D.priority;
   if (p === undefined) return skeleton('lines', 4, "Loading today's priority");
-  if (!p || !p.available) return empty('Nothing on the board right now', '');
+  // a first build of the board takes a minute or two cold (its earnings leg); the server says so after a few seconds
+  // and the page asks again, rather than holding a placeholder for the whole build (Pass 2 workflow walk, 2026-11-17)
+  if (p && p.building) return html`<p class="asof" role="status">${clean(p.reason || 'Building the board.')} ${D.priorityPolls > PRIORITY_POLLS ? 'Still building: reload the page to check.' : 'It appears here when it is done.'}</p>`;
+  if (!p || !p.available) return empty('Nothing on the board right now', clean((p && p.reason) || ''));
   // A row's day and time are left out when its title already says them ("AAPL reports Monday after the close
   // Monday, After close"), and a reason every row shares is said once, under the list (Phase 12 editorial pass)
   const bare = (t) => String(t || '').toLowerCase().replace(/\bthe\s+/g, '');      // "after the close" says "After close"
@@ -330,11 +333,22 @@ export async function render(main) {
   const step = (p, ok, bad, repaintAll) => p.then(ok, bad).finally(() => { if (live) (repaintAll ? paint() : paintMore()); });
   step(api.get('/api/brief?cached=true', { ttl: 60000, timeout: 30000 }), (d) => { D.brief = d; }, (e) => { D.briefErr = e; }, true);
   step(api.get('/api/desk/edition', { ttl: 300000 }), (d) => { D.desk = d; }, () => { D.desk = null; }, true);
-  step(api.get('/api/priority', { ttl: 300000, timeout: 90000 }), (d) => { D.priority = d; }, () => { D.priority = null; });
+  loadPriority();
   step(api.get('/api/catalyst-mode?cached=true', { ttl: 600000, timeout: 45000 }), (d) => { D.catmode = d; }, () => { D.catmode = null; });
   step(api.get('/api/weekly?cached=true', { ttl: 600000, timeout: 30000 }), (d) => { D.weekly = d; }, () => { D.weekly = null; });
   step(api.get('/api/sentiment', { ttl: 600000, timeout: 30000 }), (d) => { D.sent = d; }, () => { D.sent = null; });
   loadCats();
+}
+const PRIORITY_POLLS = 10, PRIORITY_EVERY = 10000;
+function loadPriority() {
+  const mine = D;
+  api.get('/api/priority?quick=true', { ttl: 300000, timeout: 90000, force: !!D.priorityPolls }).then((d) => { if (mine === D) D.priority = d; }, () => { if (mine === D) D.priority = null; })
+    .finally(() => {
+      if (!live || mine !== D) return;
+      paintMore();
+      if (D.priority && D.priority.building && (D.priorityPolls = (D.priorityPolls || 0) + 1) <= PRIORITY_POLLS) setTimeout(() => { if (live && mine === D) loadPriority(); }, PRIORITY_EVERY);
+      else if (D.priority && D.priority.building) paintMore();
+    });
 }
 export function dispose() { live = false; }
 export const retry = { brief: (m, r) => { api.invalidate('/api/brief'); render(m, r); } };
