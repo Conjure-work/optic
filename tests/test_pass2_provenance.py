@@ -88,3 +88,23 @@ def test_financials_draws_the_full_history_with_its_source_per_row():
     src = (V2 / "js" / "pages" / "financials.js").read_text()
     assert "/api/insiders/${encodeURIComponent(sym)}/history?years=${ihYears}" in src
     assert "'SEC Form 4'" in src and "'Yahoo Finance'" in src and "still being read" in src
+
+
+def test_every_financials_chart_names_its_source_under_it_and_no_delay():
+    """The source was said once, at the Statements section's head; each chart carried its period and no source, where
+    Home's headline chart names Yahoo Finance under it (Pass 2 gauntlet, D5, 2026-11-18). Every fv figure's caption on
+    Financials now ends with a source line. Statements are filed, not quoted, so the line carries no delay."""
+    src = (V2 / "js" / "pages" / "financials.js").read_text()
+    figures = src.split('<figure class="fv')[1:]
+    assert len(figures) >= 10, "the eight statement charts and the two segment figures"
+    for f in figures:
+        cap = f[:f.index("</figcaption>")]
+        title = cap[cap.find("<h3>") + 4:cap.find("</h3>")]
+        assert "${src}" in cap or "${sourceLine(" in cap, "no source line under " + title
+    line = src[src.index("const sourceLine"):src.index("\n", src.index("const sourceLine"))]
+    assert 'class="fv-unit"' in line and "Source: ${s}" in line
+    for name in ("STATEMENTS_SOURCE", "FILINGS_SOURCE"):
+        said = src[src.index("const " + name):src.index("\n", src.index("const " + name))]
+        assert "delay" not in said.lower() and "minute" not in said.lower(), said
+    assert "f.source ? clean(f.source)" in src, "the feed's own source line wins when it names one"
+    assert "—" not in src and "–" not in src

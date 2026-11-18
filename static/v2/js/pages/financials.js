@@ -76,6 +76,12 @@ const regFig = (id) => { const fv = FIG.of(D.t, id); return fv && fv.status === 
 const regWhen = (fv) => (fv ? `${FIG.period(fv)}${(fv.period || {}).fiscal ? ` (${fv.period.fiscal})` : ''}` : '');
 // the statements' own notes print the provider's net margin and net cash; the registry's are printed instead
 const NET_NOTE = /net margin|net (cash|debt) position/i;
+// Each chart names its source under it, as Home's headline chart does; the section head said it once, and a chart read
+// on its own, sent to Milo or printed, did not (Pass 2 gauntlet, D5, 2026-11-18). No delay: statements are filed, not
+// quoted.
+const sourceLine = (s) => html`<p class="fv-unit" data-fv-source>Source: ${s}</p>`;
+const STATEMENTS_SOURCE = "the company's statements, as Yahoo Finance carries them";
+const FILINGS_SOURCE = "the company's 10-Q and 10-K filings, from SEC EDGAR";
 function readings() {
   const c = (D.t || {}).company || {}, f = c.financials || {}, m = f.margins || {}, g = f.growth || {}, eh = c.earnings_history || {}, si = c.short_interest || {}, ow = c.ownership || {};
   const items = [], nm = regFig('net_margin_fy');
@@ -183,27 +189,28 @@ function statements(sym) {
   const rows = [['Revenue', 'revenue'], ['Gross profit', 'gross_profit'], ['Operating income', 'operating_income'], ['EBITDA', 'ebitda', true], ['Net income', 'net_income'], ['Operating cash flow', 'operating_cash_flow'], ['Capital expenditure', 'capital_expenditure'], ['Free cash flow', 'free_cash_flow', true], ['Diluted EPS (GAAP)', 'diluted_eps'], ['Diluted shares', 'diluted_shares']];
   const cell = (k, v) => (k === 'diluted_eps' ? num(v) : k === 'diluted_shares' ? compact(v) : usd(v));
   const cal = PER.calendarOf(D.t), basis = PER.basisOf(D.t) || 'Basis not stated';
+  const src = sourceLine(f.source ? clean(f.source).replace(/\.\s*$/, '') : STATEMENTS_SOURCE);
   return html`<section class="section" id="fin-statements" aria-labelledby="st-h"><div class="section-head"><div><h2 class="t-h2" id="st-h">Statements</h2>
       ${periodLine({ type: V.q ? 'quarter' : 'annual', basis, what: PER.range(V.desc), filing: PER.latestFiling(V.desc), notes: PER.notes(V.desc, cal) })}<p class="section-sub">${clean(f.source || "The company's statements as Yahoo Finance carries them.")} In ${ccyWords()}${ccy !== 'USD' ? ', as the company files; the share price is in US dollars' : ''}.</p></div>
       ${(f.quarterly_periods || []).length ? seg(period, [['year', 'Fiscal years'], ['quarter', 'Quarters']]) : ''}</div>
     <div class="fv-grid">
       <figure class="fv" data-v2-metric=""><figcaption><h3>Revenue and profit</h3><p class="fv-take">${FV.profitLine(a.revenue, a.net_income, labels, C.back, C.against, usd)}</p>${qoq ? html`<p class="fv-take fv-sub">${qoq}</p>` : ''}
-        ${key([['s1', 'Revenue'], ['s2', 'Operating income'], ['s3', 'Net income']])}<p class="fv-unit">${unit}, ${ccyWords()}</p></figcaption><div class="chart-slot" data-chart="profit"></div></figure>
+        ${key([['s1', 'Revenue'], ['s2', 'Operating income'], ['s3', 'Net income']])}<p class="fv-unit">${unit}, ${ccyWords()}</p>${src}</figcaption><div class="chart-slot" data-chart="profit"></div></figure>
       <figure class="fv" data-v2-metric=""><figcaption><h3>Margins</h3><p class="fv-take">${FV.marginLine('Operating margin', opm, labels, C.back)}</p>
-        ${key([['s1', 'Gross margin'], ['s2', 'Operating margin'], ['s3', 'Net margin']])}<p class="fv-unit">${unit}, percent of revenue</p></figcaption><div class="chart-slot" data-chart="margins"></div></figure>
+        ${key([['s1', 'Gross margin'], ['s2', 'Operating margin'], ['s3', 'Net margin']])}<p class="fv-unit">${unit}, percent of revenue</p>${src}</figcaption><div class="chart-slot" data-chart="margins"></div></figure>
       ${hasCf ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash flow</h3><p class="fv-take">${FV.cashFlowLine(ya.operating_cash_flow, ya.capital_expenditure, ya.free_cash_flow, ysaid, usd)}</p>
-        ${key([['s1', 'Operating cash flow'], ['s2', 'Capital spending, shown as cash out'], ['s3', 'Free cash flow, non-GAAP']])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}Fiscal years, ${ccyWords()}${V.q ? '. The statements Optic reads carry no quarterly cash flow' : ''}</p></figcaption>
+        ${key([['s1', 'Operating cash flow'], ['s2', 'Capital spending, shown as cash out'], ['s3', 'Free cash flow, non-GAAP']])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}Fiscal years, ${ccyWords()}${V.q ? '. The statements Optic reads carry no quarterly cash flow' : ''}</p>${src}</figcaption>
         <div class="chart-slot" data-chart="cashflow"></div>${latestBridge ? html`<p class="t-label fv-bridge-h">${Y.said(0)}: from operating cash flow to free cash flow</p><div class="chart-slot" data-chart="bridge"></div>` : ''}</figure>` : ''}
       ${hasBal ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash and debt</h3><p class="fv-take">${FV.netCashLine(bh.cash, bh.total_debt, yat, usd)}</p>
-        ${key([['s1', 'Cash and equivalents'], ['s2', 'Total debt']])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}At each fiscal year end, ${ccyWords()}</p></figcaption><div class="chart-slot" data-chart="balance"></div></figure>` : ''}
+        ${key([['s1', 'Cash and equivalents'], ['s2', 'Total debt']])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}At each fiscal year end, ${ccyWords()}</p>${src}</figcaption><div class="chart-slot" data-chart="balance"></div></figure>` : ''}
       ${shapeOk(bh) ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Balance sheet</h3><p class="fv-take">${shapeLine(bh, ysaid)}</p>
-        ${key([['s2', 'Total liabilities'], ['s1', "Shareholders' equity"]])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}At each fiscal year end, ${ccyWords()}; the bar's height is total assets</p></figcaption><div class="chart-slot" data-chart="shape"></div></figure>` : ''}
+        ${key([['s2', 'Total liabilities'], ['s1', "Shareholders' equity"]])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}At each fiscal year end, ${ccyWords()}; the bar's height is total assets</p>${src}</figcaption><div class="chart-slot" data-chart="shape"></div></figure>` : ''}
       ${V.q && ((f.quarterly_cash || {}).operating_cash_flow || []).some(isNum) ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash flow by quarter</h3>
-        ${key([['s1', 'Operating cash flow'], ['s2', 'Capital spending, shown as cash out'], ['s3', 'Free cash flow, non-GAAP']])}<p class="fv-unit">Quarters, ${ccyWords()}</p></figcaption><div class="chart-slot" data-chart="qcash"></div></figure>` : ''}
+        ${key([['s1', 'Operating cash flow'], ['s2', 'Capital spending, shown as cash out'], ['s3', 'Free cash flow, non-GAAP']])}<p class="fv-unit">Quarters, ${ccyWords()}</p>${src}</figcaption><div class="chart-slot" data-chart="qcash"></div></figure>` : ''}
       ${V.q && ((f.quarterly_balance || {}).cash || []).some(isNum) ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash and debt by quarter</h3>
-        ${key([['s1', 'Cash and equivalents'], ['s2', 'Total debt']])}<p class="fv-unit">At each quarter end, ${ccyWords()}</p></figcaption><div class="chart-slot" data-chart="qbal"></div></figure>` : ''}
+        ${key([['s1', 'Cash and equivalents'], ['s2', 'Total debt']])}<p class="fv-unit">At each quarter end, ${ccyWords()}</p>${src}</figcaption><div class="chart-slot" data-chart="qbal"></div></figure>` : ''}
       ${(a.diluted_eps || []).some(isNum) ? html`<figure class="fv fv-wide" data-v2-metric=""><figcaption><h3>Per share</h3><p class="fv-take">${FV.perShareLine(a.diluted_eps, shares, labels, C.back, C.against)}</p>
-        <p class="fv-unit">${unit}. Diluted EPS (GAAP) in ${ccyWords()} a share; the share count is the weighted diluted average each EPS divides by.</p></figcaption>
+        <p class="fv-unit">${unit}. Diluted EPS (GAAP) in ${ccyWords()} a share; the share count is the weighted diluted average each EPS divides by.</p>${src}</figcaption>
         <div class="fv-pair"><div><p class="t-label">Diluted EPS</p><div class="chart-slot" data-chart="eps"></div></div>${shares.some(isNum) ? html`<div><p class="t-label">Diluted shares</p><div class="chart-slot" data-chart="shares"></div></div>` : ''}</div></figure>` : ''}
     </div>
     <details class="more-inline fv-data"><summary>View data</summary>
@@ -402,12 +409,12 @@ function segments() {
   };
   const figure = (t, k) => {
     const v = view(t), c = v.comp;
-    if (!c || !c.rows.length) return html`<figure class="fv" data-v2-metric=""><figcaption><h3>${t.metric_label}, ${t.axis_label.toLowerCase()}</h3><p class="t-muted">No figures for the latest period in the filings read.</p></figcaption></figure>`;
+    if (!c || !c.rows.length) return html`<figure class="fv" data-v2-metric=""><figcaption><h3>${t.metric_label}, ${t.axis_label.toLowerCase()}</h3><p class="t-muted">No figures for the latest period in the filings read.</p>${sourceLine(FILINGS_SOURCE)}</figcaption></figure>`;
     const base = c.reconciles ? c.total : c.sum;
     const pos = c.rows.filter((r) => r.v >= 0), neg = c.rows.filter((r) => r.v < 0);
     return html`<figure class="fv" data-v2-metric=""><figcaption><h3>${t.metric_label}, ${t.axis_label.toLowerCase()}</h3><p class="fv-take">${FV.compositionLine(c, t.metric_label, PER.inText(v.per), susd, reconOf(t, v.rep))}</p>
         <p class="fv-unit">${t.annual_only && !years ? html`${typeBadge('annual')} Annual only: the company reports this breakdown in its 10-K, not each quarter. ` : ''}US dollars, as filed${c.dropped.length ? html`. ${c.dropped.join(', ')} is a total of other lines here, so it is left out rather than counted twice` : ''}</p>
-        ${(t.notes || []).map((n) => html`<p class="fv-unit">${clean(n)}</p>`)}</figcaption>
+        ${(t.notes || []).map((n) => html`<p class="fv-unit">${clean(n)}</p>`)}${sourceLine(FILINGS_SOURCE)}</figcaption>
       ${raw(hbars(pos.map((r) => ({ label: r.label, v: r.v, text: c.canShare && base > 0 ? `${susd(r.v)}, ${num((r.v / base) * 100, 0)}%` : susd(r.v) })), { fmt: (x) => susd(x) }))}
       ${neg.length ? html`<p class="fv-unit">${neg.map((r) => `${r.label}: ${susd(r.v)}`).join('; ')}. Costs or income the filing does not assign to a segment.</p>` : ''}
       ${v.yr && c.canShare && v.ends.length > 1 ? html`<p class="t-label fv-bridge-h">Over the fiscal years</p>${key([...c.rows.slice(0, 3).map((r, i) => [SEG_CLS[i], r.label]), ...(c.rows.length > 3 ? [['s0', 'Other']] : [])])}<div class="chart-slot" data-chart="segmix${k}"></div>` : ''}</figure>`;
