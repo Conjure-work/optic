@@ -261,3 +261,122 @@ Screenshots, the PDF and raw results: `scratchpad/r2/run/` of this session (untr
 Machine half on c91613e: deploy verified; D1, D2 and D3 fixed and re-verified on the live copy through the gate; the suite from clean green apart from the one standing skip; the in-session intraday half still NOT RUN until the market is open. The human half and the verdict are the operator's.
 
 Key file: `~/.conjure/optic-eval.key` is still in place (mode 600, lines user, gate, evaluator, admin): the human half and the delivery recording still need it.
+
+### Round three, 2026-11-18 (D4, D5 from the human half re-tested)
+
+**Kind of run: real browser from outside, through the gate, real passwords** (Playwright Chromium, headless, driven from the ops Mac against https://edge-optic-production.up.railway.app with the real gate password, signing in on the product's own form with the evaluator's real password read from `~/.conjure/optic-eval.key` into process memory). The suite ran from a fresh clone on the ops Mac. Round three re-tests the two DEFECT items of the human half (Conjure `handoffs/optic-pass-2/gauntlet-CON-54-human-half.md`, D4 and D5) and the machine checks they touch; the human re-walk of asks 11 and 26 and the verdict are the operator's; no label was applied, the issue was not moved and nothing was posted on it.
+
+Product: Optic (NEW BUILD lane). Issue CON-54, order 69988272-31ff-416d-9687-f21e101ab3fa. Environment: Railway project `conjure-optic-eval`, environment `production`, service `optic` behind `edge-optic`. Commit tested: **34a30b71c56866c8c41f62e1c922f0555c5f1f7c** (fork sidprobstein/optic, branch `factory/pass-2-works-data-workspace`). Run 2026-11-18 18:09 to 19:35 UTC, the market open until 21:00 UTC. Operator's word in session: the go to fix D4 and D5, redeploy in place and re-run the affected machine checks.
+
+#### Could not be reached (failures of the test, not passes)
+
+1. **Asks 11 and 26 by a person** (source line under the Financials charts; the sheet printed from a real browser's print dialog): the machine re-ran both below, but the operator's own Chrome print is the one that showed D4, and Chromium headless only reproduces it by printing on paper wide enough to keep the desktop layout. The operator's re-walk of asks 11 and 26 is still to do.
+2. **The reset link followed**: not in scope this round and not repeated (deploy record, item 11).
+
+#### Deploy verification, quoted
+
+From Conjure `handoffs/optic-pass-2/deploy-verify-CON-54-round3.md`: "DEPLOY VERIFIED at 34a30b71c56866c8c41f62e1c922f0555c5f1f7c on f33bedf0-b97c-480a-b293-e577e671b930, identified by tree checksum 98929266... and build id 7689d8061f5e". Migrations applied [1..22] = known [1..22], unchanged; customer data counts identical in every table. Railway reached on the FALLBACK login (no workspace token file on this Mac).
+
+#### The fixes
+
+| Defect | Fix commit | What changed | Suite case that now covers it |
+| --- | --- | --- | --- |
+| D4, the width | 5856ac7 | `static/v2/css/pages.css`, `@media print`: the shell, the sheet, each sheet page and its lists are blocks, not grids. Cause: the block hid `.rail` but left `.shell` its two columns (`var(--rail) minmax(0, 1fr)`, components.css line 5), so a print from a window wider than the 860 px breakpoint laid the sheet into the rail's 256 px column. Headless Chromium at Letter and A4 paper width never saw it: those widths fall under the breakpoint, where the shell is one column anyway, which is why round two's export check passed | `tests/test_research_sheet.py::test_the_sheet_prints_in_one_column_and_never_as_a_grid` (reads the print block as text) and `tests/e2e/test_pass2_print.py::test_the_research_sheet_prints_at_full_width_from_a_wide_window[Letter]` and `[A4]` (1280 px window, print media, `.sheet` at least 600 px wide, two pages at most). All three fail on the old stylesheet (the journey: `{'x': 0, 'w': 256, 'shell': 'grid'}`) |
+| D4, the overlap | 5856ac7 | Same block. A second cause, not the width: inside a grid Chromium printed a paragraph broken across a page over the one after it (the operator's page 2: "Beat the estimate" over "revenue of about"). Measured on the copy over a sweep of 48 PDFs (Letter, A4 and a 13.33 in wide sheet, page heights 4 to 11.5 in): 242 overlapping characters with the old CSS, 70 with the shell made one column alone, 0 with blocks. The grids' gaps became top margins (3 px between parts, 9 px above a heading, 2 px between list items) | the same text test (the shell, the sheet and the pages are blocks); the sweep is in the session scratchpad, not in the suite |
+| D5 | 34a30b7 | `static/v2/js/pages/financials.js`: each of the eight statement charts ends its caption with "Source: " and the feed's own source line, or "the company's statements, as Yahoo Finance carries them" when the feed names none; the segment figures with "Source: the company's 10-Q and 10-K filings, from SEC EDGAR". The period line stays; existing class `fv-unit`, no new colour; no delay wording (statements are filed, not quoted) | `tests/test_pass2_provenance.py::test_every_financials_chart_names_its_source_under_it_and_no_delay`, which fails on the old financials.js ("no source line under Revenue and profit") |
+
+#### The print, before and after (on the copy, AAPL, `#/AAPL/sheet`, signed in)
+
+| Measure | Before (c91613e, f61fc25c) | After (34a30b7, f33bedf0) |
+| --- | --- | --- |
+| `.sheet` in print media, 1280 px window | 256 px wide at x 0; `.shell` grid `256px 1024px` | 1280 px wide at x 0; `.shell` block |
+| `.sheet` at the printable areas, 710 x 940 and 688 x 1010 | 710 and 688 px wide, 1,813 and 1,809 px tall | 710 and 688 px wide, 1,790 and 1,809 px tall |
+| Chromium PDF at Letter and A4 (laid out at the paper's width) | 2 pages each, 0 overlapping characters | 2 pages each, 0 overlapping characters |
+| Chromium PDF on a 13.33 in wide sheet (the desktop layout, as the operator's Chrome printed) | 4 pages, the sheet in a narrow left column | 2 pages |
+| Sweep of 48 PDFs, overlapping characters | 242 | 0 |
+| The operator's PDF (Chrome 157, Letter) | 4 pages, 33 overlapping characters on page 2 | not re-printed by a person (see above) |
+
+Overlap is counted on the PDF's own text layer (pdfplumber), characters whose boxes cross another's by half a glyph each way; the same count finds the 33 on the operator's page 2. The block's comment now cites these measurements in place of "measured at 710 x 940".
+
+#### Counts block
+
+| Item | Result |
+| --- | --- |
+| Commit tested | 34a30b7, fresh clone of the fork branch in a new empty directory, HEAD verified equal, tree clean, push address DISABLED (the clone that was deployed) |
+| Suite from clean | **9,174 passed, 0 failed, 1 skipped of 9,175**, 1,998 s (19:00:57 to 19:34:17 UTC), no ANTHROPIC_API_KEY in the shell |
+| The one skip | `tests/test_brokerage_exposure.py::test_live_qqq` (reads EDGAR; `OPTIC_LIVE_EDGAR=1` to run), the same one skip as every earlier run |
+| Suite in the working checkout, before the push | 9,174 passed, 1 skipped (18:09:26 to 18:42:43 UTC); `node --check static/v2/js/pages/financials.js` passed (no other JS edited) |
+| Against round two | 9,170 passed, 1 skipped of 9,171; now 9,174 passed, 1 skipped of 9,175 (the 4 new cases: 1 print text test, 2 print journeys, 1 source-line text test) |
+| Pass 2 browser journeys, `tests/e2e/test_pass2_*.py`, from the clean clone | **26 passed** in 426 s (18:53:39 to 19:00:46 UTC), among them the two print journeys, the four axe journeys and the Milo-view journey |
+| Browser journeys in the suite | 137 collected under tests/e2e, all passed in the clean run |
+| Pass 2 tests | 71 collected under test_pass2_* (unit and e2e): 71 passed |
+| Eval, quality set | `tests/test_milo_eval.py`: 221 of 221 passed |
+| Eval, injection set | INJ-01 to INJ-14, **14 of 14**; red team `tests/test_milo_redteam.py` **38 of 38** |
+| Eval, live smoke | Excluded for want of a key in the suite's shell; not a skip. Milo answered live on the copy (D1 re-run below) |
+| Suite needs no API key | yes |
+| HTTP soak | 30 page loads, 8,640 requests, 0 failures, as the evaluator through the gate |
+| OUTCOME INSTRUMENTED | NOT APPLICABLE: no outcome named |
+| Stack torn down | none brought up (the journeys start their own servers); clones, runners and output stay in the session scratchpad |
+
+No model call changed this round. The figcaption change touches the chart Milo is told about only in its markup: the page names the chart in view by its heading (`ui/inview.js`), which is unchanged, and the Milo-view journey and the live re-run below both send "Cash flow by quarter".
+
+#### The re-run, item by item (through the gate, real passwords, evaluator account, 1440 by 900 unless a row says otherwise)
+
+| # | Item | Asked | What the copy did | Re-verified (UTC) | Pass |
+| --- | --- | --- | --- | --- | --- |
+| R1 | Print, 1280 px window, Letter | `#/AAPL/sheet` after its print button was enabled, print media, PDF at Letter | `.sheet` 1280 px wide at x 0, shell block; 2 pages, 210,213 bytes, 0 overlapping characters; no page error | 18:45 | yes |
+| R2 | Print, 1280 px window, A4 | as R1, PDF at A4 | 2 pages, 210,080 bytes, 0 overlapping characters | 18:45 | yes |
+| R3 | Print, printable areas | windows of 710 x 940 and 688 x 1010, print media | 710 and 688 px wide, 1,790 and 1,809 px tall; no overlapping boxes in the DOM | 18:45 | yes |
+| R4 | Print, desktop layout on paper | a 13.33 by 11 in sheet from a 1280 px window, the shape of the operator's print | 2 pages (4 before) | 18:45 | yes |
+| R5 | Print, page-break sweep | 48 PDFs, Letter, A4 and 13.33 in wide, heights 4 to 11.5 in | 0 overlapping characters (242 before) | 18:45:39 | yes |
+| S1 | Source under every Financials chart, fiscal years | `#/AAPL/financials`, Fiscal years | 10 figures, each with a source line: the six statement charts "Source: The company's annual and quarterly statements as Yahoo Finance carries them" (the feed's own line), the four segment figures "Source: the company's 10-Q and 10-K filings, from SEC EDGAR"; the period lines kept; no delay wording | 18:50:14 | yes |
+| S2 | ...quarters | the same, Quarters | 12 figures, each with a source line, Cash flow by quarter and Cash and debt by quarter among them; no delay wording | 18:50:17 | yes |
+| X1 | axe, Financials, quarters, 1440 | WCAG 2.1 A and AA, live data, the source lines drawn | 0 violations; 12 source lines; no sideways scroll; no page error | 18:46:54 | yes |
+| X2 | axe, Financials, quarters, 390 | as X1 at 390 by 844 | 0 violations; 12 source lines; no sideways scroll | 18:46:58 | yes |
+| D1 a | Milo given the view, after the caption change | Financials (AAPL), Quarters, Cash flow by quarter scrolled to 291 px and pressed, then Ask Milo in the top bar, "Explain this chart in two short paragraphs." | the panel moved the chart from 291 px to 1,316 px; the chat request carried `context.focus.in_view` = {metric "Cash flow by quarter", period "quarters"}; Milo answered on cash flow (1,834 characters) | 18:47:06 | yes |
+| D1 b | the same, a second fresh browser | as above | the same in_view; 1,852 characters, on cash flow | 18:47:16 | yes |
+| Soak | 30 page loads through the gate, signed in | | 8,640 requests, all 200, 0 failures | 18:50 to 18:56 | yes |
+
+axe: **zero violations of any impact** on Financials at both widths, on live data, with the new caption lines.
+
+#### Verdicts on the human half's defects
+
+- **D4: fixed and re-verified by the machine.** The sheet prints at the page's width from a wide window, two pages at Letter and A4, and the page-break overlap is gone over every page height tried; covered by a text test and two journeys that fail on the old stylesheet. The operator's own print (ask 26) is still to re-walk.
+- **D5: fixed and re-verified by the machine.** Every chart on Financials names its source under it, with no delay, at both periods; covered by a text test that fails on the old code. Ask 11 is still to re-walk.
+
+#### Findings this round
+
+**DEFECT**: none new.
+
+**Observations (not findings)**
+
+- O3. The statement charts' source line takes the feed's own wording when it sends one, so on the copy it reads "Source: The company's annual and quarterly statements as Yahoo Finance carries them" (capital T, no comma), while the segment figures read "Source: the company's 10-Q and 10-K filings, from SEC EDGAR". Both are correct; the capital after "Source:" is a style point the operator may want lowercased in the next round. At 1440 the longer line wraps to leave one word ("them") on its second line in the two-up charts.
+- O1, carried. Memory and file descriptors at rest on the new process: at boot 85 fds, 416 MB; after the browser run 278 fds, 1.28 GB; after the soak 281 fds, 1.37 GB (flat across the soak); after the clean suite, at rest, 19:34:25 UTC, 541 fds, 1.80 GB. The same climb with use as rounds one and two; worth the operator's eye before delivery; not a regression of this round.
+
+#### Limits carried forward
+
+- **L1. The brokerage link (SnapTrade)**: still untestable, no SnapTrade test keys.
+- **L2. The alert digest recipient**: still an open product question for the customer.
+- **L3. axe outside Round 2's items** (the Earnings tab's estimate revisions table at 390, the shared toast's contrast); the human half's F2 (the save toast not noticed) sits here.
+- **L4. Declared not built in this pass**: unchanged.
+- **L5. Names of the Financials table boxes repeat**: unchanged.
+
+#### Harness faults (fixed and re-run before this report, counted neither way)
+
+- The first source-line run timed out in the fiscal-years view waiting for a Playwright `:text-is` selector (also with `state="attached"`) while the figures were on the page (read directly at the time: ten figure headings, Revenue and profit first). Rewritten as a wait on the headings' text; S1 then passed.
+- The PDF overlap counter first compared whole words on different lines only and found 0 on the operator's PDF, where the overlapping lines share one baseline; rewritten to compare characters, it finds the operator's 33 and was used for every count above.
+
+#### Leave as found
+
+Created on the copy by this run, all ours, on the evaluator account only:
+
+- 17 sessions from fresh browsers through the form (sessions 81 to 98, most left to expire); 2 Milo chat messages (18:47, on AAPL Financials; milo_questions 37 to 39); `usage_event` rows from each fresh browser (624 to 651); auth_attempts 58 to 60.
+- Nothing else: no layout, passkey or watch made; no variable set; edge-optic, mailpit and edge-optic-mail not touched; no mail sent; no Stripe object; no SnapTrade call; the owner account and the first test account not touched.
+
+PDFs, screenshots and raw results: `scratchpad/r3/run/` of this session (untracked, outside every repository).
+
+#### Readiness
+
+Machine half on 34a30b7: deploy verified; D4 and D5 fixed and re-verified on the live copy through the gate; the suite from clean green apart from the one standing skip. Next is the operator's re-walk of asks 11 and 26, then the verdict, which is the operator's.
+
+Key file: `~/.conjure/optic-eval.key` is still in place (mode 600): the re-walk and the delivery recording still need it.
