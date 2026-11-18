@@ -2013,10 +2013,20 @@ ul.cal-react { display: flex; flex-wrap: wrap; gap: 4px 18px; padding-left: 0; l
   html, body, .shell, .stage, .page { background: #fff !important; color: #111 !important; }
   .rail, .topbar, .tabbar, #legal-footer, .skip, .sh-actions, .milo, .toast, .drawer { display: none !important; }
   .stage, .page { margin: 0 !important; padding: 0 !important; max-width: none !important; }
-  .sheet { max-width: none; gap: 0; }
-  .sh-page { border: 0; border-radius: 0; padding: 0; background: none; break-inside: auto; gap: 3px; }
-  /* tighter spacing, never smaller reading type: the sheet is two pages at Letter and A4 (measured at 710 x 940) */
-  .sh-page h2 { margin-top: 6px; } .sh-head { padding-bottom: 6px; } .sh-t th, .sh-t td { padding: 2px 6px; } .sh-page ul { gap: 2px; }
+  /* blocks, not grids, in print. The rail was hidden but the shell kept its two columns (256 px rail, then the page),
+     so a print from a window wider than 860 px laid the sheet into the rail's column: 256 px wide at x 0, four
+     Letter pages (Pass 2 gauntlet, D4). And inside a grid Chromium printed a paragraph broken across a page over the
+     one after it ("Beat the estimate" over "revenue of about"): 242 overlapping characters over a sweep of page
+     heights with the grids, 0 with blocks. The grids' gaps are top margins here: 3 px between a page's parts, 9 px
+     above a heading (the gap and the heading's 6 px), 2 px between list items. */
+  .shell, .sheet, .sh-page, .sh-page ul { display: block; }
+  .sheet { max-width: none; }
+  .sh-page { border: 0; border-radius: 0; padding: 0; background: none; break-inside: auto; }
+  .sheet .sh-page > * + * { margin-top: 3px; } .sheet .sh-page > h2 { margin-top: 9px; } .sh-page li + li { margin-top: 2px; }
+  /* tighter spacing, never smaller reading type: the sheet is two pages at Letter and A4, measured
+     2026-11-18 from a 1280 px window in print media (sheet 1280 px wide, was 256; Chromium's PDF 2 pages at each, no
+     overlapping text) and at the printable areas, 710 x 940 and 688 x 1010 (sheet 1790 and 1809 px tall) */
+  .sh-head { padding-bottom: 6px; } .sh-t th, .sh-t td { padding: 2px 6px; }
   .sh-cont { break-before: page; }
   .sh-page h2 { break-after: avoid; } .sh-t, .sh-chart, .sh-two > div, .sh-risk li { break-inside: avoid; }
   .sh-page, .sh-page * { color: #111 !important; border-color: #bbb !important; }
