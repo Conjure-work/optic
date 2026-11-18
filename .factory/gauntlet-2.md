@@ -143,3 +143,121 @@ Screenshots and raw results: `scratchpad/p2/run/` of this session (untracked, ou
 Machine half on 620c6d4: deploy verified; the browser run from outside passed every reachable Round 2 item except D1; three DEFECTS stand (D1 Milo's chart in view when Milo opens after the press; D2 three of the pass's own journeys red from a clean clone; D3 axe on the company grid and Financials on live data), and the in-session intraday half is NOT RUN until the market is open. Not satisfied as it stands; the human half and the verdict are the operator's.
 
 Key file: `~/.conjure/optic-eval.key` is still in place (mode 600, lines user, gate, evaluator, admin): the human half and the delivery recording still need it.
+
+
+### Round two, 2026-11-18 (D1, D2, D3 re-tested)
+
+**Kind of run: real browser from outside, through the gate, real passwords** (Playwright Chromium, headless, driven from the ops Mac against https://edge-optic-production.up.railway.app with the real gate password, signing in on the product's own form with the evaluator's real password read from `~/.conjure/optic-eval.key` into process memory). The suite ran from a fresh clone on the ops Mac. Round two re-tests the DEFECT items of round one (the section above) only, plus a short re-walk and soak; the human half and the verdict are the operator's; no label was applied, the issue was not moved and nothing was posted on it.
+
+Product: Optic (NEW BUILD lane). Issue CON-54, order 69988272-31ff-416d-9687-f21e101ab3fa. Environment: Railway project `conjure-optic-eval`, environment `production`, service `optic` behind `edge-optic`. Commit tested: **c91613ea6fcd5dec2adabd5707bbe673712e859f** (fork sidprobstein/optic, branch `factory/pass-2-works-data-workspace`). Run 2026-11-17 23:19 to 2026-11-18 00:37 UTC, after the market's close. Operator's word in session: "Fix D1, D2, D3 now, redeploy, re-run the affected items."
+
+#### Could not be reached (failures of the test, not passes)
+
+1. **The in-session intraday half** (round one's item 1) stays NOT RUN: this round also fell after the close, and it is not a defect item. Ask 14 of the human script.
+2. **The reset link followed**: not in scope this round and not repeated (deploy record, item 11).
+
+#### Deploy verification, quoted
+
+From `handoffs/optic-pass-2/deploy-verify-CON-54-round2.md`: "DEPLOY VERIFIED at c91613ea6fcd5dec2adabd5707bbe673712e859f on f61fc25c-d201-4015-be98-318a6cff8e7c, identified by tree checksum 28cee1c9... and build id 9c1e4f84ae82". Migrations applied [1..22] = known [1..22], unchanged; customer data counts identical in every table.
+
+#### The fixes
+
+| Defect | Fix commit | What changed | Suite case that now covers it |
+| --- | --- | --- | --- |
+| D1 | 785f01d (file renamed in 38ff235) | `static/v2/js/ui/inview.js`: the press is kept by the chart's name, found again after the page redraws, and holds until the reader scrolls on their own (wheel, swipe or a scrolling key). Cause: the press was held as an element that had to stay on screen; Financials redraws every chart as its later figures arrive (the EDGAR insider fill), so the pressed element was gone by the question, and the panel had also moved it (on the copy this round: from 291 px to 1,334 px, off screen) | `tests/e2e/test_pass2_milo_view.py::test_a_chart_pressed_before_milo_opens_from_the_top_bar_is_the_one_milo_is_told`: press the chart, open Milo from the top bar, let the held insider history redraw the page, ask, read `context.focus.in_view` in the chat request; then a wheel scroll hands it back. Fails on the old inview.js ("Cash flow"), passes now |
+| D2, product edge | 46c47e1 | `pages/workspace.js`: the saved-layout list redraws in its own slot; the typed name is kept apart from the box and put back, with the caret, on any whole-bar redraw | `tests/e2e/test_pass2_workspace.py::test_a_named_layout_saved_in_one_browser_opens_in_another` types the name the moment Customize opens, holds the list until then, checks name and focus survive its arrival. Fails on the old workspace.js (`'' == 'Earnings week'`), passes now |
+| D2, the journeys | 46c47e1, c91613e | Export: waited for "Apple" in `#main`, which the Overview it came from already showed, so it read the Overview or the page in between; now waits for the sheet and its enabled print button. Passkey: opened sign-in by changing only the #, where the app still held the signed-in account and went Home; now loads sign-in afresh after the cookies are cleared, and clicks through locators that survive Settings' redraws. Index Read (found red once in this round's first clean run, "Element is not attached to the DOM"): the same stale-handle wait, now a locator and a wait until the read has finished | the three named journeys plus `test_the_index_read_is_asked_from_the_board_and_answers_in_place` |
+| D3 | 556014f | Company grid (`pages/workspace.js`): each figure's note was a `small` inside a dl group; it is now a second `dd`, styled as before. Financials (`ui/align.js`): a table box that scrolls either way becomes a keyboard stop (`tabindex=0`, `role=region`, a name from its caption, fold or section heading); only what was added is removed when it stops scrolling; re-measured when a fold opens | `tests/e2e/test_pass2_axe.py`, four cases: Financials with quarters, the earnings record and fifteen congressional trades, and the company grid with its Earnings panel drawn, each at 1440 and 390, axe clean. All four fail on the old markup |
+
+#### Counts block
+
+| Item | Result |
+| --- | --- |
+| Commit tested | c91613e, fresh clone of the fork branch in a new empty directory, HEAD verified equal, tree clean, push address DISABLED |
+| Suite from clean | **9,170 passed, 0 failed, 1 skipped of 9,171**, 1,967 s (23:53:19 to 00:26:07 UTC), outbound HTTP pinned to 127.0.0.1:9, no ANTHROPIC_API_KEY in the shell |
+| The one skip | `tests/test_brokerage_exposure.py::test_live_qqq` (his live EDGAR test, `OPTIC_LIVE_EDGAR=1` to run), the same one skip as every earlier run |
+| Against round one | 9,162 passed, 3 failed, 1 skipped of 9,166; now 9,170 passed, 1 skipped of 9,171 (the 5 new cases: 1 D1 journey, 4 axe journeys) |
+| Earlier clean runs this round, not counted as the result | at 556014f, collection refused: the new journey's file name `tests/e2e/test_pass2_place.py` collided with `tests/test_pass2_place.py` (renamed in 38ff235); at 38ff235, 9,169 passed, 1 failed (the Index Read journey, fixed in c91613e), 1 skipped |
+| The journeys alone, ten times each, in the clean clone | export **10 of 10**, passkey **10 of 10**, named layout **10 of 10**; Index Read 10 of 10 (00:26 to 00:36 UTC) |
+| Browser journeys in the suite | 135 of 135 passed |
+| Pass 2 tests | 68 collected under test_pass2_*: 68 passed |
+| Eval, quality set | `tests/test_milo_eval.py`: 221 of 221 passed |
+| Eval, injection set | INJ-01 to INJ-14, **14 of 14**; red team `tests/test_milo_redteam.py` **38 of 38** |
+| Eval, live smoke | Excluded for want of a key in the suite's shell; not a skip. Milo answered live on the copy (D1 runs) |
+| Suite needs no API key | yes |
+| HTTP soak | 30 page loads, 8,640 requests, 0 failures, as the evaluator through the gate |
+| OUTCOME INSTRUMENTED | NOT APPLICABLE: no outcome named |
+| Stack torn down | none brought up (the journeys start their own servers); clones, runners and output stay in the session scratchpad |
+
+No model call changed this round (D1 changes only which name the page sends; the server's check in `app/ai.py` is unchanged), so rule 10 is met by the sets above.
+
+#### The re-run, item by item (through the gate, real passwords, evaluator account, 1440 by 900 unless a row says 390)
+
+| # | Item | Asked | What the copy did | Re-verified (UTC) | Pass |
+| --- | --- | --- | --- | --- | --- |
+| D1 a | Milo given the view, D1's order | Financials (AAPL), Quarters, Cash flow by quarter scrolled to 291 px and pressed, then Ask Milo in the top bar, "Explain this chart in two short paragraphs." | the panel moved the chart from 291 px to 1,334 px; the chat request carried `context.focus.in_view` = {metric "Cash flow by quarter", period "quarters"}; Milo answered "For AAPL, the quarterly cash flow chart..." (1,976 characters, on cash flow) | 23:56:50 | yes |
+| D1 b | the same, a second fresh browser | as above | the same in_view; "For AAPL, the cash flow chart shows quar..." (1,782 characters) | 23:56:58 | yes |
+| L1 | Named layouts, typing right after Customize | Customize pressed, the name typed at once (finished 0.30 s after the press), Save to my account | the saved-list request answered at +0.24 s, while the name was being typed; the box still held "Round two 2357" after it; PUT 200; "Round two 2357 is saved on your account." | 23:57:05 | yes |
+| L2 | ...across two browsers | a second browser, signed in through the form, Customize, Saved layouts, Open | "Saved layouts (1)"; "Round two 2357 is open as My Desk." | 23:57:07 | yes |
+| L3 | ...delete | Delete in Saved layouts | DELETE 200, 0 layouts left | 23:57:07 | yes |
+| E1 | Export to PDF | `#/AAPL/sheet`, after its print button was enabled, printed by Chromium | a 210,250-byte PDF; the sheet's text has AAPL and Apple; no page error | 23:57:11 | yes |
+| P1 | Passkey add | Settings, Add a passkey (Chromium's virtual authenticator) | register verify 200; 1 passkey on the account | 23:57:13 | yes |
+| P2 | Sign in with the passkey alone | Settings' "Sign out" on this device, then a fresh sign-in page, "Sign in with a passkey" | sign-out 200; `/api/auth/me` signed out; login verify 200; signed in as the evaluator | 23:57:16 | yes |
+| P3 | Remove | Remove, then confirm | DELETE 200; 0 passkeys left | 23:57:16 | yes |
+| X1 | axe, company grid, 1440 | `#/AAPL/workspace` at Advanced, the Earnings panel drawn | 0 violations; no sideways scroll | 23:57:27 | yes |
+| X2 | axe, Financials, 1440 | `#/AAPL/financials`, Quarters | 0 violations; four scrolling table boxes, each `tabindex=0` with a name (three "View data, table" in Segments, "Congressional disclosures, table") | 23:57:30 | yes |
+| X3 | axe, company grid, 390 | as X1 | 0 violations; no sideways scroll | 23:58:02 | yes |
+| X4 | axe, Financials, 390 | as X2 | 0 violations; eight scrolling boxes, each reachable and named (Statements, Segments, "Earnings track record, table", "Insider trades, full history, table", "Congressional disclosures, table") | 23:58:06 | yes |
+| W1 | Re-walk, Home at Advanced | signed in, live feeds | no raw text, no failed block, no sideways scroll, no page error | 23:59:07 | yes |
+| W2 | Re-walk, Home at Beginner | same | same | 00:00:09 | yes |
+| W3 | Re-walk, AAPL Overview | same | same, nothing left loading | 00:00:12 | yes |
+| W4 | Re-walk, AAPL Chart | same | same, nothing left loading | 00:00:16 | yes |
+| S | Soak | 30 page loads through the gate, signed in | 8,640 requests, all 200, 0 failures | 00:02 to 00:09 | yes |
+
+axe: **zero serious and zero critical** (zero violations of any impact) on the company grid and Financials at both widths, on live data.
+
+#### Verdicts on round one's defects
+
+- **D1: fixed and re-verified.** The pressed chart reaches Milo after the panel opens and moves it, twice on the copy; covered by the new journey, which fails on the old code.
+- **D2: fixed and re-verified.** The layout name typed during the list's arrival is kept on the copy; the suite from clean is green (9,170 passed, 1 skipped) and the three journeys pass 10 of 10 alone; the fourth journey of the same kind found on the way (Index Read) is fixed under the same defect and also 10 of 10.
+- **D3: fixed and re-verified.** axe clean on both screens at both widths on live data; covered by four new journeys that fail on the old markup.
+
+#### Findings this round
+
+**DEFECT**: none new.
+
+**LIMIT**
+
+- **L5. Names of the Financials table boxes repeat.** Several boxes in one section carry the same name ("View data, table" three or four times in Segments). axe's WCAG A and AA rules pass; its best-practice rule `landmark-unique` (not in the bar this pass promised) would flag them. One line in `ui/align.js` (prefix the section's heading) would fix it. Not fixed: outside D1 to D3.
+
+**Observations (not findings)**
+
+- O1. Memory and file descriptors at rest. On the new process: at boot 54 fds, 390 MB; after the browser run 277 fds, 1.09 GB; after the soak 344 fds, 1.14 GB; at rest 365 (00:10), 577 (00:27) and 579 fds (00:36) with 1.24 GB. The previous process (620c6d4) read 570 fds and 2.26 GB at rest at 23:19, an hour after round one. Pass 1: 121 to 171 fds, 0.4 to 0.7 GB. The count rises with use and levels near 580 at rest; what the descriptors are was not readable from the ssh session (readlink refused). Worth the operator's eye before delivery; not a regression of this round (the same growth on the code before it).
+- O2. The D3 change to `ui/align.js` is shared, so table boxes that scroll on other pages (the Earnings tab's estimate revisions at 390, LIMIT L3) are now keyboard stops as well; not re-scanned this round, so L3 is carried unchanged.
+
+#### Limits carried forward
+
+- **L1. The brokerage link (SnapTrade)**: still untestable, no SnapTrade test keys; carried unchanged.
+- **L2. The alert digest recipient**: still an open product question for the customer (one configured address, the owner's); carried unchanged.
+- **L3. axe outside Round 2's items** (the Earnings tab's estimate revisions table at 390, the shared toast's contrast): carried; the table part may now be covered by D3's shared fix (O2), not re-scanned; the toast contrast is untouched.
+- **L4. Declared not built in this pass**: Investing and Earnings send their tab to Milo, not the chart in view; the sector or holdings donut and treemap; the Read page's Desk keeps its layout; the grid reached by "Open as panels"; tiers are round 3. Carried unchanged.
+
+#### Harness faults (fixed and re-run before this report, counted neither way)
+
+- The re-walk counted the skeleton inside Home's hidden "Your portfolio" panel as "still loading" (the panel is hidden until the brokerage answers, by design, and the skeleton is not visible: hidden, no offsetParent); re-read checking visibility, nothing visible left loading.
+- The first count before the deploy timed out on `railway ssh` (connect timeout); retried at 23:54:58 UTC, and that reading is the one in the deploy record.
+
+#### Leave as found
+
+Created on the copy by this run, all ours, on the evaluator account only:
+
+- About 17 sessions from fresh browsers through the form (most left to expire) and one from the passkey sign-in; 2 Milo chat messages (23:56, on AAPL Financials; the plan allows 4,000 a day); one named layout saved and deleted (0 left); one passkey added and removed (0 left); the second browser's Home put back on Market Overview; `usage_event` rows from each fresh browser.
+- Nothing else: no variable set; edge-optic, mailpit and edge-optic-mail not touched; no mail sent; no Stripe object; no SnapTrade call; the owner account and the first test account not touched.
+
+Screenshots, the PDF and raw results: `scratchpad/r2/run/` of this session (untracked, outside every repository).
+
+#### Readiness
+
+Machine half on c91613e: deploy verified; D1, D2 and D3 fixed and re-verified on the live copy through the gate; the suite from clean green apart from the one standing skip; the in-session intraday half still NOT RUN until the market is open. The human half and the verdict are the operator's.
+
+Key file: `~/.conjure/optic-eval.key` is still in place (mode 600, lines user, gate, evaluator, admin): the human half and the delivery recording still need it.
