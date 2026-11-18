@@ -1,0 +1,47 @@
+1
+00:00:00,350 --> 00:00:15,494
+The founder of Optic asked Conjure for a second round on Optic, the research terminal for people who follow or own stocks: every workflow working from start to finish, the data drawn as charts with its sources, and a workspace that follows the reader to any computer.
+
+2
+00:00:16,344 --> 00:00:41,928
+Here is one reader's session. They open Home while the market is open and see today's line on each ticker. They open Apple's Financials, drawn as charts, each naming its source, and read ten years of insider trades. They press one chart and ask Milo about it, and the answer is about that chart. Back on Home, they arrange their panels, save the layout, and open it again on another computer. Later, the owner sees the counts.
+
+3
+00:00:42,878 --> 00:01:06,302
+First, every workflow now walks from start to finish. Home, the market read, the indices: each screen loads, and when something cannot load, it says so in plain words, with a way to try again. A mistyped address gets a page with a search box rather than a blank. And while brokerage linking is switched off, the Brokerage page says so and offers the watchlist and the Paper Desk instead.
+
+4
+00:01:07,252 --> 00:01:27,892
+Six features could not be tried on the private test site last round. They were tried this time. Index Read: pressed on the indices board, a written read of the index appears in place. The research sheet prints as a clean two-page document. Deep research, passkeys and the alerts page work as well. The brokerage link waits on test keys from SnapTrade.
+
+5
+00:01:28,842 --> 00:01:46,314
+Now Milo is told what the reader is looking at. On Apple's Financials, by quarter, the reader presses the Cash flow by quarter chart, then Ask Milo, and asks it to explain the chart. The answer is about cash flow by quarter, and the figures the company reported are underlined, with their source beside them.
+
+6
+00:01:47,464 --> 00:02:03,304
+Every chart now names where its figures come from, on the line beneath it. Further down, insider trades go back ten years. The free feed lists only its latest batch, so the older trades are read from the company's own filings at the SEC, each one linked to its filing.
+
+7
+00:02:04,254 --> 00:02:21,390
+On Home, each ticker in the watchlist carries today's line, green or red by the day's direction, refreshed every five minutes and marked as delayed. One press on 1D draws today alone on the headline chart, with the price dot saying delayed while the market is open, and closed after.
+
+8
+00:02:22,340 --> 00:02:39,404
+Financials reads as charts: revenue and profit, margins, cash flow, cash and debt, and the shape of the balance sheet, by year or by quarter, with the company's segments below. On Earnings, analysts' price targets are drawn as a range, with today's price as a dot.
+
+9
+00:02:40,354 --> 00:02:49,474
+On Home, the Optic Desk now keeps its sources, saved research and Milo's follow-up questions in a column beside the reading, so there is less to scroll.
+
+10
+00:02:50,424 --> 00:03:10,464
+And the workspace. Panels sit in colour groups: Blue, Gold and Teal. A ticker chosen in one panel changes every panel in its group and leaves the rest alone. The reader names a layout and saves it to their account, and it appears under Saved layouts, ready to open from any browser. A company's page opens as the same grid of panels.
+
+11
+00:03:11,614 --> 00:03:28,942
+Last, the owner. The owner's Settings say plainly that plans are not on sale yet; billing switches on later from the hosting settings alone, with no change to the app. And Metrics keeps counting the three things the founder named: a stock opened from Home, a question to Milo, and a reader coming back.
+
+12
+00:03:29,892 --> 00:03:36,948
+This round is live now on the same private test site, updated in place, and the sign-in details arrive separately.
