@@ -29,29 +29,32 @@ CONFORMS, with five deferrals on the operator's call to round 3 (the holdings do
 | `CON-54-optic-workflow.html` | 75,649 | 7a8cd9bdb4d482511e1f796a1e4e6087 | no (regenerable) | canvas 3586 x 798 units; attach |
 | `CON-54-optic-pass2-delivery-deck.pdf` | 3,558,878 (3.6 MB) | fca42722a738192dacbbd05c0d67d27b | yes | 24 pages, 960 x 540 pt, 4 reviewer pages after one divider; attach |
 | `CON-54-optic-pass2-delivery-narration.md` | 6,348 | | yes | 12 beats, clips measured |
-| `CON-54-optic-pass2-delivery-video.srt` | 3,843 | | yes | 12 captions from the measured clip timings |
-| `CON-54-optic-pass2-delivery-video.mp4` | 15,578,055 (15.6 MB) | 57b2fa85f7645bccedfe846a81efa12a | no (media) | 720p web encode; attach |
+| `CON-54-optic-pass2-delivery-video.srt` | 3,865 | | yes | 12 captions from the re-voiced clip timings |
+| `CON-54-optic-pass2-delivery-video.mp4` | 15,615,166 (15.6 MB) | 6d09d7112a9815a656adc751efd97028 | no (media) | 720p web encode, re-voiced after operator review; attach |
+| `CON-54-optic-pass2-delivery-video-take1.mp4` | 15,578,055 | 57b2fa85f7645bccedfe846a81efa12a | no (media) | the rejected first voice track, kept for comparison; do not attach |
 | `CON-54-checks.md`, `CON-54-pre-send-checklist.md`, this file | small | | yes | |
 
 All of the above under `/Users/sid/Code/claude_work/optic-wt-delivery-pass-2/.factory/delivery/` (worktree of the fork on branch `factory/delivery-optic-pass-2`).
 
-Outside the repositories: the 1080p master `/Users/sid/Code/claude_work/Conjure/handoffs/CON-54-optic-pass2-delivery-video-1080p.mp4` (40,631,424 bytes) and its .srt; the per-beat takes `/Users/sid/Code/claude_work/Conjure/handoffs/CON-54-recording/` (eleven .webm and `rec-log.json` with each take's start offset; 63 MB); the narration clips `marketing/videos/build/audio/optic2_s01.wav` to `optic2_s12.wav` (measured 15.48, 25.58, 21.96, 20.98, 17.47, 15.84, 17.14, 17.06, 9.12, 20.04, 17.33, 7.06 s), the segments in `marketing/videos/build/seg/` and the closing card `marketing/videos/build/frames/optic2_close.png`, all in `/Users/sid/Code/claude_work/Conjure-wt-delivery-optic-pass-2/` (untracked); the build manifests `marketing/videos/build/optic-pass2.json` and `optic-pass2.rec.json` (committed in the Conjure branch). The deck's HTML source and images: `/Users/sid/Code/claude_work/Conjure/customers/optic/pass-2/deck-source/` (gitignored). The deck was authored as HTML and printed to PDF by Chromium; there is no PPTX. The recorder and capture scripts: `/private/tmp/claude-501/-Users-sid-Code-claude-work/af39d319-3b3e-44e2-8ba0-0f7137191302/scratchpad/k54/` (`record.py`, `cap/cap.py`, `undo.py`, `pdf.py`).
+Outside the repositories: the 1080p master `/Users/sid/Code/claude_work/Conjure/handoffs/CON-54-optic-pass2-delivery-video-1080p.mp4` (re-voiced) and its .srt; the per-beat takes `/Users/sid/Code/claude_work/Conjure/handoffs/CON-54-recording/` (eleven .webm and `rec-log.json` with each take's start offset; 63 MB); the narration clips `marketing/videos/build/audio/optic2_s01.wav` to `optic2_s12.wav` (re-voiced; measured 15.14, 25.58, 23.42, 20.64, 17.47, 15.84, 17.14, 17.06, 9.12, 20.04, 17.33, 7.06 s; the take-one clips in `audio/take1-optic2/`), the segments in `marketing/videos/build/seg/` and the closing card `marketing/videos/build/frames/optic2_close.png`, all in `/Users/sid/Code/claude_work/Conjure-wt-delivery-optic-pass-2/` (untracked); the build manifests `marketing/videos/build/optic-pass2.json` and `optic-pass2.rec.json` (committed in the Conjure branch). The deck's HTML source and images: `/Users/sid/Code/claude_work/Conjure/customers/optic/pass-2/deck-source/` (gitignored). The deck was authored as HTML and printed to PDF by Chromium; there is no PPTX. The recorder and capture scripts: `/private/tmp/claude-501/-Users-sid-Code-claude-work/af39d319-3b3e-44e2-8ba0-0f7137191302/scratchpad/k54/` (`record.py`, `cap/cap.py`, `undo.py`, `pdf.py`).
 
 ## The video, ffprobe on the exact file to attach
 
 ```
 ffprobe -v error -show_entries format=size,duration:stream=codec_name,bit_rate -of default=noprint_wrappers=1 CON-54-optic-pass2-delivery-video.mp4
 codec_name=h264
-bit_rate=444771
+bit_rate=443922
 codec_name=aac
-bit_rate=119364
-duration=217.615333
-size=15578055
+bit_rate=119478
+duration=218.404667
+size=15615166
 ```
 
-1280 x 720, 30 fps, H.264 high, AAC 48 kHz stereo, faststart, CRF 21 (first rung, under 45 MB), narration loudness-normalised to -16 LUFS by two-pass loudnorm (measured -20.37 LUFS in). Voice en-US-AndrewNeural at +4% through `narrate.py`; the house edge-tts install (7.2.8) was refused by the service (403), so the clips were made with edge-tts 7.3.1 in a scratch virtual environment, same voice and rate.
+1280 x 720, 30 fps, H.264 high, AAC 48 kHz stereo, faststart, CRF 21 (first rung, under 45 MB), narration loudness-normalised to -16 LUFS by two-pass loudnorm (measured -20.38 LUFS in).
 
-Beats, all live on the private test site at build 7689d8061f5e on 2026-11-18 between about 14:55 and 15:05 ET (market open) except the diagram and the closing card: (1) the commission over the workflow diagram; (2) the journey walked, fifteen steps, motion on; (3) Home, Read, Indices, the not-found page, Brokerage off; (4) Index Read on the S&P 500 row, the research sheet; (5) Cash flow by quarter pressed, Ask Milo, the answer streaming; (6) a chart's source line, Insider trades at 10 years; (7) Watchlist rows with today's lines, 1D; (8) Financials by year, Earnings price-target range; (9) the Optic Desk's right column; (10) Customize, one panel's group changed, a layout saved, Saved layouts, Open as panels; (11) the owner's Settings ("Plans are not on sale yet") and Metrics, figures blurred; (12) the closing card. Narration 3:38.
+Re-voiced 2026-11-18 after the operator's review of take one (deck approved under D-54-2). The voice track was rejected on three points: "S&P 500" read as letters, the brand not smooth, and the sentence shape "an X that is not a Y" in beat 3. The operator's revised lines (`scratchpad/CON-54-narration-v2.md`) are spoken word for word: the brand is said as "Conjure" (the closing card keeps conjure.work), the index is "the index", and beat 3 reads "A mistyped address gets a page with a search box". All twelve clips regenerated, same voice and rate (edge-tts 7.3.1, en-US-AndrewNeural, +4%), measured 15.14, 25.58, 23.42, 20.64, 17.47, 15.84, 17.14, 17.06, 9.12, 20.04, 17.33, 7.06 s. Picture unchanged: the same eleven takes at the same start offsets and the same closing card, cut to the new clip lengths; beat 3's line is longer, so its last frame is held about 1.1 s (`handoffs/CON-54-recording/held/s03.mp4`); beats 1 and 4 end slightly earlier in the same takes. Take one kept beside the new encode as `CON-54-optic-pass2-delivery-video-take1.mp4`, and its 1080p master as `Conjure/handoffs/CON-54-optic-pass2-delivery-video-take1-1080p.mp4`. Grep of the narration and the captions: Alexander, Yazji, S&P, conjure.work, em dash and en dash all zero. Voice en-US-AndrewNeural at +4% through `narrate.py`; the house edge-tts install (7.2.8) was refused by the service (403), so the clips were made with edge-tts 7.3.1 in a scratch virtual environment, same voice and rate.
+
+Beats, all live on the private test site at build 7689d8061f5e on 2026-11-18 between about 14:55 and 15:05 ET (market open) except the diagram and the closing card: (1) the commission over the workflow diagram; (2) the journey walked, fifteen steps, motion on; (3) Home, Read, Indices, the not-found page, Brokerage off; (4) Index Read on the S&P 500 row, the research sheet; (5) Cash flow by quarter pressed, Ask Milo, the answer streaming; (6) a chart's source line, Insider trades at 10 years; (7) Watchlist rows with today's lines, 1D; (8) Financials by year, Earnings price-target range; (9) the Optic Desk's right column; (10) Customize, one panel's group changed, a layout saved, Saved layouts, Open as panels; (11) the owner's Settings ("Plans are not on sale yet") and Metrics, figures blurred; (12) the closing card. Narration 3:38 (218.4 s as re-voiced).
 
 ## Presentation edits, named
 

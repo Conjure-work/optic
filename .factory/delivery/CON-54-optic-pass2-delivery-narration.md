@@ -2,9 +2,9 @@
 
 Voice: Microsoft Andrew neural (en-US-AndrewNeural) through the pipeline of record (marketing/videos/build/narrate.py), rate +4%. Audience: the customer and their investors, non-technical. Reality rule: everything on camera was performed live on the private test site on 2026-11-18, signed in off camera; the opening diagram is this round's workflow diagram. Plain language only; third person; no figures from testing; no reviewer material. Captions come from the same measured clip timings (`CON-54-optic-pass2-delivery-video.srt`).
 
-## Beat 1 (s01), clip 15.48 s
+## Beat 1 (s01), clip 15.14 s
 
-The founder of Optic asked conjure.work for a second round on Optic, the research terminal for people who follow or own stocks: every workflow working from start to finish, the data drawn as charts with its sources, and a workspace that follows the reader to any computer.
+The founder of Optic asked Conjure for a second round on Optic, the research terminal for people who follow or own stocks: every workflow working from start to finish, the data drawn as charts with its sources, and a workspace that follows the reader to any computer.
 
 On screen: The workflow diagram of this round, still, opened from its HTML file.
 
@@ -14,19 +14,17 @@ Here is one reader's session. They open Home while the market is open and see to
 
 On screen: The same diagram with motion on, walked one step at a time through its fifteen steps.
 
-## Beat 3 (s03), clip 21.96 s
+## Beat 3 (s03), clip 23.42 s
 
-First, every workflow now walks from start to finish. Home, the market read, the indices: each screen loads, and when something cannot load, it says so in plain words with a way to try again. An address that is not a company shows a page with search. And Brokerage, while it is switched off, says so and offers the watchlist and the Paper Desk instead of a dead end.
+First, every workflow now walks from start to finish. Home, the market read, the indices: each screen loads, and when something cannot load, it says so in plain words, with a way to try again. A mistyped address gets a page with a search box rather than a blank. And while brokerage linking is switched off, the Brokerage page says so and offers the watchlist and the Paper Desk instead.
 
-On screen: Signed in (off camera) as the reader at Intermediate: Home, then Read, then Indices, then an address that is not a company (the not-found page with search), then Brokerage in its off state.
+On screen: Signed in (off camera) as the reader at Intermediate: Home, then Read, then Indices, then a mistyped address (the not-found page with search), then Brokerage in its off state.
 
-## Beat 4 (s04), clip 20.98 s
+## Beat 4 (s04), clip 20.64 s
 
-The six features that had never been tried on the private test site were tried there. Index Read: pressed from the indices board, a written read of the S&P 500 appears in place. The research sheet prints as a clean two-page document. Deep research, passkeys and the alerts page work as well. The brokerage link waits on test keys from SnapTrade.
+Six features could not be tried on the private test site last round. They were tried this time. Index Read: pressed on the indices board, a written read of the index appears in place. The research sheet prints as a clean two-page document. Deep research, passkeys and the alerts page work as well. The brokerage link waits on test keys from SnapTrade.
 
-Spoken as: The six features that had never been tried on the private test site were tried there. Index Read: pressed from the indices board, a written read of the S and P 500 appears in place. The research sheet prints as a clean two-page document. Deep research, passkeys and the alerts page work as well. The brokerage link waits on test keys from SnapTrade.
-
-On screen: Indices: Read pressed on the S&P 500 row and the written read appearing in place; then Apple's research sheet.
+On screen: Indices: Read pressed on the index row and the written read appearing in place; then Apple's research sheet.
 
 ## Beat 5 (s05), clip 17.47 s
 
@@ -76,4 +74,6 @@ This round is live now on the same private test site, updated in place, and the 
 
 On screen: The closing card.
 
-Total with pads: about 217 s.
+Total: 218.4 s as encoded.
+
+Re-voiced 2026-11-18 after the operator's review: the spoken lines are the operator's revision (brand spoken as "Conjure"; the index named as "the index"; the operator's sentence-shape rule applied). Same voice and rate; the picture is the same takes at the same start offsets, with beat 3's last frame held about 1.1 s to fit its longer line.

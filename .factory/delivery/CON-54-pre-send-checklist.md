@@ -13,7 +13,8 @@ Numbered to match the Delivery checklist (mirror `updated: 2026-11-06T19:59:38.4
 1. [M] [x] Real-browser smoke from outside on the deployed build: GREEN.
 2. [M] [x] Secret scan green (gitleaks v8.24.3, the fork's own job). Free round: no transfer set to stage.
 3. [M] [x] Deck machine checks GREEN. [CARD] [ ] the deck (card D-54-2 below).
-4. [M] [x] Video machine checks GREEN. [CARD] [ ] the video (card D-54-3 below).
+3. note: card D-54-2 answered by the operator: deck approved as is.
+4. [M] [x] Video machine checks GREEN on the re-voiced encode. [CARD] [ ] the video (card D-54-3 below): re-voiced after operator review, awaiting the operator.
 5. [M] [ ] RED: CI's suite job is cancelled at its 40-minute limit, so no CI count agrees with the clean clone's 9,174 passed, 1 skipped at 34a30b7.
 6. [x] Invoice: none. CON-54 carries Free (students offer, free pass 2 of 3).
 7. [M] [x] Message lints GREEN with the one disclosed exception (the private link is the host's own address, as in Pass 1). Attach on THE message: the deck PDF, the video, both diagram HTML pages.
@@ -41,14 +42,16 @@ If nothing is answered:  the work waits at the gate
 
 ```
 CARD       D-54-3   Video   holds: the send card
-Context    The round-two walkthrough, recorded live on the private test site at build 7689d8061f5e.
-Question   Does the video go as it is?
+Status     Re-voiced after operator review, awaiting the operator (take one rejected on the voice track: S&P read as letters, the brand, one sentence shape)
+Context    The round-two walkthrough, recorded live on the private test site at build 7689d8061f5e; the picture as shot, the voice track re-made from the operator's revised lines.
+Question   Does the re-voiced video go as it is?
 Options    A (recommended) Looks right - attached as is
            B Change - say which beat; that beat is re-recorded and the video re-assembled
            C Hold - nothing is sent
-Evidence   ffprobe: 15,578,055 bytes, 217.6 s, h264 444,771 b/s, aac 119,364 b/s, 1280 x 720
+Evidence   ffprobe: 15,615,166 bytes, 218.4 s, h264 443,922 b/s, aac 119,478 b/s, 1280 x 720
            12 beats: diagram, journey, workflows, six features, Milo, sources and insiders, today's lines, Financials, Desk, workspace, owner, close
            Metrics figures and session addresses blurred in the page; the model-named tab hidden
+           Spoken text grep: Alexander, Yazji, S&P, conjure.work, both dashes all zero; picture unchanged (beat 3 held 1.1 s)
            Beat 4 says deep research, passkeys and alerts work without showing them on camera
            One demo layout saved on camera and deleted afterwards; nothing left standing
 Record     .factory/delivery/CON-54-optic-pass2-delivery-narration.md and .srt
@@ -65,7 +68,7 @@ Evidence   [M] checks: 6 of 7 green; item 5 RED (CI suite timeout), item 7 carri
            Deployed build 7689d8061f5e = code 34a30b7 = the commit the gauntlet tested
            Invoice: none, Free
            Placeholder search empty
-           Message Conjure/handoffs/CON-54-delivery-message.txt; attachments 3.6 MB, 15.6 MB, 96 KB, 76 KB
+           Message Conjure/handoffs/CON-54-delivery-message.txt; attachments 3.6 MB, 15.6 MB (re-voiced), 96 KB, 76 KB
 Record     CON-54-checks.md, CON-54-package-manifest.md
 If nothing is answered:  the work waits at the gate
 ```
