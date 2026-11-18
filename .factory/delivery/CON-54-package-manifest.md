@@ -92,4 +92,4 @@ L1 brokerage link (SnapTrade test keys), L2 alert email recipient, L3 the save n
 
 Send time: [to be filled at the send]
 
-Commits and pull requests: [filled after the push, below]
+Commits and pull requests: fork sidprobstein/optic, branch `factory/delivery-optic-pass-2` (cut from `factory/pass-2-works-data-workspace` at 92dbcca), kit commit e9baf74, pull request https://github.com/sidprobstein/optic/pull/1 (base: the pass branch, not the customer's repository); Conjure sidprobstein/conjure-work, branch `factory/delivery-optic-pass-2` (cut from origin/main 831c3a3), record commit 8c82cdf, pull request https://github.com/sidprobstein/conjure-work/pull/398. Not merged. This line added by a follow-up commit on each branch.
