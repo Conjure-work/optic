@@ -33,8 +33,8 @@ E2E_SLICES = 6
 # Each shard's floor: what it passed when the floors were last set (the one standing skip, test_live_qqq, is in py).
 # The workflow's SUITE_FLOOR is their sum.
 SHARD_FLOORS: Dict[str, int] = {
-    "py": 9073,
-    "e2e-1": 23, "e2e-2": 23, "e2e-3": 23, "e2e-4": 23, "e2e-5": 23, "e2e-6": 22,
+    "py": 9384,
+    "e2e-1": 37, "e2e-2": 37, "e2e-3": 37, "e2e-4": 36, "e2e-5": 36, "e2e-6": 36,
 }
 
 
