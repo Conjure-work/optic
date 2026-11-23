@@ -97,7 +97,7 @@ def test_the_sign_up_form_leads_to_the_questions_and_every_sign_in_may_offer_the
     app = (JS / "app.js").read_text()
     assert "if (store.signedIn()) P.levelquiz().then((m) => m.offer())" in app
     lq = (JS / "pages/levelquiz.js").read_text()
-    assert "data-v2-lq-skip" in lq and "data-v2-lq-continue" in lq and "lq-btn" in lq
+    assert "data-v2-lq-skip" in lq and 'type="submit" class="btn btn-primary lq-btn">Continue' in lq and "lq-btn" in lq
     css = (V2 / "css" / "pages.css").read_text()
     assert ".lq-btn { min-width: 9.5rem; min-height: 44px;" in css, "Skip and Continue are one size"
     assert "drawer" not in lq and 'role="dialog"' not in lq and "aria-modal" not in lq, "no modal: the questions are a page and a band"

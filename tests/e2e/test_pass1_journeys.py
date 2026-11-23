@@ -298,12 +298,14 @@ def test_the_level_follows_the_account_to_another_device(chrome, server):
     home(pa, server)
     pa.wait_for_selector("[data-v2-account].avatar")
     with pa.expect_response(lambda r: "/api/auth/preferences" in r.url and r.request.method == "PATCH"):
-        pa.click("[data-v2-lc] [data-v2-level='beginner']")
+        pa.click("[data-v2-lc] [data-v2-level='advanced']")
+    # Advanced, not Beginner: since round three (2026-11-23) a fresh browser already starts at Beginner, so pressing
+    # it would send nothing and prove nothing about the account
     # another device: its own storage, nothing in it, the same account
     b, pb = open_page(chrome, server, cookies=jar)
     home(pb, server)
-    pb.wait_for_function("() => document.querySelector('[data-v2-lc] [aria-pressed=\"true\"]').dataset.v2Level === 'beginner'")
-    assert pb.evaluate("localStorage.getItem('optic.knowledge.v1')") == "beginner"
+    pb.wait_for_function("() => document.querySelector('[data-v2-lc] [aria-pressed=\"true\"]').dataset.v2Level === 'advanced'")
+    assert pb.evaluate("localStorage.getItem('optic.knowledge.v1')") == "advanced"
     a.close(); b.close()
 
 

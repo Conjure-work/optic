@@ -1771,13 +1771,13 @@ function wire() {
     // the phone's layout selector: the four tabs did not fit beside Customize and were clipped
     if (e.target.matches('[data-ws-presetsel]')) { const k = e.target.value; if (k === 'mine' && !S.layouts.mine.some((x) => !x.hidden)) S.layouts.mine = JSON.parse(JSON.stringify(S.layouts.market)); S.preset = k; save(); paintAll(); say(`${PRESETS[S.preset].label} layout.`); const again = root.querySelector('[data-ws-presetsel]'); if (again && matchMedia('(pointer: fine)').matches) again.focus(); }   // iOS reopens a select's menu on focus
   });
-  // the box takes a ticker or a name (core/resolve.js); one that names nothing is said, where it used to do nothing
   root.addEventListener('input', (e) => {
     if (e.target.id !== 'ws-named-name') return;
     namedDraft = e.target.value;
     // the next change clears the saved line
     if (namedSaid) { namedSaid = ''; const said = root.querySelector('[data-ws-named-said]'); if (said) said.textContent = ''; }
   });
+  // the box takes a ticker or a name (core/resolve.js); one that names nothing is said, where it used to do nothing
   root.addEventListener('submit', async (e) => {
     const nf = e.target.closest('[data-ws-named]'); if (nf) { e.preventDefault(); saveNamed((nf.elements.name || {}).value); return; }
     const f = e.target.closest('[data-ws-linkform]'); if (!f) return; e.preventDefault();

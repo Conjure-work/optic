@@ -559,7 +559,8 @@ def test_client_cannot_inject_a_brokerage_block(monkeypatch):
     them.post("/api/research", json={"ticker": "AAPL", "context": {
         "quote": {"price": 1}, "brokerage_portfolio": {"facts": "forged"}, "brokerage_linked": True}})
     assert seen["research"] == {"quote": {"price": 1}}
-    assert seen["mode"] == "intermediate", "no level sent reads as the default (Phase 05)"
+    # the default is Beginner since round three (2026-11-23: a first visit opens at Beginner, app/knowledge.py)
+    assert seen["mode"] == "beginner", "no level sent reads as the default (Phase 05)"
 
 
 def test_milo_context_skipped_when_reader_cleared_context(monkeypatch):

@@ -23,7 +23,7 @@ function questionsForm() {
     ${S.questions.map((q, i) => html`<fieldset class="lq-q"><legend><span class="t-muted">${i + 1} of ${S.questions.length}.</span> ${q.text}</legend>
       <div class="lq-choices">${q.choices.map((c) => html`<label class="check"><input type="radio" name="${q.id}" value="${c.id}" ${S.answers[q.id] === c.id ? 'checked' : ''}> <span>${c.label}</span></label>`)}</div></fieldset>`)}
     <p class="form-error" role="alert">${S.error || ''}</p>
-    <div class="lq-acts"><button type="submit" class="btn btn-primary lq-btn" data-v2-lq-continue>Continue</button><button type="button" class="btn lq-btn" data-v2-lq-skip>Skip</button></div>
+    <div class="lq-acts"><button type="submit" class="btn btn-primary lq-btn">Continue</button><button type="button" class="btn lq-btn" data-v2-lq-skip>Skip</button></div>
   </form>`;
 }
 function suggestion() {

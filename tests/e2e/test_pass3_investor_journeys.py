@@ -360,7 +360,7 @@ def test_the_sign_up_form_leads_to_the_questions_and_accepting_writes_only_the_l
         qs = page.locator(".lq-q").count()
         assert 5 <= qs <= 8
         # Skip is as large as Continue
-        c = page.locator("[data-v2-lq-continue]").bounding_box()
+        c = page.locator("[data-v2-lq-form] button[type=submit]").bounding_box()
         s = page.locator("[data-v2-lq-skip]").bounding_box()
         assert abs(c["width"] - s["width"]) <= 1 and abs(c["height"] - s["height"]) <= 1, (c, s)
         # the keyboard: answer every question with the arrow keys, then Continue
@@ -370,7 +370,7 @@ def test_the_sign_up_form_leads_to_the_questions_and_accepting_writes_only_the_l
             page.keyboard.press("ArrowDown")
             if i < qs - 1:
                 page.keyboard.press("Tab")
-        page.focus("[data-v2-lq-continue]")
+        page.focus("[data-v2-lq-form] button[type=submit]")
         page.keyboard.press("Enter")
         page.wait_for_selector("[data-v2-lq-why]", timeout=15000)
         suggested = page.get_attribute("[data-v2-lq-result]", "data-v2-lq-result")
