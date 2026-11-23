@@ -1004,3 +1004,19 @@ def milo_context(user: Dict[str, Any], account_ids: Optional[List[str]] = None,
                         "performance part, greeks in its options part. broker_as_of is when the broker last "
                         "reported; last_sync_at is when Optic fetched it.",
     }
+
+
+def health_mode() -> Dict[str, Any]:
+    """The brokerage line on /api/health (round three, 2026-11-23): which provider is chosen and whether SnapTrade's
+    two values are set, in plain words. Names and states only, never a value. "not configured" is the evaluation
+    copy's state until the owner's SnapTrade sandbox Client ID and Consumer Key arrive, and the brokerage flow stays
+    untested end to end until then (docs/operations/brokerage-sandbox.md)."""
+    choice = (os.environ.get("BROKERAGE_PROVIDER") or "").strip().lower() or "off"
+    keys = bool(os.environ.get("SNAPTRADE_CLIENT_ID") and os.environ.get("SNAPTRADE_CONSUMER_KEY"))
+    env = "production" if (os.environ.get("SNAPTRADE_ENV") or "").lower() == "production" else "sandbox"
+    return {"provider": choice, "enabled": bool(status().get("enabled")),
+            "snaptrade": "configured ({})".format(env) if keys else "not configured"}
+
+
+from .. import health_extra as _health_extra  # noqa: E402 - registered once this module is loaded
+_health_extra.register("brokerage", health_mode, public=True)
