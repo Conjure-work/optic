@@ -79,7 +79,8 @@ export function mount(app) {
     <div class="stage">
       <header class="topbar">
         <a class="brand-sm" href="#/" aria-label="Optic Terminal, Home">${brandMark()}</a>
-        <button type="button" class="search-btn" data-v2-open-palette aria-label="Search companies, tickers and pages, or ask Milo">${icon('search')}<span class="sb-long">Search or ask</span><span class="sb-short" aria-hidden="true">Search</span><kbd>⌘K</kbd></button>
+        ${/* the name is the words shown, then what they search (round three: axe's label-content-name-mismatch flagged the
+         old aria-label, which did not contain "Search or ask"); on a phone the long words are kept for screen readers */ ''}<button type="button" class="search-btn" data-v2-open-palette>${icon('search')}<span class="sb-long">Search or ask</span><span class="sb-short" aria-hidden="true">Search</span><span class="sr"> companies, tickers and pages, or Milo</span><kbd aria-hidden="true">⌘K</kbd></button>
         <span class="spacer"></span><span class="session-chip" id="session-chip" role="status" aria-live="off"></span>
         <a class="icon-btn topbar-bell" href="#/alerts" data-v2-bell hidden aria-label="Alerts">${icon('bell')}<span class="bell-n" aria-hidden="true"></span></a>
         <button type="button" class="btn btn-milo btn-sm topbar-milo" data-v2-milo="" data-v2-milo-ctx="" data-v2-milo-sym="" aria-label="Ask Milo"><span class="scout-badge" aria-hidden="true"><span class="scout-badge-fig"></span></span><span class="tm-label" aria-hidden="true">Ask Milo</span></button>
@@ -176,7 +177,8 @@ export function paintAccount() {
     const ini = ((u.first_name || u.email || '?')[0] + ((u.last_name || '')[0] || '')).toUpperCase();
     b.textContent = ini.slice(0, 2);
     b.classList.add('avatar');
-    b.setAttribute('aria-label', `Account: ${u.name || u.email}`);
+    // the name starts with what is shown (round three, axe label-content-name-mismatch on a signed-in page)
+    b.setAttribute('aria-label', `${ini.slice(0, 2)}, your account: ${u.name || u.email}`);
   } else {
     b.textContent = 'Sign in';
     b.classList.remove('avatar');

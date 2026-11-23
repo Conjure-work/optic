@@ -540,7 +540,7 @@ export const PANELS = {
           // which lifts the delivered 28% cap; at 55% the tile's ink still reads at 5.2:1 on the green and 7.5:1 on
           // the red. The fund's code left the tile's face; its name and move stay, and the code is in its label.
           const v = r[P.period], a = Math.round(14 + 41 * Math.min(1, Math.abs(v) / full));
-          return html`<button type="button" class="ws-heat-t" data-ws-pick="${r.symbol}" aria-pressed="${S.link === r.symbol}" aria-label="${r.label || r.name} (${r.symbol}), ${moveWords(v, signed(v))}" style="--mix:${a}%" data-dir="${dir(v)}"><span>${r.label || r.name}</span>${mv(v)}</button>`; })}</div>`;
+          return html`<button type="button" class="ws-heat-t" data-ws-pick="${r.symbol}" aria-pressed="${S.link === r.symbol}" aria-label="${r.label || r.name} ${signed(v)}, ${r.symbol}, ${moveWords(v, signed(v))}" style="--mix:${a}%" data-dir="${dir(v)}"><span>${r.label || r.name}</span>${mv(v)}</button>`; })}</div>`;
     },
     foot: (d) => ({ source: 'Sector SPDR funds, Yahoo Finance', at: (d || {}).generated_at }),
     milo: 'Which sectors are leading and lagging, and is it broad rotation or a few names?',

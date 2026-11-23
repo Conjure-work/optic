@@ -1512,6 +1512,7 @@ th .pbadge, dt .pbadge, .k .pbadge { margin-left: 6px; vertical-align: 1px; }
 .dn-arc.mute, .donut .sw.mute { stroke: var(--c-ink-3); background: var(--c-ink-3); }
 .dn-c { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
 .dn-c b { font: 600 var(--t-xl)/1.1 var(--f-sans); color: var(--c-ink); } .dn-c small { font-size: var(--t-sm); color: var(--c-ink-3); }
+.dn .dn-cb { font: 600 var(--t-xl) var(--f-sans); fill: var(--c-ink); } .dn .dn-cs { font-size: var(--t-sm); fill: var(--c-ink-3); }
 .dn-key { display: grid; gap: 6px; min-width: 150px; margin: 0; padding: 0; list-style: none; font-size: var(--t-md); color: var(--c-ink-2); }
 .dn-key li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; } .dn-key b { color: var(--c-ink); font-variant-numeric: tabular-nums; }
 .donut .sw { display: block; width: 10px; height: 10px; border-radius: 2px; }
