@@ -17,6 +17,7 @@ which is the same answer for the same reason as the login form's.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from .. import db, knowledge
@@ -650,6 +651,83 @@ def set_preferences(user_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
     ])
     return preferences(user_id)
 
+
+
+# ------------------------------------------------------ round three preferences
+#
+# Four columns from migration 25, kept apart from DEFAULT_PREFERENCES because their values are structured (JSON) and
+# set_preferences cuts every value to 64 characters. Each is validated here, once, so the four workstreams that read
+# them (chart intervals, Milo's stance, the sign-up questions, the reader's alert digest) cannot store something no
+# page can read. Unknown or malformed values are dropped, never stored.
+
+STANCES = ("neutral", "longterm", "stoic", "quant")
+_INTERVAL = re.compile(r"^[0-9]{1,3}(m|h|d|wk|mo)$")
+_QUIZ_OUTCOMES = ("accepted", "skipped", None)
+
+
+def _clean_intervals(value: Any) -> Optional[str]:
+    if not isinstance(value, list):
+        return None
+    seen: List[str] = []
+    for v in value[:8]:
+        if isinstance(v, str) and _INTERVAL.match(v) and v not in seen:
+            seen.append(v)
+    return json.dumps(seen)
+
+
+def _clean_quiz(value: Any) -> Optional[str]:
+    if not isinstance(value, dict):
+        return None
+    suggested = value.get("suggested")
+    if suggested is not None and not knowledge.known(suggested):
+        return None
+    outcome = value.get("outcome")
+    if outcome not in _QUIZ_OUTCOMES:
+        return None
+    clean = {"shown": bool(value.get("shown")),
+             "suggested": knowledge.three(suggested) if suggested else None,
+             "outcome": outcome,
+             "at": str(value.get("at") or db.utcnow())[:40]}
+    return json.dumps(clean, sort_keys=True)
+
+
+def round_three_preferences(user_id: str) -> Dict[str, Any]:
+    found = db.row("SELECT favourite_intervals, milo_stance, level_quiz, alert_email FROM user_preferences "
+                   "WHERE user_id = ?", (user_id,)) or {}
+    def _load(raw: Any, default: Any) -> Any:
+        try:
+            return json.loads(raw) if raw else default
+        except (TypeError, ValueError):
+            return default
+    return {"favourite_intervals": _load(found.get("favourite_intervals"), None),
+            "milo_stance": found.get("milo_stance") if found.get("milo_stance") in STANCES else None,
+            "level_quiz": _load(found.get("level_quiz"), None),
+            "alert_email": bool(found.get("alert_email"))}
+
+
+def set_round_three_preferences(user_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
+    fields: Dict[str, Any] = {}
+    if "favourite_intervals" in patch:
+        v = _clean_intervals(patch["favourite_intervals"])
+        if v is not None:
+            fields["favourite_intervals"] = v
+    if "milo_stance" in patch and patch["milo_stance"] in STANCES:
+        fields["milo_stance"] = patch["milo_stance"]
+    if "level_quiz" in patch:
+        v = _clean_quiz(patch["level_quiz"])
+        if v is not None:
+            fields["level_quiz"] = v
+    if "alert_email" in patch and isinstance(patch["alert_email"], bool):
+        fields["alert_email"] = 1 if patch["alert_email"] else 0
+    if fields:
+        sets = ", ".join("{} = ?".format(k) for k in fields)      # keys are literals above
+        db.execute_many([
+            ("INSERT INTO user_preferences (user_id,updated_at) VALUES (?,?) "
+             "ON CONFLICT(user_id) DO NOTHING", (user_id, db.utcnow())),
+            ("UPDATE user_preferences SET {}, updated_at = ? WHERE user_id = ?".format(sets),
+             list(fields.values()) + [db.utcnow(), user_id]),
+        ])
+    return round_three_preferences(user_id)
 
 # ----------------------------------------------------------- subscription
 #

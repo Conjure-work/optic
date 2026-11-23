@@ -1022,6 +1022,71 @@ MIGRATION_22 = [
 ]
 
 
+# Round three (Pass 3, 2026-11-23). Forward-only and additive: no existing column is altered or dropped, every new
+# column is nullable or has a default, and every existing row keeps its values. tests/test_pass3_migrations.py builds a
+# database at migration 22 with rows in it, migrates, and asserts every old value is unchanged.
+#
+# 23 and 24: watchlists and saved research gain the owner shape `workspace_layouts` already has, so the organization
+# round can add ('org', ...) without a second table. Every existing row is set to its own user; nothing reads
+# owner_kind other than 'user' yet, and no sharing behaviour exists.
+MIGRATION_23 = [
+    "ALTER TABLE watchlists ADD COLUMN owner_kind TEXT NOT NULL DEFAULT 'user' CHECK (owner_kind IN ('user', 'org'))",
+    "ALTER TABLE watchlists ADD COLUMN owner_id TEXT",
+    "UPDATE watchlists SET owner_id = user_id WHERE owner_id IS NULL",
+    "CREATE INDEX IF NOT EXISTS watchlists_owner ON watchlists (owner_kind, owner_id)",
+]
+
+MIGRATION_24 = [
+    "ALTER TABLE saved_research ADD COLUMN owner_kind TEXT NOT NULL DEFAULT 'user' "
+    "CHECK (owner_kind IN ('user', 'org'))",
+    "ALTER TABLE saved_research ADD COLUMN owner_id TEXT",
+    "UPDATE saved_research SET owner_id = user_id WHERE owner_id IS NULL",
+    "CREATE INDEX IF NOT EXISTS saved_research_owner ON saved_research (owner_kind, owner_id)",
+]
+
+# 25: the reader's round-three preferences. favourite_intervals is a JSON list of chart intervals; milo_stance one of
+# Milo's four stances; level_quiz a JSON object (shown, suggested, outcome, at) and never the answers themselves;
+# alert_email 1 when the reader asked for their own alert digest (read only while the owner's switch is on).
+MIGRATION_25 = [
+    "ALTER TABLE user_preferences ADD COLUMN favourite_intervals TEXT",
+    "ALTER TABLE user_preferences ADD COLUMN milo_stance TEXT",
+    "ALTER TABLE user_preferences ADD COLUMN level_quiz TEXT",
+    "ALTER TABLE user_preferences ADD COLUMN alert_email INTEGER",
+]
+
+# 26: chart layouts kept on the account (one, two or four charts, each slot its own symbol, timeframe and interval).
+# A guest's layout stays in the browser. Capped at 20 per account by the module that writes them.
+MIGRATION_26 = [
+    """
+    CREATE TABLE IF NOT EXISTS chart_layouts (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        count       INTEGER NOT NULL CHECK (count IN (1, 2, 4)),
+        slots       TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        UNIQUE (user_id, name)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS chart_layouts_user ON chart_layouts (user_id, updated_at)",
+]
+
+# 27: one row per watch hit sent to a reader's own address, so a reader's digest carries each hit once. Written only
+# while the owner's switch (ALERT_DELIVERY_READERS) is on.
+MIGRATION_27 = [
+    """
+    CREATE TABLE IF NOT EXISTS watch_delivery (
+        hit_id      TEXT NOT NULL,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        sent_at     TEXT NOT NULL,
+        PRIMARY KEY (hit_id, user_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS watch_delivery_user ON watch_delivery (user_id, sent_at)",
+]
+
+
 MIGRATIONS: List[Tuple[int, str, List[str]]] = [
     (1, "accounts", MIGRATION_1),
     (2, "oauth_pkce", MIGRATION_2),
@@ -1045,6 +1110,11 @@ MIGRATIONS: List[Tuple[int, str, List[str]]] = [
     (20, "research_library", MIGRATION_20),
     (21, "usage_signals", MIGRATION_21),
     (22, "workspace_layouts", MIGRATION_22),
+    (23, "watchlists_owner", MIGRATION_23),
+    (24, "saved_research_owner", MIGRATION_24),
+    (25, "preferences_round_three", MIGRATION_25),
+    (26, "chart_layouts", MIGRATION_26),
+    (27, "watch_delivery", MIGRATION_27),
 ]
 
 

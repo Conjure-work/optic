@@ -27,6 +27,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from . import public_errors
+from . import health_extra, investor_routes, chart_routes, milo_routes
 from . import (ai, brief as brief_mod, feeds as feeds_mod, legal,
                news as news_mod, paper, session as session_mod)
 from . import figures as figures_mod
@@ -1269,6 +1270,9 @@ async def health(request: Request) -> Dict[str, Any]:
         "frontend": {"active": frontend.active(), "classic": frontend.classic_on(), "setting": frontend.CLASSIC_SETTING},
         "usage_capture": usage_mod.capture_on(),
     }
+    # Round three's modes (billing, legal text, alert delivery, the chart feed's history limit, Milo's off-topic set),
+    # each reported by the module that decides it (app/health_extra.py)
+    public["modes"] = health_extra.snapshot(operator=_operator(request))
     assistant = _assistant_status()
     # Where the AI credential comes from, whether Anthropic refused it and the migrations are the operator's
     # diagnostics: a visitor gets whether Milo is on, nothing more (BUG-052, Phase 10)
@@ -9250,6 +9254,10 @@ async def research(request: Request,
 # matches routes in registration order and the mount at "/" swallows every path
 # after it, so a router added below that line answers nothing at all.
 app.include_router(auth_routes.router)
+# Round three (Pass 3): each workstream's routes in its own module
+app.include_router(investor_routes.router)
+app.include_router(chart_routes.router)
+app.include_router(milo_routes.router)
 app.include_router(account_mod.router)
 app.include_router(library_mod.router)
 from . import layouts as layouts_mod  # noqa: E402 - named layouts on the account (Pass 2)
