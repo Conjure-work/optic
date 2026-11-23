@@ -543,8 +543,9 @@ def prompt_for(step: Dict[str, str], n: int, total: int, sym: str, name: str, to
 
 def _sync_client() -> Any:
     """The writers' client, as ai._ask's other callers make theirs: synchronous, retried, within the step's limit."""
-    from anthropic import Anthropic
-    return Anthropic(max_retries=3, timeout=STEP_TIMEOUT)
+    from anthropic import Anthropic  # noqa: F401 - the import is the check that the SDK is installed
+    # the shared client (app/ai.py _sync_client): one connection pool for every step, not one per step
+    return ai._sync_client(max_retries=3, timeout=STEP_TIMEOUT)
 
 
 def answer(prompt: str, level: str) -> Dict[str, Any]:

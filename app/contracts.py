@@ -42,6 +42,7 @@ import time
 import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional
+from .boundcache import BoundedCache
 
 log = logging.getLogger("uvicorn.error")
 
@@ -73,7 +74,8 @@ TIMEOUT = 25.0
 TTL = 3600.0
 
 _LOCK = threading.RLock()
-_CACHE: Dict[str, Dict[str, Any]] = {}
+# Bounded (2026-11-23): one entry per name asked about, kept no longer than its TTL and at most 256 at once
+_CACHE: Dict[str, Dict[str, Any]] = BoundedCache(maxsize=256, max_age=TTL)
 
 
 # Corporate suffixes, dropped from both sides before names are compared.

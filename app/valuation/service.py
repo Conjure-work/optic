@@ -22,9 +22,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .. import public_errors
 from . import MODEL_VERSION, analysis, classify, defaults, engine, inputs
+from ..boundcache import BoundedCache
 
 INPUT_TTL = 1800.0
-_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+# Bounded (2026-11-23): at most 256 symbols' inputs, none past INPUT_TTL
+_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = BoundedCache(maxsize=256, max_age=INPUT_TTL)
 _LOCK = threading.Lock()
 
 
