@@ -88,7 +88,9 @@ def test_the_shell_routes_and_names_from_b1():
     assert "const NAV_LAST = {};" in shell and "if (g && g.pages.some((p) => p.view === route.view)) NAV_LAST[g.id] = route.view;" in shell
     assert "row('#/signin', 'user', 'Sign in'" in shell and "store.user ? ''" in shell, "Sign in in More for a guest only"
     # the count sits on the phone bar's Lists since it took the rail's names (gauntlet L3, 2026-11-10); same rule
-    assert "t.setAttribute('aria-label', `Lists. ${words}`)" in shell, "the count's name starts with the visible word"
+    # the count in words in a hidden span, so the name is built from the tab's own text (round three: axe-core 4.14
+    # counts the badge as shown, and an aria-label over the tab no longer contained it)
+    assert "said.textContent = `, ${words}`;" in shell, "the count is said in words beside the tab's own text"
     assert "['ov:stages']" not in (JS / "core/milo-text.js").read_text() and "null]" not in (JS / "core/milo-text.js").read_text()
     assert '<a class="rail-row" href="#/research">Saved research</a>' in (JS / "app.js").read_text(), "B4d replaced the link to Classic"
     css = (V2 / "css/components.css").read_text()

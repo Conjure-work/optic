@@ -49,11 +49,17 @@ function paintUnread() {
     const c = bell.querySelector('.bell-n'); if (c) c.textContent = unread > 9 ? '9+' : String(unread);
   }
   $$('.tabbar [data-v2-tab="lists"]').forEach((t) => {
-    let dot = t.querySelector('.tab-n');
-    if (!unread) { if (dot) dot.remove(); t.removeAttribute('aria-label'); return; }
+    // The count is said in words by a hidden span, not by an aria-label: a name set over the tab's own words has to
+    // contain everything shown, and axe-core 4.14 reads the badge's digits as shown (label-content-name-mismatch on the
+    // phone bar once alerts were unread, found on the evaluation copy in round three, 2026-11-23). The name is now
+    // "Lists, 3 unread alerts", built from the tab's text. Lists opens the Watchlist, where Alerts is a view.
+    t.removeAttribute('aria-label');
+    let dot = t.querySelector('.tab-n'), said = t.querySelector('.tab-said');
+    if (!unread) { if (dot) dot.remove(); if (said) said.remove(); return; }
     if (!dot) { dot = document.createElement('span'); dot.className = 'tab-n'; dot.setAttribute('aria-hidden', 'true'); t.appendChild(dot); }
+    if (!said) { said = document.createElement('span'); said.className = 'tab-said sr'; t.appendChild(said); }
     dot.textContent = unread > 9 ? '9+' : String(unread);
-    t.setAttribute('aria-label', `Lists. ${words}`);   // starts with the visible word (WCAG 2.5.3); Lists opens the Watchlist, where Alerts is a tab
+    said.textContent = `, ${words}`;
   });
 }
 const groupIsV2 = (g) => g.pages.some((p) => p.v2);
