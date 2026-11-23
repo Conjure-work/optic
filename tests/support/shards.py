@@ -34,7 +34,7 @@ E2E_SLICES = 6
 # The workflow's SUITE_FLOOR is their sum.
 SHARD_FLOORS: Dict[str, int] = {
     "py": 9384,
-    "e2e-1": 37, "e2e-2": 37, "e2e-3": 37, "e2e-4": 36, "e2e-5": 36, "e2e-6": 36,
+    "e2e-1": 37, "e2e-2": 37, "e2e-3": 37, "e2e-4": 37, "e2e-5": 37, "e2e-6": 36,
 }
 
 
