@@ -14,6 +14,7 @@ import { skeleton, failed } from '../ui/states.js';
 import { provideContext } from '../ui/milo.js';
 import { sectionHead } from './tabs.js';
 import { separate } from '../core/investorpages.js';
+import * as TM from '../ui/treemap.js';
 
 const PAPER_KEY = 'optic.paper.v1';
 const MODEL_BOOKS = [['conservative', 'Conservative'], ['balanced', 'Balanced'], ['aggressive', 'Aggressive']];
@@ -48,8 +49,8 @@ function risk() {
   if (!r.available) return html`<p data-v2-pf-div="none">${clean(r.reason || 'Not enough to measure.')}</p>`;
   const dr = r.diversification_ratio;
   return html`<dl class="kv" style="--kv:3" data-v2-pf-div="${S.view}">
-    <div><dt>Diversification ratio</dt><dd>${dr === null || dr === undefined ? 'n/a' : num(dr, 2)}</dd><p class="kv-note">1.0 means nothing is cancelling</p></div>
-    <div><dt>Effective positions</dt><dd>${isNum(r.effective_positions) ? num(r.effective_positions, 1) : 'n/a'}</dd><p class="kv-note">of ${num(r.names, 0)} held</p></div>
+    <div><dt>Diversification ratio</dt><dd>${dr === null || dr === undefined ? 'n/a' : num(dr, 2)}</dd><dd class="kv-note">1.0 means nothing is cancelling</dd></div>
+    <div><dt>Effective positions</dt><dd>${isNum(r.effective_positions) ? num(r.effective_positions, 1) : 'n/a'}</dd><dd class="kv-note">of ${num(r.names, 0)} held</dd></div>
     <div><dt>Gross exposure</dt><dd>${isNum(r.gross_exposure) ? money(r.gross_exposure, 0) : 'n/a'}</dd></div></dl>
     ${r.verdict ? html`<p>${clean(r.verdict)}</p>` : ''}`;
 }
@@ -71,7 +72,13 @@ function paperBlock(first) {
     <p class="section-sub">Practice trades you enter yourself, kept in this browser. Open the <a class="textlink" href="#/paper">Paper Desk</a> to trade or close them.</p>
     ${open.length ? html`<div class="tscroll" tabindex="0" aria-label="Your Paper Desk positions"><table class="t"><caption class="sr">Your Paper Desk positions</caption><thead><tr><th scope="col">Position</th><th scope="col">Side</th><th scope="col" class="n">Entry</th></tr></thead>
       <tbody>${open.slice(0, 20).map((p) => html`<tr><th scope="row"><a href="#/${encodeURIComponent(p.ticker)}">${p.qty} ${p.ticker}${p.instrument === 'option' ? ` ${num(p.strike)} ${p.option_type}` : ''}</a></th><td>${p.direction === 'short' ? 'Short' : 'Long'}</td><td class="n">${num(p.entry_price)}</td></tr>`)}</tbody></table></div>`
-    : html`<p data-v2-pf-paper="empty">Nothing open on your Paper Desk. <a class="textlink" href="#/paper">Open a practice trade</a>.</p>`}</section>`;
+    : html`<p data-v2-pf-paper="empty">Nothing open on your Paper Desk. <a class="textlink" href="#/paper">Open a practice trade</a>.</p>`}
+    ${!S.brokerage && open.length ? TM.holdingsDonut(TM.paperBook(), { label: 'Your Paper Desk by value', note: 'Valued at each position\'s entry price.' }) : ''}</section>`;
+}
+// The market the books sit in (round three, held from Pass 2): the eleven sector funds as a treemap with its table.
+function sectorsBlock() {
+  const w = Math.max(280, Math.min(1100, ((mainEl && mainEl.clientWidth) || 900) - 48));
+  return html`<section class="section" aria-labelledby="pf-sx">${TM.sectorFigure(S.smap, S.smapErr, w, '', html`<h2 class="t-h2" id="pf-sx">The market around your books: sectors by weight, today</h2>`)}</section>`;
 }
 function modelsBlock() {
   return html`<section class="section" aria-labelledby="pf-md" data-v2-pf-models><h2 class="t-h2" id="pf-md">Optic's model portfolios</h2>
@@ -92,6 +99,7 @@ function paint() {
       <section class="section" aria-labelledby="pf-dv"><h2 class="t-h2" id="pf-dv">Diversification</h2>
         <p class="section-sub">How much the positions in one book move together, from six months of daily returns. Choose the book.</p>
         ${picker()}<div aria-live="polite">${risk()}</div></section>
+      ${sectorsBlock()}
       ${modelsBlock()}
       <p class="asof">Planning for retirement is its own tool: <a class="textlink" href="#/retirement">Retirement</a>.</p>`}`);
   if (keep) { const b = mainEl.querySelector(`[data-v2-pf-book="${keep}"]`); if (b) b.focus({ preventScroll: true }); }
@@ -125,6 +133,7 @@ async function load() {
   if (!live) return;
   paint();
   loadRisk(S.view);
+  TM.loadSectorMap().then((m) => { S.smap = m; if (live) paint(); }, (e) => { S.smapErr = e; if (live) paint(); });
 }
 
 export async function render(main, route) {

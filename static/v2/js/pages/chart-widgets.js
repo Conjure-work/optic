@@ -459,7 +459,7 @@ const BODY = {
     return html`${kv([['Equity', money(s.equity, 0)], ['Open', num(s.open_count, 0)], ['Return', html`<span class="${tone(s.return_pct)}">${signed(s.return_pct, 2)}</span>`]])}
       ${fine(mine.length ? `Holding ${sym}: ${mine.map((x) => `${num(x.qty, 0)} ${x.instrument === 'option' ? 'contracts' : 'shares'} at ${num(x.entry_price)}`).join('; ')}.` : `No position in ${sym}.`)}
       ${fine(`The ${clean(s.book || 'balanced')} book of Optic Portfolio: Optic's own paper trades, made by its rule sets, the same for everyone and never real money.`)}
-      ${more('#/portfolio', 'Open Optic Portfolio')}`;
+      ${more('#/models', "Open Optic's model portfolios")}`;
   },
 
   learn() {
