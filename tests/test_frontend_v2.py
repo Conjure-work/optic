@@ -39,6 +39,10 @@ def _sub_labels():
 def test_group_names_are_the_classic_ones():
     classic = {gid: label for gid, label, _ in _classic_groups()}
     v2 = dict(re.findall(r"\{ id: '([a-z]+)', label: '([^']+)'", NAV))
+    # Round three (2026-11-23, the owner's Round 3 text, "the portfolio with one meaning"): the Positions group reads
+    # Portfolio, as the rail and the phone bar already did. Classic keeps Positions.
+    assert classic.get("portfolio") == "Positions" and v2.pop("portfolio") == "Portfolio"
+    classic.pop("portfolio")
     assert v2 == classic
 
 
@@ -46,9 +50,12 @@ def test_page_names_are_the_classic_ones():
     labels = _sub_labels()
     pages = re.findall(r"\{ view: '([a-z]+)', label: '([^']+)'", NAV)
     assert pages, "nav.js lists no pages"
+    # round three (2026-11-23): Optic's three books are named as Optic's on screen, "Optic's model portfolios", now that
+    # #/portfolio is the reader's own books; Classic keeps "Optic Portfolio"
+    renamed = {"tracker": "Optic’s model portfolios"}
     for view, label in pages:
         if view in labels:
-            assert label == labels[view], view
+            assert label == renamed.get(view, labels[view]), view
     # every classic page is in v2's navigation
     assert {v for v, _ in pages} >= set(labels) - {"overview"} | {"overview"}
 

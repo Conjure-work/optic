@@ -102,7 +102,8 @@ def test_every_financials_chart_names_its_source_under_it_and_no_delay():
         title = cap[cap.find("<h3>") + 4:cap.find("</h3>")]
         assert "${src}" in cap or "${sourceLine(" in cap, "no source line under " + title
     line = src[src.index("const sourceLine"):src.index("\n", src.index("const sourceLine"))]
-    assert 'class="fv-unit"' in line and "Source: ${s}" in line
+    # round three (2026-11-23, O3): the source is written as a sentence after "Source:" (sourceText capitalises it)
+    assert 'class="fv-unit"' in line and "Source: ${sourceText(s)}" in line
     for name in ("STATEMENTS_SOURCE", "FILINGS_SOURCE"):
         said = src[src.index("const " + name):src.index("\n", src.index("const " + name))]
         assert "delay" not in said.lower() and "minute" not in said.lower(), said

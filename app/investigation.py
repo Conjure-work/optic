@@ -642,10 +642,10 @@ def store_new(user_id: str, inv: Dict[str, Any], limit: int) -> Optional[str]:
     rid = db.new_id()
     now = db.utcnow()
     db.execute("INSERT INTO saved_research (id, user_id, title, symbol, content, research_type, created_at, updated_at, "
-               "tickers, ref, summary, payload, item_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+               "tickers, ref, summary, payload, item_key, owner_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                (rid, user_id, inv["name"], inv["ticker"], summary_text(inv), KIND, now, now, json.dumps([inv["ticker"]]),
                 json.dumps({"investigation": inv["id"]}), json.dumps(status_of(inv)), json.dumps(inv),
-                "{}:{}".format(KIND, inv["id"])))
+                "{}:{}".format(KIND, inv["id"]), user_id))
     return rid
 
 

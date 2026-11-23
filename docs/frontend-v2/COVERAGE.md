@@ -24,13 +24,15 @@ Status words:
 | Markets | Read | `#/read` | Rebuilt |
 | Markets | Macro | `#/macro` | Rebuilt |
 | Markets | Indices | `#/indices` | Rebuilt |
+| Markets | Calendar | `#/calendar` | Rebuilt |
 | Discover | Explore | `#/explore` | Rebuilt |
 | Discover | Scan | `#/scan` | Rebuilt |
 | Discover | Insiders | `#/insiders` | Rebuilt |
 | Discover | Analysts | `#/analysts` | Rebuilt |
-| Positions | Optic Portfolio | `#/portfolio` | Rebuilt |
-| Positions | Paper Desk | `#/paper` | Rebuilt |
-| Positions | Retirement | `#/retirement` | Rebuilt |
+| Portfolio | Your books | `#/portfolio` | Rebuilt |
+| Portfolio | Paper Desk | `#/paper` | Rebuilt |
+| Portfolio | Optic’s model portfolios | `#/models` | Rebuilt |
+| Portfolio | Retirement | `#/retirement` | Rebuilt |
 | Brokerage | Brokerage | `#/brokerage` | Rebuilt |
 | Watchlist | Watchlist | `#/watchlist` | Rebuilt |
 | Watchlist | Alerts | `#/alerts` | Rebuilt |
@@ -38,6 +40,7 @@ Status words:
 | Reports | Claude usage | `#/usage` | Rebuilt |
 | Reports | Accounts | `#/accounts` | Rebuilt |
 | Reports | Metrics | `#/metrics` | Rebuilt |
+| Reports | Owner report | `#/owner-report` | Rebuilt |
 | (rail footer) | Settings | `#/settings` | Rebuilt |
 | (none) | Instrument | `#/instrument/{SYM}` | Rebuilt |
 

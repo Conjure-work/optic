@@ -29,7 +29,8 @@ export function groupTabs(groupId, current, symbol) {
 // Where the rail of 2026-11-09 names a page by another word than its group, the heading says the rail's word
 // (visual hierarchy review, 2026-11-10, change 8, F9): Portfolio opened on "Positions", Ideas and Filings & Ownership on
 // "Discover", Alerts on "Watchlist". The group and its tabs keep their names. `title` overrides both.
-export const RAIL_TITLES = { tracker: 'Portfolio', paper: 'Portfolio', roth: 'Portfolio', scan: 'Ideas', insiders: 'Filings & Ownership', alerts: 'Alerts' };
+// Round three: Alerts is a view of Watchlist, so it is headed Watchlist (the separate-pages setting heads it Alerts again)
+export const RAIL_TITLES = { portfolio: 'Portfolio', tracker: 'Portfolio', paper: 'Portfolio', roth: 'Portfolio', scan: 'Ideas', insiders: 'Filings & Ownership', alerts: 'Watchlist' };
 export function sectionHead(groupId, current, symbol, title = '') {
   const g = GROUPS.find((x) => x.id === groupId);
   const p = g && g.pages.find((x) => x.view === current);

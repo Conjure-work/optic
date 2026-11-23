@@ -55,7 +55,9 @@ EXPLAIN_INLINE = "inline"
 EXPLAIN_ON_DEMAND = "on_demand"
 EXPLAIN_OFF = "off"
 
-DEFAULT_MODE = "intermediate"
+# Beginner since round three (2026-11-23): a first visit with no level chosen opens at Beginner, with the onboarding
+# band and the first-visit card, so nothing is explained above a newcomer's head. A reader who has chosen keeps theirs.
+DEFAULT_MODE = "beginner"
 
 # Ids before Phase 05, as stored in browsers and sent by pages loaded before it.
 LEGACY = {

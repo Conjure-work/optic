@@ -29,6 +29,8 @@ export const GROUPS = [
     { view: 'brief', label: 'Read', slug: 'read', v2: true },
     { view: 'market', label: 'Macro', slug: 'macro', v2: true },
     { view: 'indices', label: 'Indices', slug: 'indices', v2: true },
+    // round three: the session clock, the economic releases and the earnings week in one place (pages/calendar.js)
+    { view: 'calendar', label: 'Calendar', slug: 'calendar', v2: true },
   ] },
   { id: 'discover', label: 'Discover', icon: 'discover', pages: [
     { view: 'explore', label: 'Explore', slug: 'explore', v2: true },
@@ -36,12 +38,18 @@ export const GROUPS = [
     { view: 'insiders', label: 'Insiders', slug: 'insiders', v2: true },
     { view: 'analysts', label: 'Analysts', slug: 'analysts', v2: true },
   ] },
-  { id: 'portfolio', label: 'Positions', icon: 'positions', pages: [
-    { view: 'tracker', label: 'Optic Portfolio', slug: 'portfolio', v2: true },
+  // Portfolio with one meaning (round three): #/portfolio is the reader's own books, a linked brokerage first and the
+  // Paper Desk second, with Optic's model books last and named as Optic's (pages/portfolio.js). The model books keep
+  // their own page at #/models; OPTIC_SEPARATE_ALERTS_AND_MODELS=on opens them at #/portfolio again (core/investorpages.js).
+  { id: 'portfolio', label: 'Portfolio', icon: 'positions', pages: [
+    { view: 'portfolio', label: 'Your books', slug: 'portfolio', v2: true },
     { view: 'paper', label: 'Paper Desk', slug: 'paper', v2: true },
+    { view: 'tracker', label: 'Optic’s model portfolios', slug: 'models', v2: true },
     { view: 'roth', label: 'Retirement', slug: 'retirement', v2: true },
   ] },
   { id: 'brokerage', label: 'Brokerage', icon: 'brokerage', feature: 'brokerage', pages: [{ view: 'brokerage', label: 'Brokerage', slug: 'brokerage', v2: true }] },
+  // Watchlists and alerts in one place (round three): one page, Watchlist, with two views, the lists (each name's
+  // alerts of all three kinds beside it) and Alerts (all three kinds gathered); #/alerts lands on the second view
   { id: 'follow', label: 'Watchlist', icon: 'watchlist', pages: [
     { view: 'watchlist', label: 'Watchlist', slug: 'watchlist', v2: true },
     { view: 'alerts', label: 'Alerts', slug: 'alerts', v2: true },
@@ -51,6 +59,8 @@ export const GROUPS = [
     { view: 'usage', label: 'Claude usage', slug: 'usage', v2: true },
     { view: 'accounts', label: 'Accounts', slug: 'accounts', v2: true },
     { view: 'metrics', label: 'Metrics', slug: 'metrics', v2: true },
+    // what people open, which level they use and the three signals by week (round three); counts only
+    { view: 'ownerreport', label: 'Owner report', slug: 'owner-report', v2: true },
   ] },
 ];
 

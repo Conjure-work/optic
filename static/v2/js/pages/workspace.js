@@ -931,6 +931,9 @@ let NAMED = { items: null, busy: false, failed: false };
 // the bar then wiped a name typed in that moment (gauntlet, Pass 2 round one). The list now redraws in its own slot,
 // and any whole-bar redraw puts the typed name and the caret back.
 let namedDraft = '';
+// A plain line beside the form when a save lands (round three, the Pass 2 human half's F2: the toast at the bottom was
+// easy to miss). It stays until the next change to the form or the saved list; the toast is the second signal.
+let namedSaid = '';
 function loadNamed(force = false) {
   if (!store.signedIn() || NAMED.busy || (NAMED.items && !force)) return;
   NAMED.busy = true;
@@ -948,7 +951,7 @@ function layoutBody() {
 function namedLayouts() {
   if (!store.signedIn()) return html`<p class="ws-sub ws-named-note">Sign in to name a layout and keep it on your account; until then it is kept in this browser.</p>`;
   loadNamed();
-  return html`<form class="ws-named" data-ws-named><label for="ws-named-name">Save this layout as</label><input id="ws-named-name" name="name" maxlength="40" required placeholder="Earnings week" autocomplete="off" value="${namedDraft}"><button type="submit" class="btn btn-sm">Save to my account</button></form>
+  return html`<form class="ws-named" data-ws-named><label for="ws-named-name">Save this layout as</label><input id="ws-named-name" name="name" maxlength="40" required placeholder="Earnings week" autocomplete="off" value="${namedDraft}"><button type="submit" class="btn btn-sm">Save to my account</button><p class="ws-named-said" role="status" data-ws-named-said>${namedSaid}</p></form>
     <div class="ws-named-saved" data-ws-named-saved>${namedList()}</div>`;
 }
 function namedList() {
@@ -963,12 +966,14 @@ async function saveNamed(name) {
     const r = await api.put(`/api/layouts/${encodeURIComponent(name)}`, { layout: layoutBody() }, { timeout: 15000 });
     NAMED = { items: r.layouts || [], busy: false, failed: false };
     namedDraft = '';
+    namedSaid = r.replaced ? `Saved: ${r.name} is updated on your account.` : `Saved: ${r.name} is on your account.`;
     toast(r.replaced ? `${r.name} is updated on your account.` : `${r.name} is saved on your account. Open it from any browser.`);
     if (live && EDIT) paintAll();
   } catch (e) { toast(e && e.message && e.kind !== 'server' ? e.message : api.explain(e, 'Saving the layout'), { kind: 'bad' }); }
 }
 function openNamed(name) {
   const l = (NAMED.items || []).find((x) => x.name === name); if (!l) return;
+  namedSaid = '';
   const got = norm((l.layout || {}).panels || []); if (!got) { toast(`${name} could not be opened: its panels are not ones this version has.`, { kind: 'bad' }); return; }
   S.layouts.mine = got; S.custom.mine = true; S.preset = 'mine';
   ((l.layout || {}).panels || []).forEach((x) => { if (!PANELS[x.id] || !PANELS[x.id].linked) return; if (x.grp === 'none') return; if (GROUP_NAME[x.grp]) ps(x.id).grp = x.grp; });
@@ -979,6 +984,7 @@ function openNamed(name) {
   toast(`${name} is open as My Desk.`);
 }
 async function deleteNamed(name) {
+  namedSaid = '';
   try {
     const r = await api.del(`/api/layouts/${encodeURIComponent(name)}`, { timeout: 15000 });
     NAMED = { items: r.layouts || [], busy: false, failed: false };
@@ -1632,7 +1638,12 @@ function wire() {
     if (e.target.matches('[data-ws-presetsel]')) { const k = e.target.value; if (k === 'mine' && !S.layouts.mine.some((x) => !x.hidden)) S.layouts.mine = JSON.parse(JSON.stringify(S.layouts.market)); S.preset = k; save(); paintAll(); say(`${PRESETS[S.preset].label} layout.`); const again = root.querySelector('[data-ws-presetsel]'); if (again && matchMedia('(pointer: fine)').matches) again.focus(); }   // iOS reopens a select's menu on focus
   });
   // the box takes a ticker or a name (core/resolve.js); one that names nothing is said, where it used to do nothing
-  root.addEventListener('input', (e) => { if (e.target.id === 'ws-named-name') namedDraft = e.target.value; });
+  root.addEventListener('input', (e) => {
+    if (e.target.id !== 'ws-named-name') return;
+    namedDraft = e.target.value;
+    // the next change clears the saved line
+    if (namedSaid) { namedSaid = ''; const said = root.querySelector('[data-ws-named-said]'); if (said) said.textContent = ''; }
+  });
   root.addEventListener('submit', async (e) => {
     const nf = e.target.closest('[data-ws-named]'); if (nf) { e.preventDefault(); saveNamed((nf.elements.name || {}).value); return; }
     const f = e.target.closest('[data-ws-linkform]'); if (!f) return; e.preventDefault();

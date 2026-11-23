@@ -111,8 +111,9 @@ def ensure_default(user_id: str) -> Dict[str, Any]:
         return existing[0]
     now = db.utcnow()
     wid = db.new_id()
-    db.execute("INSERT INTO watchlists (id,user_id,name,position,created_at,updated_at) "
-               "VALUES (?,?,?,0,?,?)", (wid, user_id, DEFAULT_LIST, now, now))
+    # owner_kind defaults to 'user'; owner_id is the person (migration 23, round three: the organization round adds 'org')
+    db.execute("INSERT INTO watchlists (id,user_id,name,position,created_at,updated_at,owner_id) "
+               "VALUES (?,?,?,0,?,?,?)", (wid, user_id, DEFAULT_LIST, now, now, user_id))
     found = db.row("SELECT * FROM watchlists WHERE id = ?", (wid,))
     assert found is not None
     return found
@@ -150,8 +151,8 @@ async def create_watchlist(request: Request,
 
     now = db.utcnow()
     wid = db.new_id()
-    db.execute("INSERT INTO watchlists (id,user_id,name,position,created_at,updated_at) "
-               "VALUES (?,?,?,?,?,?)", (wid, user["id"], name, len(existing), now, now))
+    db.execute("INSERT INTO watchlists (id,user_id,name,position,created_at,updated_at,owner_id) "
+               "VALUES (?,?,?,?,?,?,?)", (wid, user["id"], name, len(existing), now, now, user["id"]))
     symbols = payload.get("symbols")
     if isinstance(symbols, list):
         _put_symbols(wid, symbols)
@@ -385,8 +386,8 @@ def _adopt_lists(user_id: str, lists: List[Any]) -> Dict[str, Any]:
         if target is None:
             now = db.utcnow()
             wid = db.new_id()
-            db.execute("INSERT INTO watchlists (id,user_id,name,position,created_at,updated_at) "
-                       "VALUES (?,?,?,?,?,?)", (wid, user_id, name, len(existing), now, now))
+            db.execute("INSERT INTO watchlists (id,user_id,name,position,created_at,updated_at,owner_id) "
+                       "VALUES (?,?,?,?,?,?,?)", (wid, user_id, name, len(existing), now, now, user_id))
             target = db.row("SELECT * FROM watchlists WHERE id = ?", (wid,))
             created.append(name)
         before = len(_list_payload(target)["symbols"])
@@ -477,10 +478,10 @@ async def save_research(request: Request,
     rid = db.new_id()
     db.execute(
         "INSERT INTO saved_research (id,user_id,title,symbol,content,research_type,"
-        "created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+        "created_at,updated_at,owner_id) VALUES (?,?,?,?,?,?,?,?,?)",
         # 200 KB is far more than any answer this app produces and stops one
         # entry filling the volume.
-        (rid, user["id"], title, symbol, content[:200000], kind, now, now))
+        (rid, user["id"], title, symbol, content[:200000], kind, now, now, user["id"]))
     saved = db.row("SELECT * FROM saved_research WHERE id = ?", (rid,))
     assert saved is not None
     return {"ok": True, "research": _research_payload(saved, full=True)}

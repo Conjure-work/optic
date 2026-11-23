@@ -14,7 +14,8 @@ const KNOW_KEY = 'optic.knowledge.v1', ASKED_KEY = 'optic.knowledge.asked.v1';
 export const LEVEL_IDS = ['beginner', 'intermediate', 'advanced'];
 const LEVELS = { beginner: 0, intermediate: 1, advanced: 2 };
 const LEGACY = { new: 'beginner', expert: 'advanced', simple: 'beginner', literate: 'intermediate', professional: 'advanced', adaptive: 'intermediate' };
-const DEFAULT_MODE = 'intermediate';
+// Beginner since round three (2026-11-23): a first visit with no level chosen opens at Beginner (app/knowledge.py)
+const DEFAULT_MODE = 'beginner';
 
 // The classic list, word for word (static/app.js TIMEZONES).
 export const TIMEZONES = [

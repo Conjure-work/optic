@@ -79,7 +79,10 @@ const NET_NOTE = /net margin|net (cash|debt) position/i;
 // Each chart names its source under it, as Home's headline chart does; the section head said it once, and a chart read
 // on its own, sent to Milo or printed, did not (Pass 2 gauntlet, D5, 2026-11-18). No delay: statements are filed, not
 // quoted.
-const sourceLine = (s) => html`<p class="fv-unit" data-fv-source>Source: ${s}</p>`;
+// Each source reads as a sentence after "Source:", whatever case the feed sent it in (round three, O3: the statement
+// charts read "Source: The company's..." from the feed and the segment figures "Source: the company's...")
+export const sourceText = (s) => { const t = String(s || '').trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
+const sourceLine = (s) => html`<p class="fv-unit" data-fv-source>Source: ${sourceText(s)}</p>`;
 const STATEMENTS_SOURCE = "the company's statements, as Yahoo Finance carries them";
 const FILINGS_SOURCE = "the company's 10-Q and 10-K filings, from SEC EDGAR";
 function readings() {

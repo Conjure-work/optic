@@ -43,9 +43,10 @@ def test_only_the_three_are_written(tmp_path, value, written):
     assert got["k"] == written
 
 
-def test_an_unknown_value_reads_as_the_default_and_a_first_visit_is_intermediate(tmp_path):
+def test_an_unknown_value_reads_as_the_default_and_a_first_visit_is_beginner(tmp_path):
+    # Beginner since round three (2026-11-23): a first visit with no level chosen opens at Beginner; it was intermediate
     got = prefs_run(tmp_path, "localStorage.setItem('optic.knowledge.v1', 'zzz');", "print(JSON.stringify({ k: p.level() }));")
-    assert got["k"] == "intermediate"
+    assert got["k"] == "beginner"
 
 
 # ------------------------------------------------------------------ the server's copy

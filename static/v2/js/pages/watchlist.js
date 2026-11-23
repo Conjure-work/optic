@@ -21,6 +21,7 @@ import { provideContext, button as miloButton } from '../ui/milo.js';
 import { groupTabs } from './tabs.js';
 import { poll, inTradingDay } from '../core/poll.js';
 import { clock } from '../core/prefs.js';
+import * as ALL from '../core/allalerts.js';
 
 const SIGNAL_RANK = { bullish: 3, neutral: 2, bearish: 1, unknown: 0 };
 const has = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -62,7 +63,7 @@ export function sortRows(rows, sortId) {
 }
 
 const readSort = () => { try { const v = localStorage.getItem(SORT_KEY); return SORTS.some((x) => x.id === v) ? v : 'changed'; } catch (e) { return 'changed'; } };
-const fresh = () => ({ sort: readSort(), filter: 'all', q: '', rows: null, err: null, editing: null, confirmDelete: false, method: '', earn: {}, alerts: {}, undo: null, hold: null, shown: [], resort: false, checked: null });
+const fresh = () => ({ kinds: {}, sort: readSort(), filter: 'all', q: '', rows: null, err: null, editing: null, confirmDelete: false, method: '', earn: {}, alerts: {}, undo: null, hold: null, shown: [], resort: false, checked: null });
 let S = fresh();
 let live = true, refresh = null;
 // The prices refresh on their own (motion proposal, 2026-10-24: the page used to show load-time prices for good):
@@ -91,7 +92,9 @@ async function loadExtras(main, symbols) {
   const earn = api.get(`/api/watchlist/earnings?symbols=${want.map(encodeURIComponent).join(',')}`, { ttl: 3600000, timeout: 45000 })
     .then((r) => { Object.assign(S.earn, (r && r.dates) || {}); }, () => { want.forEach((s) => { if (S.earn[s] && S.earn[s].loading) S.earn[s] = { failed: true }; }); });
   const watches = alertsBySymbol().then((m) => { if (m) S.alerts = m; });
-  await Promise.all([earn, watches]);
+  // round three: each name's alerts of all three kinds beside it (yours, Optic's book, your brokerage)
+  const kinds = ALL.gather().then((g) => { S.kinds = ALL.bySymbol(g.items); }, () => {});
+  await Promise.all([earn, watches, kinds]);
   if (my !== seq || !live) return;
   paintRows(main);
 }
@@ -141,10 +144,18 @@ function earnCell(r) {
   if (e.failed) return cellMissing('Not loaded');
   return e.date ? html`${shortDate(e.date)}<small class="t-muted"> ${e.days === 0 ? 'today' : `${e.days}d`}</small>` : cellMissing('None set');
 }
+/** Each name's alerts of the three kinds, as words: yours (set, or fired today), Optic's book, your brokerage. */
+export function alertWords(mine, kinds) {
+  const out = [];
+  if (mine && (mine.n || mine.fired)) out.push({ cls: mine.fired ? 'is-fired' : '', text: mine.fired ? `${mine.fired} fired today` : `${mine.n} alert${mine.n === 1 ? '' : 's'}` });
+  if (kinds && kinds.optic) out.push({ cls: '', text: `${kinds.optic} from Optic's book` });
+  if (kinds && kinds.brokerage) out.push({ cls: '', text: `${kinds.brokerage} from your brokerage` });
+  return out;
+}
 function alertCell(r) {
-  const a = S.alerts[r.symbol];
-  if (!a || (!a.n && !a.fired)) return '';
-  return html`<span class="wl-alert ${a.fired ? 'is-fired' : ''}">${icon('bell')}${a.fired ? `${a.fired} fired today` : `${a.n} alert${a.n === 1 ? '' : 's'}`}</span>`;
+  const words = alertWords(S.alerts[r.symbol], (S.kinds || {})[r.symbol]);
+  if (!words.length) return '';
+  return html`<span class="wl-alerts" data-v2-wl-alerts="${r.symbol}">${words.map((w, i) => html`<span class="wl-alert ${w.cls}">${i === 0 ? icon('bell') : ''}${w.text}</span>`)}</span>`;
 }
 
 function rowsBlock() {
@@ -179,12 +190,12 @@ function rowsBlock() {
     <div class="wl-head" aria-hidden="true"><span>Symbol</span><span class="num">Price</span><span class="num">Today</span><span class="spark-cell">30 sessions</span><span class="num wl-vol">Volume</span><span class="wl-earn">Earnings</span><span>What changed</span><span>Signal</span></div>
     <div role="list">
     ${rows.map((r, i) => html`<div class="wl-row" role="listitem">
-      ${r.available ? html`<button type="button" class="row-main" data-v2-company="${r.symbol}" aria-haspopup="dialog" aria-label="${r.symbol}, ${has(r.price) ? num(r.price) : 'no price'}, ${has(r.change_pct) ? signed(r.change_pct) : 'no change figure'} today${r.changed ? `, ${clean(r.changed.text)}` : ''}${r.signal ? `, ${SIGNAL[r.signal] || 'no signal'}` : ''}. Open the detail">
+      ${r.available ? html`<button type="button" class="row-main" data-v2-company="${r.symbol}" aria-haspopup="dialog">
         <span class="who"><b class="tick">${r.symbol}</b>${alertCell(r)}</span><span class="num wl-price">${has(r.price) ? num(r.price) : cellMissing()}</span><span class="num wl-chg ${dir(r.change_pct)}">${has(r.change_pct) ? signed(r.change_pct) : cellMissing()}</span>
-        <span class="spark-cell">${raw(spark(r.spark))}</span>
+        <span class="spark-cell" aria-hidden="true">${raw(spark(r.spark))}</span>
         <span class="num wl-vol">${has(r.volume_ratio) ? html`${num(r.volume_ratio, 1)}×${r.volume_partial ? html`<small class="t-muted"> so far</small>` : ''}` : cellMissing()}</span>
         <span class="wl-earn">${earnCell(r)}</span>
-        <span class="note">${r.changed ? clean(r.changed.text) : html`<span class="t-muted">Nothing new</span>`}</span><span class="sig sig-${r.signal}">${SIGNAL[r.signal] || 'No signal'}</span></button>`
+        <span class="note">${r.changed ? clean(r.changed.text) : html`<span class="t-muted">Nothing new</span>`}</span><span class="sig sig-${r.signal}">${SIGNAL[r.signal] || 'No signal'}</span><span class="sr">. Open the detail</span></button>`
     : html`<div class="row-main is-off"><span class="who"><b class="tick">${r.symbol}</b></span><span class="note t-muted" style="grid-column: 2 / -1">${clean(r.reason || 'No data right now.')}</span></div>`}
       ${custom ? html`<span class="order"><button type="button" class="icon-btn" data-v2-sym-move="-1" data-v2-sym="${r.symbol}" aria-label="Move ${r.symbol} up" ${i === 0 ? 'disabled' : ''}>${icon('up')}</button><button type="button" class="icon-btn" data-v2-sym-move="1" data-v2-sym="${r.symbol}" aria-label="Move ${r.symbol} down" ${i === rows.length - 1 ? 'disabled' : ''}>${icon('down')}</button></span>` : ''}
       <button type="button" class="icon-btn" data-v2-unwatch="${r.symbol}" aria-label="Remove ${r.symbol} from ${a.name}">${icon('close')}</button>

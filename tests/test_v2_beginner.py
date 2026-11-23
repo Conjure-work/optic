@@ -21,7 +21,9 @@ NAV = (JS / "nav.js").read_text()
 
 def test_navigation_names_are_unchanged():
     # the owner's rule: no sidebar section, item or phone label renamed without an explicit yes in conversation
-    for label in ("label: 'Dossier'", "label: 'Positions'", "label: 'Discover'", "label: 'Markets'", "label: 'Optic Portfolio'", "label: 'Paper Desk'"):
+    # round three (2026-11-23), the owner's Round 3 text, "the portfolio with one meaning": Positions reads Portfolio and
+    # Optic's books are named "Optic's model portfolios"; the rest are unchanged
+    for label in ("label: 'Dossier'", "label: 'Portfolio'", "label: 'Discover'", "label: 'Markets'", 'label: \'Optic’s model portfolios\'', "label: 'Paper Desk'"):
         assert label in NAV, label
 
 

@@ -280,6 +280,29 @@ Returning visitors see changes immediately: `index.html` is served
 cached copy. See `tests/test_asset_cache.py` — this regressed once, and a
 stale-HTML bug presents as a deploy that appears to have done nothing.
 
+## Watchlist, Portfolio and the owner report (round three, 2026-11-23)
+
+**Watchlists and alerts are in one place, and Portfolio has one meaning.** Watchlist (`#/watchlist`) holds the lists,
+each name with its alerts of all three kinds beside it (yours, Optic's book, a linked brokerage's), and an Alerts view
+(`#/alerts`) that gathers the three kinds in one list above each kind's own tools. Portfolio (`#/portfolio`) is the
+reader's own books: a linked brokerage first, the Paper Desk second, never hidden, and Optic's three model books last,
+named as Optic's; their full page is `#/models`. The diversification figure follows the book in view.
+
+**One setting brings back the old separate pages: `OPTIC_SEPARATE_ALERTS_AND_MODELS=on`, then restart.** `#/alerts` is
+then headed Alerts as before and `#/portfolio` opens Optic's model books. Nothing is deleted either way; the alert
+stores are unchanged. `GET /api/health` reports which, under `modes.investor_pages`, and the owner's Metrics page
+lists it under "How this site is set".
+
+**The owner report** (`#/owner-report`, the owner only, as Metrics): what people open (the screens the three events
+happen on, and the stocks opened from Home), which level they use, and the three signals, per week and over the last
+30 days, counts only, never a percentage. The address takes `owner_kind` and `owner_id` (the names saved layouts use)
+so the organization round can read one group; today every count is everyone's, and the page says so.
+
+**A first visit opens at Beginner** (it was Intermediate), and every new account is offered six optional questions
+that suggest a level, once: after the sign-up form, or on a band above the page for an account made with Google,
+Apple or a passkey. Only the suggested level, the outcome and that the questions were shown are kept; the answers are
+not.
+
 ## One front end, and the usage signals (2026-11-09)
 
 **The new design (v2) is the only front end by default.** With nothing set, every public page address (`/`,

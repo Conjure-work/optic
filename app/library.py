@@ -441,9 +441,9 @@ async def save_item(request: Request, payload: Dict[str, Any] = Body(default={})
     rid = db.new_id()
     key = key or "{}:{}".format(kind, rid)   # never NULL: NULL is how a question saved before the library is told apart
     db.execute("INSERT INTO saved_research (id, user_id, title, symbol, content, research_type, created_at, updated_at, "
-               "tickers, ref, summary, payload, item_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+               "tickers, ref, summary, payload, item_key, owner_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                (rid, user["id"], name, tickers[0] if tickers else None, content, kind, now, now, json.dumps(tickers),
-                json.dumps(ref), summary, body, key))
+                json.dumps(ref), summary, body, key, user["id"]))
     return {"ok": True, "updated": False, "item": _out(_owned(rid, user["id"]))}
 
 

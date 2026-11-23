@@ -14,6 +14,9 @@
   --c-scene: #1b1a18;
   --c-scene-2: #252320;
   --c-on-scene: #f4efe5;
+  /* the shared toast's failure kind, one value in every theme (round three, the scanner's contrast item): the dark
+     themes' --c-neg (#f87171) under the toast's light text measured 2.41:1; this measures 7.3:1 against --c-on-scene */
+  --c-toast-bad: #8e2b1b;
   --c-on-scene-2: #b9b1a2;
   /* ink */
   --c-ink: #1b1a18;
