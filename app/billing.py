@@ -19,9 +19,29 @@ its row so Stripe's retry is processed rather than acknowledged. Events can
 arrive out of order, so each subscription row remembers the `created` time of
 the last event applied and ignores anything older.
 
-**Only Optic's price counts.** A subscription grants Pro only if one of its
-items is `STRIPE_PRICE_ID`. The same Stripe account selling something else
-must not hand out Optic plans.
+**Only Optic's prices count, and the price decides the plan.** The plan
+ladder (round three, 2026-11-23) is the plans in `auth.store.PLANS` (free, pro,
+enterprise today) with one Stripe price id per paid plan, read from
+`STRIPE_PRICE_ID_<PLAN>` (`STRIPE_PRICE_ID_PRO`, `STRIPE_PRICE_ID_ENTERPRISE`;
+`STRIPE_PRICE_ID` is still read as the pro price, so a deploy configured before
+this keeps working). A subscription grants the highest plan whose price is one
+of its items, and nothing else: metadata the app wrote at Checkout is never
+read for the plan, because the customer portal, a schedule or a Dashboard edit
+changes the price and leaves the metadata alone. `invoice.paid` re-reads the
+subscription from Stripe and derives the plan again, as a safety net for an
+event missed or applied out of order. The same Stripe account selling
+something else must not hand out Optic plans.
+
+**Caps.** What each plan allows lives in `PLANS` and is enforced in one place
+(`auth.store.subscription`, read by Milo's spend guard and the brokerage
+entitlement). Billing off changes nothing there: plans stay what the stored
+rows say, as before round three; billing on, Stripe's webhook writes the rows.
+
+**Terms first.** Checkout is refused while the terms and privacy text is the
+placeholder (app/legal_text.py), with the sentence the pages show. On a test
+key only, `BILLING_TEST_IGNORE_LEGAL_PLACEHOLDER=true` lifts that, so the
+Checkout round trip can be proved on an evaluation copy before counsel's text
+exists; a live key ignores it.
 
 No SDK: four endpoints over `requests`, which is already a dependency.
 """
@@ -36,9 +56,9 @@ import time
 from typing import Any, Dict, Optional
 
 import requests
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Body, HTTPException, Request
 
-from . import db, runtime
+from . import db, health_extra, legal_text, runtime
 from .auth import deps, store as auth_store
 from .brokerage import service as brokerage
 from .brokerage import store as bstore
@@ -48,8 +68,90 @@ router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 API = "https://api.stripe.com/v1"
 TOLERANCE = 300
-PAID_PLAN = "pro"
+PAID_PLAN = "pro"            # the plan a Checkout with no plan named buys (the Settings button before round three)
 TERMINAL = ("canceled", "incomplete_expired")
+NOT_ON_SALE = "Plans are not on sale yet. Every account is on Free."
+
+
+def _api() -> str:
+    """Stripe's base address, a setting so the suite can pin it to a local recording stub."""
+    return (os.environ.get("STRIPE_API_BASE") or API).rstrip("/")
+
+
+def _timeout() -> float:
+    """Seconds before Stripe is called down; a setting so a test can play a timeout without waiting 20 s."""
+    try:
+        return max(0.5, float(os.environ.get("STRIPE_TIMEOUT_SECONDS") or 20))
+    except ValueError:
+        return 20.0
+
+
+def _env(name: str) -> str:
+    return (os.environ.get(name) or "").strip()
+
+
+# ------------------------------------------------------------------ the ladder
+
+
+def paid_plans() -> list:
+    """The paid plans in ladder order (cheapest first), from auth.store.PLANS."""
+    return [p for p in auth_store.PLANS if p != "free"]
+
+
+def price_id(plan: str) -> str:
+    """The Stripe price that sells `plan`: STRIPE_PRICE_ID_<PLAN>; for pro, STRIPE_PRICE_ID as before."""
+    own = _env("STRIPE_PRICE_ID_" + plan.upper())
+    if own or plan != "pro":
+        return own
+    return _env("STRIPE_PRICE_ID")
+
+
+def plan_for_price(pid: str) -> Optional[str]:
+    for plan in paid_plans():
+        if pid and price_id(plan) == pid:
+            return plan
+    return None
+
+
+def _plan_label(plan: str) -> str:
+    return _env("BILLING_PLAN_LABEL_" + plan.upper()) or auth_store.PLANS[plan]["label"]
+
+
+def ladder() -> list:
+    """Free, then every paid plan that has a price id, with what each allows. Read by the pricing panel."""
+    out = [{"plan": "free", "label": _plan_label("free"), "price_label": None,
+            "limits": {k: v for k, v in auth_store.PLANS["free"].items() if k != "label"}}]
+    for plan in paid_plans():
+        if price_id(plan):
+            out.append({"plan": plan, "label": _plan_label(plan), "price_label": price_label(plan=plan),
+                        "limits": {k: v for k, v in auth_store.PLANS[plan].items() if k != "label"}})
+    return out
+
+
+def missing() -> list:
+    """The variable names billing still needs; empty when it can run. Names only, never values."""
+    need = [n for n in ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET") if not _env(n)]
+    if not any(price_id(p) for p in paid_plans()):
+        need.append("STRIPE_PRICE_ID_PRO")
+    return need
+
+
+def anything_set() -> bool:
+    names = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"] + [
+        "STRIPE_PRICE_ID_" + p.upper() for p in paid_plans()]
+    return any(_env(n) for n in names)
+
+
+def _legal_override() -> bool:
+    """The evaluation copy's switch, honoured on a test key only (see the module docstring)."""
+    return mode() == "test" and _env("BILLING_TEST_IGNORE_LEGAL_PLACEHOLDER").lower() == "true"
+
+
+def checkout_refusal() -> Optional[str]:
+    """Why Checkout cannot open while billing is otherwise on, or None."""
+    if legal_text.placeholder() and not _legal_override():
+        return legal_text.CHECKOUT_REFUSAL
+    return None
 
 
 def _key() -> str:
@@ -64,17 +166,38 @@ def mode() -> Optional[str]:
 
 
 def status() -> Dict[str, Any]:
-    missing = [n for n in ("STRIPE_SECRET_KEY", "STRIPE_PRICE_ID", "STRIPE_WEBHOOK_SECRET")
-               if not (os.environ.get(n) or "").strip()]
-    if missing:
+    need = missing()
+    if need:
         return {"available": False, "reason": runtime.for_reader(
-            "Plans are not on sale yet. Every account is on Free.",
-            "Billing is off: set {}.".format(", ".join(missing)))}
+            NOT_ON_SALE, "Billing is off: set {}.".format(", ".join(need)))}
     if mode() == "live" and (os.environ.get("BILLING_LIVE_APPROVED") or "").lower() != "true":
         return {"available": False, "reason": runtime.for_reader(
-            "Plans are not on sale yet. Every account is on Free.",
+            NOT_ON_SALE,
             "A live Stripe key is set but BILLING_LIVE_APPROVED is not true. Refusing live billing.")}
-    return {"available": True, "mode": mode(), "price_label": price_label()}
+    refusal = checkout_refusal()
+    return {"available": True, "mode": mode(), "price_label": price_label(), "plans": ladder(),
+            "checkout_open": refusal is None, "checkout_refusal": refusal}
+
+
+def health() -> Dict[str, Any]:
+    """Billing's line on /api/health (public): on or off, the mode, the plan count, and how caps are decided."""
+    st = status()
+    on = bool(st.get("available"))
+    return {"state": "on" if on else "off", "mode": mode() if on else None,
+            "plans": len(st.get("plans") or []) if on else 0,
+            "checkout_open": bool(st.get("checkout_open")) if on else False,
+            "caps": ("per plan, derived from Stripe's prices" if on else
+                     "per stored plan, as before round three (billing off: nothing on sale, plans granted by the owner)")}
+
+
+def health_operator() -> Dict[str, Any]:
+    """The owner's half: which variable names are missing (names only), and whether the copy's legal switch is on."""
+    return {"missing": missing() if anything_set() else [], "configured": anything_set(),
+            "legal_override": _legal_override()}
+
+
+health_extra.register("billing", health)
+health_extra.register("billing_setup", health_operator, public=False)
 
 
 # The price the button names (Pass 2, 2026-11-17): BILLING_PRICE_LABEL when the owner sets one, else read from the
@@ -95,14 +218,21 @@ def _money(amount: Any, currency: str) -> Optional[str]:
     return "{}{}".format(sym, num) if sym else "{} {}".format(num, (currency or "").upper())
 
 
-def price_label(now: Optional[float] = None) -> Optional[str]:
-    own = (os.environ.get("BILLING_PRICE_LABEL") or "").strip()
+_PRICES: Dict[str, Dict[str, Any]] = {}
+
+
+def price_label(now: Optional[float] = None, plan: str = PAID_PLAN) -> Optional[str]:
+    own = _env("BILLING_PRICE_LABEL_" + plan.upper()) or (_env("BILLING_PRICE_LABEL") if plan == "pro" else "")
     if own:
         return own
-    pid = (os.environ.get("STRIPE_PRICE_ID") or "").strip()
+    pid = price_id(plan)
+    if not pid:
+        return None
     now = time.time() if now is None else now
-    if _PRICE["id"] == pid and now - _PRICE["at"] < PRICE_TTL:
-        return _PRICE["label"]
+    # pro keeps the one cache it always had (tests reset it); each other plan has its own
+    cached = _PRICE if plan == PAID_PLAN else _PRICES.setdefault(plan, {"id": None, "at": 0.0, "label": None})
+    if cached["id"] == pid and now - cached["at"] < PRICE_TTL:
+        return cached["label"]
     label = None
     try:
         p = _stripe("GET", "/prices/" + pid)
@@ -111,7 +241,7 @@ def price_label(now: Optional[float] = None) -> Optional[str]:
         label = "{} a {}".format(money, every) if money and every else money
     except HTTPException:
         label = None
-    _PRICE.update({"id": pid, "at": now, "label": label})
+    cached.update({"id": pid, "at": now, "label": label})
     return label
 
 
@@ -121,7 +251,7 @@ def _stripe(method: str, path: str, data: Optional[Dict[str, Any]] = None,
     if idempotency_key:
         headers["Idempotency-Key"] = idempotency_key
     try:
-        resp = requests.request(method, API + path, data=data, headers=headers, timeout=20)
+        resp = requests.request(method, _api() + path, data=data, headers=headers, timeout=_timeout())
     except requests.RequestException as exc:
         raise HTTPException(status_code=503, detail="The payment provider did not answer. Try again "
                                                     "in a minute.") from exc
@@ -155,7 +285,7 @@ async def billing_status(request: Request) -> Dict[str, Any]:
 
 
 @router.post("/checkout")
-async def checkout(request: Request) -> Dict[str, Any]:
+async def checkout(request: Request, payload: Optional[Dict[str, Any]] = Body(default=None)) -> Dict[str, Any]:
     # Signed in, not necessarily confirmed: Stripe collects and confirms the
     # billing email itself, and production mail is not configured yet, so
     # requiring a confirmed address would mean nobody could subscribe.
@@ -164,19 +294,28 @@ async def checkout(request: Request) -> Dict[str, Any]:
     st = status()
     if not st["available"]:
         raise HTTPException(status_code=503, detail=st["reason"])
+    if not st.get("checkout_open"):
+        raise HTTPException(status_code=503, detail=st["checkout_refusal"])
+    plan = str((payload or {}).get("plan") or PAID_PLAN)
+    if plan not in paid_plans() or not price_id(plan):
+        raise HTTPException(status_code=400, detail="That plan is not on sale.")
     sub = auth_store.subscription(user["id"])
     row = _sub_row(user["id"]) or {}
     open_sub = row.get("provider_subscription_id") and row.get("provider_status") not in TERMINAL
-    if sub["plan"] == PAID_PLAN or open_sub:
+    if sub["plan"] != "free" or open_sub:
         # Also refused while a subscription exists that has not ended, even
         # before its webhook made the plan Pro: two quick checkouts used to be
         # two subscriptions on one account (review M6).
-        raise HTTPException(status_code=409, detail="You already have a Pro subscription. Use Manage billing "
-                                                    "to change or cancel it.")
+        # A change of plan goes through the customer portal, which Stripe prices and prorates; a second
+        # Checkout would be a second subscription.
+        raise HTTPException(status_code=409, detail="You already have a {} subscription. Use Manage billing "
+                                                    "to change or cancel it.".format(sub["label"]
+                                                                                      if sub["plan"] != "free"
+                                                                                      else "paid"))
     base = runtime.base_url()
     data: Dict[str, Any] = {
         "mode": "subscription",
-        "line_items[0][price]": os.environ["STRIPE_PRICE_ID"],
+        "line_items[0][price]": price_id(plan),
         "line_items[0][quantity]": "1",
         "client_reference_id": user["id"],
         "metadata[user_id]": user["id"],
@@ -192,7 +331,7 @@ async def checkout(request: Request) -> Dict[str, Any]:
     # A double click inside the same minute returns the same session rather
     # than two open checkouts.
     session = _stripe("POST", "/checkout/sessions", data,
-                      idempotency_key="optic-checkout-{}-{}".format(user["id"], int(time.time() // 60)))
+                      idempotency_key="optic-checkout-{}-{}-{}".format(user["id"], plan, int(time.time() // 60)))
     return {"url": session.get("url")}
 
 
@@ -274,12 +413,16 @@ def _find_user(obj: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def plan_of(sub: Dict[str, Any]) -> Optional[str]:
+    """The highest plan whose price is an item of this subscription, or None. Prices only; metadata never."""
+    found = [plan_for_price(((item.get("price") or {}).get("id")) or "")
+             for item in ((sub.get("items") or {}).get("data") or [])]
+    ranked = [p for p in paid_plans() if p in found]
+    return ranked[-1] if ranked else None
+
+
 def _has_our_price(sub: Dict[str, Any]) -> bool:
-    want = os.environ.get("STRIPE_PRICE_ID") or ""
-    for item in ((sub.get("items") or {}).get("data") or []):
-        if ((item.get("price") or {}).get("id")) == want:
-            return True
-    return False
+    return plan_of(sub) is not None
 
 
 def _period_end(sub: Dict[str, Any]) -> Optional[str]:
@@ -338,10 +481,10 @@ def apply_event(event: Dict[str, Any]) -> str:
             log.error("stripe: second subscription %s for a user who already has %s; not applied",
                       obj.get("id"), stored)
             return "second-subscription"
-        ours = _has_our_price(obj)
-        entitled = ours and stripe_status in auth_store.ENTITLED_STATUSES
+        ours = plan_of(obj)
+        entitled = bool(ours) and stripe_status in auth_store.ENTITLED_STATUSES
         wrote = _write(uid, created,
-                       plan=PAID_PLAN if entitled else "free",
+                       plan=ours if entitled else "free",
                        status=stripe_status if stripe_status in auth_store.ENTITLED_STATUSES else "active",
                        provider="stripe", provider_status=stripe_status,
                        provider_customer_id=obj.get("customer"), provider_subscription_id=obj.get("id"),
@@ -349,7 +492,17 @@ def apply_event(event: Dict[str, Any]) -> str:
                        current_period_end=_period_end(obj))
         if wrote:
             brokerage.on_plan_change(uid)
-        return ("pro" if entitled else "free") if wrote else "stale"
+        return (ours if entitled else "free") if wrote else "stale"
+    if etype == "invoice.paid":
+        # The safety net (billing truth): read the subscription as Stripe bills it now and derive the plan again, so a
+        # missed or reordered subscription event cannot leave a reader on the wrong plan for a billing period.
+        sid = obj.get("subscription") or (((obj.get("parent") or {}).get("subscription_details") or {})
+                                          .get("subscription"))
+        if not sid:
+            return "no-subscription"
+        current = _stripe("GET", "/subscriptions/{}".format(sid))
+        return apply_event({"type": "customer.subscription.updated", "created": created,
+                            "data": {"object": current}})
     if etype == "invoice.payment_failed":
         # The subscription's own update event moves it to past_due; nothing
         # to change here, and past_due stays entitled while Stripe retries.

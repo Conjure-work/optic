@@ -14,6 +14,8 @@ RUN apt-get update \
 
 COPY app ./app
 COPY static ./static
+# The terms and privacy text the pages render (app/legal_text.py); counsel's text replaces the placeholders
+COPY legal ./legal
 
 # Don't run as root — the app needs no privileges once it's serving.
 RUN useradd --create-home --shell /usr/sbin/nologin optic && chown -R optic:optic /app

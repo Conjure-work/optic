@@ -60,8 +60,10 @@ function account() {
       ${security()}</section>
     <section class="section" aria-labelledby="pl-h"><h2 class="t-h2" id="pl-h">Plan</h2>
       ${row(plan.label || 'Free', html`${lim.watchlists !== undefined ? `${lim.watchlists} watchlists, ${lim.saved_research} saved items, ${lim.ai_calls_per_day} assistant messages a day${lim.ai_calls_per_month ? ` (${lim.ai_calls_per_month} in any 30 days)` : ''}.` : ''}${plan.cancel_at_period_end && plan.current_period_end ? ` Ends on ${prefs.stamp(plan.current_period_end).split(',').slice(0, 2).join(',')}; it will not renew.` : ''}`, billing(), tag(true, plan.status || 'active'))}
+      ${ladder()}
       ${D.flash ? html`<p class="stale" role="status">${D.flash}</p>` : ''}
       ${D.brokerage ? row('Linked brokerages', 'Read-only connections, what they can see, and how to disconnect or delete the data.', html`<a class="btn btn-sm" href="#/brokerage/connections">Manage</a>`) : ''}</section>
+    ${alertMail()}
     <section class="section set-danger" aria-labelledby="dl-h"><h2 class="t-h2" id="dl-h">Delete account</h2>
       <p>Removes the account and everything kept on it: watchlists, watches, saved research, theses, valuation scenarios, signal history, preferences, connected sign-in methods and every session. It cannot be undone. Problem reports you sent are kept with the address they came from, so a reply can still reach you, and the shared paper-trading ledger is not affected because it was never yours.</p>
       <p>A paid plan is cancelled at the same moment, and any linked brokerage is disconnected at the provider with Optic's copy of its data deleted.</p>
@@ -79,10 +81,39 @@ function billing() {
   // billing off (nothing set on the platform): a reader sees no billing at all; the owner sees which variables are
   // missing, by name (Pass 2: "with nothing set, nothing shows")
   if (!b || !b.available) return store.state.me && store.state.me.admin ? html`<span class="set-row-note">${billingOff((b || {}).reason, true)}</span>` : '';
-  const pro = ((b.subscription || me().subscription || {}).plan || '') === 'pro';
+  const plan = (b.subscription || me().subscription || {}).plan || 'free';
   const test = b.mode === 'test' ? tag(false, 'Test mode') : '';
-  if (pro) return b.can_manage ? html`<button type="button" class="btn btn-sm" data-v2-billing="portal">Manage billing</button>${test}` : html`<span class="set-row-note">Pro, granted by the operator.</span>`;
-  return html`<button type="button" class="btn btn-sm btn-primary" data-v2-billing="checkout">Upgrade to Pro${b.price_label ? `, ${b.price_label}` : ''}</button>${b.can_manage ? html`<button type="button" class="btn btn-sm" data-v2-billing="portal">Billing history</button>` : ''}${test}`;
+  if (plan !== 'free') return b.can_manage ? html`<button type="button" class="btn btn-sm" data-v2-billing="portal">Manage billing</button>${test}` : html`<span class="set-row-note">${(b.subscription || {}).label || 'This plan'}, granted by the operator.</span>`;
+  return html`${b.can_manage ? html`<button type="button" class="btn btn-sm" data-v2-billing="portal">Billing history</button>` : ''}${test}`;
+}
+
+// The plan ladder (round three): one row per paid plan Stripe sells here, with what it allows and its price, and one
+// button each. While the terms are still being prepared with counsel the buttons are withheld and the one sentence
+// the server refuses Checkout with is shown instead (app/legal_text.py). Billing off draws nothing.
+const allows = (l) => `${l.watchlists} watchlists, ${l.saved_research} saved items, ${l.ai_calls_per_day} assistant messages a day${l.ai_calls_per_month ? ` (${l.ai_calls_per_month} in any 30 days)` : ''}, ${l.brokerage_connections ? `${l.brokerage_connections} brokerage connections` : 'no brokerage connections'}.`;
+function ladder() {
+  const b = D.billing;
+  if (!b || !b.available) return '';
+  const current = (b.subscription || me().subscription || {}).plan || 'free';
+  const paid = (b.plans || []).filter((p) => p.plan !== 'free');
+  if (!paid.length) return '';
+  const open = b.checkout_open !== false && current === 'free';
+  return html`<div class="set-plans" data-v2-plans>
+    <h3>Plans</h3>
+    ${b.checkout_open === false ? html`<p class="set-row-note" data-v2-plans-refusal>${b.checkout_refusal || ''} <a class="textlink" href="#/terms">Terms of use</a>, <a class="textlink" href="#/privacy">Privacy policy</a>.</p>` : ''}
+    ${paid.map((p) => row(p.label, allows(p.limits || {}),
+      open ? html`<button type="button" class="btn btn-sm btn-primary" data-v2-billing="checkout" data-v2-plan="${p.plan}">Choose ${p.label}${p.price_label ? `, ${p.price_label}` : ''}</button>` : (p.price_label ? html`<span class="set-row-note">${p.price_label}</span>` : ''),
+      current === p.plan ? tag(true, 'Your plan') : ''))}
+    <p class="set-row-note">Payments, receipts and refunds are handled by Stripe; Manage billing opens Stripe's own page for your plan.</p></div>`;
+}
+
+// Alert emails to readers (round three): offered only while the owner's switch is on; off, alerts stay in Optic
+function alertMail() {
+  const a = D.alertMail;
+  if (!a || !a.offered) return '';
+  return html`<section class="section" aria-labelledby="am-h"><h2 class="t-h2" id="am-h">Alert emails</h2>
+    ${row('Email me my alerts', 'One email after each check with what fired on your own alerts, sent to your account address. Each alert is emailed once.',
+      html`<button type="button" class="btn btn-sm" data-v2-alert-mail aria-pressed="${!!a.email_me}">${a.email_me ? 'On' : 'Off'}</button>`, tag(!!a.email_me, a.email_me ? 'On' : 'Off'))}</section>`;
 }
 
 function security() {
@@ -225,6 +256,7 @@ function loadAll() {
   if (store.signedIn()) {
     loadSecurity();
     api.get('/api/billing/status', { force: true }).then((b) => { D.billing = b; }, () => { D.billing = null; }).finally(paint);
+    api.get('/api/alert-delivery/me', { force: true }).then((a) => { D.alertMail = a; }, () => { D.alertMail = null; }).finally(paint);
     api.get('/api/brokerage/status', { ttl: 60000 }).then((b) => { D.brokerage = !!(b && b.available); paint(); }, () => {});
   }
   api.get('/api/session', { ttl: 60000 }).then((s) => { D.session = s; }, () => { D.session = null; }).finally(paint);
@@ -259,8 +291,15 @@ function wire(main) {
     if (t('[data-v2-set-recheck]')) { await store.loadMe(); if (appRef) appRef.settleAuth(); return; }
     if (t('[data-v2-set-resend]')) { await act(() => api.post('/api/auth/resend-verification', {}), (r) => (r && r.already_verified ? 'This address is already confirmed.' : r && r.mail && r.mail.available === false ? 'Email is not switched on here yet, so no link could be sent.' : 'A new confirmation link is on its way.')); return; }
     if ((b = t('[data-v2-billing]'))) {
-      const r = await act(() => api.post(`/api/billing/${b.dataset.v2Billing === 'portal' ? 'portal' : 'checkout'}`, {}));
+      const body = b.dataset.v2Plan ? { plan: b.dataset.v2Plan } : {};
+      const r = await act(() => api.post(`/api/billing/${b.dataset.v2Billing === 'portal' ? 'portal' : 'checkout'}`, body));
       if (r && r.url && SAFE.test(r.url)) location.href = r.url; else if (r) toast('Billing is not available right now.', { kind: 'bad' });
+      return;
+    }
+    if ((b = t('[data-v2-alert-mail]'))) {
+      const want = b.getAttribute('aria-pressed') !== 'true';
+      const r = await act(() => api.post('/api/alert-delivery/me', { email_me: want }), want ? 'Your alerts will be emailed to you.' : 'Alert emails are off.');
+      if (r) { D.alertMail = r; paint(); const again = mainEl.querySelector('[data-v2-alert-mail]'); if (again) again.focus(); }
       return;
     }
     if (t('[data-v2-set-del]')) { ui.deleting = true; ui.delErr = ''; paint(); const i = mainEl.querySelector('[data-v2-set-delete] input'); if (i) i.focus(); return; }

@@ -287,7 +287,15 @@ def run_once(snapshot: Callable[[str], Dict[str, Any]],
             if result and result.get("met") and row["kind"] == "swing_setup":
                 record_signal(row["user_id"], result, "scheduled alert check", when)
 
-    return {
+    # Readers' own alert emails (round three), only while the owner's switch is on; off, this is a no-op and the
+    # owner summary is unchanged. After the pass, so a slow relay never delays a check.
+    delivered: Dict[str, Any] = {}
+    try:
+        from . import alerts as alerts_mod
+        delivered = alerts_mod.deliver_to_readers(when)
+    except Exception as exc:  # noqa: BLE001 - the hits are stored; mail is second
+        log.warning("reader alert delivery failed: %s", exc)
+    out = {
         "ran_at": when.isoformat(),
         "symbols": len(symbols),
         "skipped_symbols": max(0, len(grouped) - len(symbols)),
@@ -295,6 +303,9 @@ def run_once(snapshot: Callable[[str], Dict[str, Any]],
         "hits": fired,
         "failed_symbols": failed,
     }
+    if delivered.get("readers") or delivered.get("pending"):
+        out["reader_delivery"] = delivered
+    return out
 
 
 def hits_for(user_id: str, limit: int = 50,

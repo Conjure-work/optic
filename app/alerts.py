@@ -448,3 +448,106 @@ def deliver_pending(limit: int = DELIVER_LIMIT) -> Dict[str, Any]:
                          [(row["id"],) for row in rows])
     _note_attempt(len(rows))
     return {"sent": len(rows)}
+
+
+# ---------------------------------------------------------------- per reader
+#
+# Round three (2026-11-23). Everything above emails ONE address, the owner's: Optic's own book alerts, the owner
+# summary. A reader's watches (watch_runner, the watch_hits table) were shown in Optic only. Whether readers should get
+# their own alert emails is the owner's decision, asked and not yet answered, so it is built behind one switch,
+# ALERT_DELIVERY_READERS, off by default. Off, nothing below sends anything and the owner summary is exactly as it was.
+# On, a reader who ticked "Email me my alerts" in Settings gets one digest per pass of the hits on their own watches,
+# at their own account address, through the same mailer; each hit goes to a reader once (watch_delivery, migration
+# 27), and a send the relay refuses stays pending for the next pass.
+
+from fastapi import APIRouter, Body, Request  # noqa: E402  (kept beside the code that uses it)
+
+from . import db as accounts_db, health_extra  # noqa: E402
+from .auth import deps, store as auth_store  # noqa: E402
+
+READER_SWITCH = "ALERT_DELIVERY_READERS"
+READER_BATCH = 200
+
+router = APIRouter(prefix="/api/alert-delivery", tags=["alerts"])
+
+
+def readers_on() -> bool:
+    return (os.environ.get(READER_SWITCH) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def delivery_mode() -> Dict[str, Any]:
+    return {"mode": "readers" if readers_on() else "owner summary", "owner_summary": True,
+            "switch": READER_SWITCH}
+
+
+def _reader_digest(rows: List[Dict[str, Any]]) -> Dict[str, str]:
+    subject = ("Optic alert: " + rows[0]["title"] if len(rows) == 1
+               else "Optic alerts: {} new on your watches".format(len(rows)))
+    lines: List[str] = []
+    for row in rows:
+        lines.append(row["title"])
+        if row.get("condition"):
+            lines.append("    You asked: " + row["condition"])
+        if row.get("body"):
+            lines.append("    " + row["body"])
+        lines.append("")
+    lines.append("Your alerts and the readings behind them: " + base_url() + "/#/watchlist")
+    lines.append("To stop these emails, untick \"Email me my alerts\" in Settings.")
+    return {"subject": subject[:150], "body": "\n".join(lines)}
+
+
+def deliver_to_readers(now: Optional[datetime] = None) -> Dict[str, Any]:
+    """One digest per opted-in reader of their own undelivered hits from the last DELIVER_WITHIN_HOURS.
+
+    Blocking; the caller runs it off the event loop. Never raises over one reader's failure."""
+    if not readers_on():
+        return {"sent": 0, "readers": 0, "mode": "owner summary"}
+    if not mailer.available().get("available"):
+        return {"sent": 0, "readers": 0, "reason": "no mail server"}
+    now = now or datetime.now(timezone.utc)
+    since = (now - timedelta(hours=DELIVER_WITHIN_HOURS)).isoformat()
+    rows = accounts_db.rows(
+        "SELECT h.id, h.user_id, h.title, h.body, h.condition, h.created_at, u.email FROM watch_hits h "
+        "JOIN users u ON u.id = h.user_id JOIN user_preferences p ON p.user_id = h.user_id "
+        "WHERE p.alert_email = 1 AND u.is_active = 1 AND h.created_at >= ? "
+        "AND NOT EXISTS (SELECT 1 FROM watch_delivery d WHERE d.hit_id = h.id AND d.user_id = h.user_id) "
+        "ORDER BY h.user_id, h.created_at, h.id LIMIT ?", (since, READER_BATCH))
+    by_user: Dict[str, List[Dict[str, Any]]] = {}
+    for r in rows:
+        by_user.setdefault(r["user_id"], []).append(r)
+    sent = pending = 0
+    for uid, hits in by_user.items():
+        mail = _reader_digest(hits)
+        if not mailer.send(hits[0]["email"], mail["subject"], mail["body"]):
+            pending += len(hits)
+            continue
+        stamp = accounts_db.utcnow()
+        accounts_db.execute_many([("INSERT OR IGNORE INTO watch_delivery (hit_id, user_id, sent_at) VALUES (?,?,?)",
+                                   (h["id"], uid, stamp)) for h in hits])
+        sent += len(hits)
+    return {"sent": sent, "pending": pending, "readers": len(by_user)}
+
+
+@router.get("/me")
+async def my_delivery(request: Request) -> Dict[str, Any]:
+    """Whether this reader can ask for their own alert emails, and whether they have. Signed in only."""
+    user = deps.require_user(request)
+    prefs = auth_store.round_three_preferences(user["id"])
+    return {"offered": readers_on(), "email_me": bool(prefs["alert_email"]) and readers_on()}
+
+
+@router.post("/me")
+async def set_my_delivery(request: Request, payload: Dict[str, Any] = Body(default={})) -> Dict[str, Any]:
+    user = deps.require_user(request)
+    deps.csrf_guard(request)
+    from fastapi import HTTPException
+    if not readers_on():
+        raise HTTPException(status_code=409, detail="Alert emails to readers are not switched on here.")
+    want = payload.get("email_me")
+    if not isinstance(want, bool):
+        raise HTTPException(status_code=400, detail="email_me must be true or false.")
+    prefs = auth_store.set_round_three_preferences(user["id"], {"alert_email": want})
+    return {"offered": True, "email_me": bool(prefs["alert_email"])}
+
+
+health_extra.register("alert_delivery", delivery_mode)
