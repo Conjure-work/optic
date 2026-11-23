@@ -71,8 +71,11 @@ const P = {
   saved: lazy(() => import('./pages/saved.js'), 'saved'),
   dossierstart: lazy(() => import('./pages/dossierstart.js'), 'dossierstart'),
   notfound: lazy(() => import('./pages/notfound.js'), 'notfound'),
+  // round three: Portfolio with one meaning, the Markets calendar and the sign-up questions
+  portfolio: lazy(() => import('./pages/portfolio.js'), 'portfolio'), calendar: lazy(() => import('./pages/calendar.js'), 'calendar'),
+  levelquiz: lazy(() => import('./pages/levelquiz.js'), 'levelquiz'),
 };
-const PAGES = { home: P.workspace, overview: P.dossier, swing: P.options, long: P.investing, earnings: P.earnings, financials: P.financials, news: P.news, chart: P.chart, brief: P.read, market: P.macro, indices: P.indices, instrument: P.instrument, explore: P.explore, scan: P.scan, insiders: P.insiders, analysts: P.analysts, settings: () => settingsPage, compare: P.compare, tracker: P.tracker, paper: P.paper, roth: P.retirement, brokerage: P.brokerage, reports: P.reports, usage: P.reports, accounts: P.reports, metrics: P.reports, watchlist: P.watchlist, alerts: P.alerts, signin: () => signin, terms: P.legal, privacy: P.legal, earningsweek: P.earningsweek, dossierstart: P.dossierstart, stockgrid: P.workspace, sheet: P.sheet, investigate: P.investigate, saved: P.saved, notfound: P.notfound };
+const PAGES = { home: P.workspace, overview: P.dossier, swing: P.options, long: P.investing, earnings: P.earnings, financials: P.financials, news: P.news, chart: P.chart, brief: P.read, market: P.macro, indices: P.indices, instrument: P.instrument, explore: P.explore, scan: P.scan, insiders: P.insiders, analysts: P.analysts, settings: () => settingsPage, compare: P.compare, tracker: P.tracker, paper: P.paper, roth: P.retirement, brokerage: P.brokerage, reports: P.reports, usage: P.reports, accounts: P.reports, metrics: P.reports, ownerreport: P.reports, portfolio: P.portfolio, calendar: P.calendar, welcome: P.levelquiz, watchlist: P.watchlist, alerts: P.alerts, signin: () => signin, terms: P.legal, privacy: P.legal, earningsweek: P.earningsweek, dossierstart: P.dossierstart, stockgrid: P.workspace, sheet: P.sheet, investigate: P.investigate, saved: P.saved, notfound: P.notfound };
 // While an uncached check is out, a quiet line in place of the last page (after a moment, so a quick answer shows none)
 function holdFor(my, text) {
   setTimeout(() => {
@@ -141,6 +144,9 @@ async function afterAuth() {
   }
   if (current) shell.paint(current.route);
   if (current && current.page.onAuth) current.page.onAuth(current.view);
+  // round three: an account that has never been shown the sign-up questions is offered them once, whatever way it
+  // was made (the sign-up form sends the reader to them directly; Google, Apple and passkeys get a band above the page)
+  if (store.signedIn()) P.levelquiz().then((m) => m.offer()).catch(() => {});
 }
 
 // The thin line under the top bar while the page has a section still loading (ui/motion.js watchLoading)

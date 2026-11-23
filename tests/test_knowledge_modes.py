@@ -52,9 +52,11 @@ def test_classics_panel_ladder_does_not_move():
     assert [knowledge.MODES[k]["level"] for k in knowledge.ORDER] == [0, 0, 1, 2, 3]
 
 
-def test_the_recommended_default_is_the_middle():
-    """New to Markets as the default would talk down to most readers; Expert would explain nothing."""
-    assert knowledge.DEFAULT_MODE == "intermediate"
+def test_the_default_for_a_first_visit_is_beginner():
+    """Round three (2026-11-23, the owner's Round 3 text: "land on the right first view on a first visit"): a reader
+    who has chosen no level is treated as a beginner, so nothing is explained above a newcomer's head. It was the
+    middle level until then."""
+    assert knowledge.DEFAULT_MODE == "beginner"
 
 
 def test_an_unknown_level_falls_back_and_the_old_ids_map():
@@ -116,7 +118,8 @@ def test_the_catalogue_publishes_what_it_cannot_change_and_one_fact_five_ways():
     cat = knowledge.catalogue()
     assert cat["changes"] and any("figures" in c for c in cat["never_changes"])
     assert cat["preview_fact"].startswith("A company whose shares trade at 30 times its earnings")
-    assert [m["id"] for m in cat["modes"]] == knowledge.ORDER and cat["default"] == "intermediate"
+    # the default is Beginner since round three (2026-11-23); it was intermediate
+    assert [m["id"] for m in cat["modes"]] == knowledge.ORDER and cat["default"] == "beginner"
     assert cat["legacy"] == knowledge.LEGACY
     for m in cat["modes"]:
         assert m["preview"] and "30" in m["preview"], m["id"]
@@ -206,7 +209,9 @@ def test_the_clients_level_table_agrees_with_the_server():
     assert "export const LEVEL_IDS = ['beginner', 'intermediate', 'advanced'];" in v2
     assert "const LEGACY = { new: 'beginner', expert: 'advanced', simple: 'beginner', literate: 'intermediate', professional: 'advanced', adaptive: 'intermediate' };" in v2
     assert knowledge.THREE == ["beginner", "intermediate", "advanced"]
-    assert "const DEFAULT_MODE = 'intermediate';" in v2 and "var DEFAULT_MODE = 'intermediate';" in COMPONENT
+    # round three (2026-11-23): v2's first visit opens at Beginner, as the server's default; Classic, behind its flag,
+    # keeps its own default unchanged
+    assert "const DEFAULT_MODE = 'beginner';" in v2 and "var DEFAULT_MODE = 'intermediate';" in COMPONENT
 
 
 def test_the_component_copies_only_the_levels():

@@ -99,6 +99,8 @@ export async function render(main, route, app) {
       if (kind === 'up') {
         if (fd.get('password') !== fd.get('confirm')) throw new api.ApiError('bad', 400, 'Those passwords do not match.');
         const r = await api.post('/api/auth/register', { email: fd.get('email'), first_name: fd.get('first_name'), last_name: fd.get('last_name'), password: fd.get('password'), confirm_password: fd.get('confirm'), remember: !!fd.get('remember') });
+        // round three: the optional questions that suggest a level come straight after the form, then where the reader was going
+        p.next = `#/welcome?next=${encodeURIComponent(p.next || '#/')}`;
         await done('in');
         toast(r && r.mail && r.mail.available === false ? 'Account created. Email is not switched on yet, so no confirmation message was sent.' : r && r.verification_sent === false ? 'Account created, but the confirmation email could not be sent. You can request another from Settings.' : 'Account created. A confirmation link is on its way to your inbox.');
         return;

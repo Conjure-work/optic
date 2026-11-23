@@ -150,7 +150,9 @@ function revisions(sym) {
   return html`<section class="section" aria-labelledby="rv-h"><h2 class="t-h2" id="rv-h">Estimate revisions</h2>
     <p>${clean(r.note || '')}${isNum(r.analysts_up_30d) && isNum(r.analysts_down_30d) ? ` ${r.analysts_up_30d} ${r.analysts_up_30d === 1 ? 'analyst' : 'analysts'} raised and ${r.analysts_down_30d} cut in the last 30 days.` : ''}</p>
     <div class="chart-slot" data-chart="rev"></div>
-    <div class="tscroll"><table class="t"><thead><tr><th>Period</th><th>Estimate</th><th>30 days</th><th>90 days</th><th>Up, 30 days</th><th>Down, 30 days</th></tr></thead>
+    ${/* round three (the scanner's item at phone width): the box is a named keyboard stop of its own and the table says
+       what it holds, so a phone reader can reach the columns that scroll off the side */ ''}
+    <div class="tscroll" tabindex="0" role="region" aria-label="Estimate revisions by period, table" data-scroll-stop><table class="t"><caption class="sr">Estimate revisions by period: the current estimate, its change over 30 and 90 days, and how many analysts raised or cut it</caption><thead><tr><th scope="col">Period</th><th scope="col">Estimate</th><th scope="col">30 days</th><th scope="col">90 days</th><th scope="col">Up, 30 days</th><th scope="col">Down, 30 days</th></tr></thead>
       <tbody>${r.rows.map((x) => html`<tr><td>${x.label}</td><td>${num(x.current)}</td><td>${signed(x.chg_30d_pct)}</td><td>${signed(x.chg_90d_pct)}</td><td>${x.analysts_up_30d}</td><td>${x.analysts_down_30d}</td></tr>`)}</tbody></table></div>
     <p class="asof">${clean(r.caveat || '')}</p></section>`;
 }

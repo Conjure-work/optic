@@ -145,7 +145,8 @@ def test_an_account_that_never_chose_takes_the_level_chosen_in_this_browser(tmp_
 
 def test_an_account_that_never_chose_and_a_browser_that_never_chose_send_nothing(tmp_path):
     got = account_run(tmp_path, {"preferences": {"knowledge_level": None}})
-    assert got["level"] == "intermediate" and not [c for c in got["calls"] if c[0] == "PATCH"]
+    # the default is Beginner since round three (2026-11-23); nothing is sent either way
+    assert got["level"] == "beginner" and not [c for c in got["calls"] if c[0] == "PATCH"]
 
 
 def test_a_failed_save_is_remembered_with_the_version_this_browser_saw(tmp_path):

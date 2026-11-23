@@ -99,7 +99,7 @@
   .toast.show { transform: none; }
   .toast-act { margin-left: 0; flex: none; }
 }
-.toast[data-kind="bad"] { background: var(--c-neg); }
+.toast[data-kind="bad"] { background: var(--c-toast-bad); color: var(--c-on-scene); }
 .more-list { display: grid; gap: 2px; }
 
 /* dossier */
@@ -517,7 +517,7 @@ details.method p { max-width: 80ch; }
 h1[tabindex="-1"]:focus, h2[tabindex="-1"]:focus, #main:focus { outline: none; }
 .dh-sk { display: inline-block; width: 220px; height: 64px; border-radius: var(--r-lg); }
 .search-btn .sb-short { display: none; }
-@media (max-width: 860px) { .search-btn .sb-long { display: none; } .search-btn .sb-short { display: inline; } }
+@media (max-width: 860px) { .search-btn .sb-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } .search-btn .sb-short { display: inline; } }
 .pf-rows { margin-top: 22px; border-top: 1px solid var(--c-line); }
 .pf-row { display: grid; grid-template-columns: minmax(0, 1.6fr) 1fr 1fr 1fr; gap: 12px; align-items: center; min-height: 52px; padding: 8px 8px; border-bottom: 1px solid var(--c-line-2); text-decoration: none; }
 a.pf-row:hover { background: var(--c-plane-2); }
@@ -2557,3 +2557,24 @@ details.whose > p { margin: 4px 0 6px; }
 .ws-named-row { display: flex; gap: 6px; justify-content: space-between; }
 /* the saved list's own slot, so it can redraw without the name box beside it (pages/workspace.js paintNamedList) */
 .ws-named-saved { display: contents; }
+
+/* Round three: the three kinds of alert drawn one way (pages/alerts.js All alerts, pages/watchlist.js rows). The kind
+   is a word in a quiet outlined tag, never a colour alone, so it reads the same in both themes and to a screen reader. */
+.al-kind { display: inline-block; margin-right: 6px; padding: 1px 7px; border: 1px solid var(--c-line); border-radius: var(--r-xs); font: 500 var(--t-sm)/1.5 var(--f-label); color: var(--c-ink-2); vertical-align: 1px; }
+.al-kind-yours { border-color: var(--c-ink-3); color: var(--c-ink); }
+.wl-alerts { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; }
+.wl-alerts .wl-alert { margin-left: 0; }
+.cal-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.cal-note { font-weight: 600; }
+.pf-whose { margin-top: 6px; color: var(--c-ink-2); max-width: 70ch; }
+/* the sign-up questions (pages/levelquiz.js): Skip is the same size as Continue, by rule (round three) */
+.lq-form fieldset { border: 0; margin: 0; padding: 0; }
+.lq-form legend { font-weight: 600; color: var(--c-ink); margin-bottom: 6px; }
+.lq-q { padding-bottom: 14px; border-bottom: 1px solid var(--c-line-2); }
+.lq-choices { display: grid; gap: 6px; }
+.lq-acts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.lq-btn { min-width: 9.5rem; min-height: 44px; justify-content: center; }
+.lq-offer { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin: 12px auto 0; padding: 10px 14px; border: 1px solid var(--c-line); border-radius: var(--r-md); background: var(--c-surface, transparent); color: var(--c-ink); max-width: 100%; }
+.lq-offer p { margin: 0; }
+.ws-named-said { flex-basis: 100%; margin: 4px 0 0; color: var(--c-ink); font-size: var(--t-sm); min-height: 1em; }
+.ws-named-said:empty { display: none; }

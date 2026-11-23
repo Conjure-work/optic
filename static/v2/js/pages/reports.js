@@ -13,8 +13,8 @@ import { skeleton, failed, how } from '../ui/states.js';
 import { toast } from '../ui/toast.js';
 import { groupTabs } from './tabs.js';
 
-const TITLES = { reports: 'Problem Reports', usage: 'Claude usage', accounts: 'Accounts', metrics: 'Metrics' };
-let view = 'reports', D = {}, live = true, mainEl = null, tab = 'open', armedAll = null, seq = 0;
+const TITLES = { reports: 'Problem Reports', usage: 'Claude usage', accounts: 'Accounts', metrics: 'Metrics', ownerreport: 'Owner report' };
+let view = 'reports', D = {}, live = true, mainEl = null, tab = 'open', armedAll = null, seq = 0, params = {};
 const isOwner = () => !!(store.state.me && store.state.me.admin);
 const count = (n) => Number(n || 0).toLocaleString('en-US');
 
@@ -142,7 +142,7 @@ function metrics() {
     : html`${count(w.active_accounts)}${w.active_from ? html` <small class="t-muted">from ${shortDate(w.active_from)}</small>` : ''}`);
   const shown = weeks.slice().reverse(), recent = cohorts.slice().reverse();
   const anyQ = kinds.some((k) => k.all);
-  return html`${frontEnd()}<p class="section-sub">${lead}</p>
+  return html`${frontEnd()}${modesBlock()}<p class="section-sub">${lead}</p>
     ${signals()}
     <dl class="kv mt-kv"><div><dt>Accounts</dt><dd>${count(a.total)}</dd></div><div><dt>Active, 7 days</dt><dd>${count(a.active_7_days)}</dd></div><div><dt>Active, 30 days</dt><dd>${count(a.active_30_days)}</dd></div><div><dt>Verified email</dt><dd>${count(a.verified)}</dd></div></dl>
 
@@ -175,12 +175,74 @@ function metrics() {
     <p class="asof">Counted ${stamp(d.generated_at)}.</p>`;
 }
 
+/* ---------------- the modes round three adds (app/health_extra.py), as /api/health reports them ---------------- */
+// Billing, the legal text, alert delivery, the chart feed's history limit, Milo's off-topic set and which pages Watchlist
+// and Portfolio are: each module reports its own mode, and this lists whatever is registered, so a mode added later
+// shows here without a change to this page.
+const MODE_NAMES = { billing: 'Billing', legal_text: 'Terms and privacy text', alert_delivery: 'Alert delivery', chart_history: 'Chart history',
+  milo_offtopic: "Milo's off-topic set", investor_pages: 'Watchlist and Portfolio pages' };
+const words = (k) => MODE_NAMES[k] || capWords(k);
+const capWords = (k) => String(k).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+function modeValue(v) {
+  if (v === null || v === undefined) return html`<span class="t-muted">Not reported</span>`;
+  if (Array.isArray(v)) return v.length ? v.map((x) => clean(String(x))).join(', ') : html`<span class="t-muted">none</span>`;
+  if (typeof v === 'object') return html`<dl class="mt-modes-in">${Object.entries(v).map(([k, x]) => html`<div><dt>${capWords(k)}</dt><dd>${modeValue(x)}</dd></div>`)}</dl>`;
+  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+  return clean(String(v));
+}
+function modesBlock() {
+  const m = (D.health || {}).modes;
+  if (!m) return html`<p class="asof" data-v2-modes="none">The site's modes could not be read just now.</p>`;
+  const keys = Object.keys(m);
+  if (!keys.length) return '';
+  return html`<section class="section" aria-labelledby="md-h" data-v2-modes><h2 class="t-h2" id="md-h">How this site is set</h2>
+    <p class="section-sub">Each line is reported by the part of Optic that decides it, the same as /api/health says.</p>
+    <dl class="kv mt-modes">${keys.map((k) => html`<div data-v2-mode="${k}"><dt>${words(k)}</dt><dd>${modeValue(m[k])}</dd></div>`)}</dl></section>`;
+}
+
+/* ---------------- the owner report: what people open, which level they use, and the three signals ---------------- */
+// Counts and weekly series only, never a part of a whole: on the handful of readers a new site has, a figure
+// over a small number reads as more than it is (refinement A8). The group in the address (owner_kind, owner_id) is
+// passed to the server, which today reads everyone and says so; the organization round reads one group with it.
+const EVENT_NAMES = { home_stock_open: 'Opened a stock from Home', milo_question: 'Asked Milo a question', visit: 'Visited (first visit of a day)' };
+const LEVEL_NAMES = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', 'not recorded': 'Not recorded' };
+function ownerReport() {
+  const d = D.d || {}, m = d.last_30_days || {}, weeks = (d.weeks || []).slice().reverse(), g = d.group || {};
+  const sig = (x, e) => ((x.signals || {})[e] || {});
+  const lv = (x) => (x.levels || []).map((l) => `${LEVEL_NAMES[l.level] || l.level} ${count(l.events)}`).join(', ') || 'none';
+  return html`<p class="section-sub">Counted from Optic's own database: the three events recorded since round one, the screen each happened on and the reader's level at the time.${d.owners_left_out ? ' Your own signed-in activity is left out.' : ''}</p>
+    <p class="asof" data-v2-or-group="${g.applied || 'everyone'}">Group: <b>everyone</b>.${g.note ? ` ${clean(g.note)}` : ''}</p>
+    <section class="section" aria-labelledby="or-30"><h2 class="t-h2" id="or-30">The last 30 days</h2>
+      <div class="tscroll" tabindex="0" aria-label="The three signals over the last 30 days"><table class="t mt-t" data-v2-or-signals><caption class="sr">The three signals over the last 30 days</caption>
+        <thead><tr><th scope="col">Signal</th><th scope="col" class="n">Events</th><th scope="col" class="n">Readers</th></tr></thead>
+        <tbody>${Object.keys(EVENT_NAMES).map((e) => html`<tr><th scope="row">${EVENT_NAMES[e]}</th><td class="n">${count(sig(m, e).events)}</td><td class="n">${count(sig(m, e).readers)}</td></tr>`)}
+          <tr><th scope="row">Came back within a week of a first visit</th><td class="n">${count((m.came_back || {}).readers)}</td><td class="n">of ${count((m.came_back || {}).had_a_full_week)} a week old</td></tr></tbody></table></div>
+      <h3 class="t-h3 mt-h3">Which level readers use</h3>
+      <div class="tscroll" tabindex="0" aria-label="Events by level over the last 30 days"><table class="t mt-t" data-v2-or-levels><caption class="sr">Events by level over the last 30 days</caption>
+        <thead><tr><th scope="col">Level</th><th scope="col" class="n">Events</th></tr></thead>
+        <tbody>${(m.levels || []).length ? m.levels.map((l) => html`<tr><th scope="row">${LEVEL_NAMES[l.level] || l.level}</th><td class="n">${count(l.events)}</td></tr>`) : html`<tr><td colspan="2">Nothing recorded yet.</td></tr>`}</tbody></table></div>
+      <h3 class="t-h3 mt-h3">What people open</h3>
+      <div class="tscroll" tabindex="0" aria-label="Screens where the events happened over the last 30 days"><table class="t mt-t" data-v2-or-screens><caption class="sr">Screens where the events happened over the last 30 days</caption>
+        <thead><tr><th scope="col">Screen</th><th scope="col">Event</th><th scope="col" class="n">Events</th></tr></thead>
+        <tbody>${(m.screens || []).length ? m.screens.map((x) => html`<tr><th scope="row">${clean(x.screen)}</th><td>${EVENT_NAMES[x.event] || x.event}</td><td class="n">${count(x.events)}</td></tr>`) : html`<tr><td colspan="3">Nothing recorded yet.</td></tr>`}</tbody></table></div>
+      ${(m.symbols || []).length ? html`<p data-v2-or-symbols>Stocks opened from Home most: ${m.symbols.map((x) => `${x.symbol} ${count(x.opens)}`).join(', ')}.</p>` : ''}
+    </section>
+    <section class="section" aria-labelledby="or-wk"><h2 class="t-h2" id="or-wk">Week by week</h2>
+      <p class="asof">Weeks start on Monday (UTC), newest first. "Came back" counts readers whose first visit fell in that week and who visited again within seven days.</p>
+      <div class="tscroll" tabindex="0" aria-label="The three signals and levels by week"><table class="t mt-t" data-v2-or-weeks><caption class="sr">The three signals and levels by week, newest first</caption>
+        <thead><tr><th scope="col">Week of</th><th scope="col" class="n">Stocks opened from Home</th><th scope="col" class="n">Milo questions</th><th scope="col" class="n">Visit days</th><th scope="col" class="n">Came back</th><th scope="col">Levels</th></tr></thead>
+        <tbody>${weeks.map((w) => html`<tr><th scope="row">${shortDate(w.week)}</th><td class="n">${count(sig(w, 'home_stock_open').events)}</td><td class="n">${count(sig(w, 'milo_question').events)}</td><td class="n">${count(sig(w, 'visit').events)}</td><td class="n">${count((w.came_back || {}).readers)} of ${count((w.came_back || {}).had_a_full_week)}</td><td>${lv(w)}</td></tr>`)}</tbody></table></div></section>
+    ${how(html`<p>${clean(d.what_is_counted || '')}</p><p>The group in the address is for the organization round: it is read by the server and, until groups exist, every count is everyone's.</p>`)}
+    <p class="asof">Counted ${stamp(d.generated_at)}.</p>`;
+}
+/* ---------------- end of the owner report ---------------- */
+
 /* ---------------- page ---------------- */
 function paint() {
   if (!live) return;
-  const what = { reports: 'The reports', usage: 'The usage ledger', accounts: 'The accounts', metrics: 'The metrics' }[view];
+  const what = { reports: 'The reports', usage: 'The usage ledger', accounts: 'The accounts', metrics: 'The metrics', ownerreport: 'The owner report' }[view];
   const body = !isOwner() ? notOwner() : D.err ? errorBlock(D.err, what) : !D.d ? skeleton('rows', 5, 'Loading')
-    : view === 'reports' ? reports() : view === 'usage' ? usage() : view === 'metrics' ? metrics() : accounts();
+    : view === 'reports' ? reports() : view === 'usage' ? usage() : view === 'metrics' ? metrics() : view === 'ownerreport' ? ownerReport() : accounts();
   draw(mainEl, html`<header class="page-head"><h1 class="t-display-m">${TITLES[view]}</h1>${isOwner() ? groupTabs('reports', view) : ''}</header>
     <section class="section first" aria-label="${TITLES[view]}">${body}</section>`);
 }
@@ -194,7 +256,10 @@ async function load() {
     if (view === 'reports') d = await api.get(`/api/feedback?limit=50&status=${tab}`, { force: true, timeout: 20000 });
     else if (view === 'usage') { [d, D.health] = await Promise.all([api.get('/api/ai/usage', { force: true }), api.get('/api/health', { ttl: 60000 }).catch(() => null)]); }
     else if (view === 'metrics') { [d, D.signals, D.health] = await Promise.all([api.get('/api/admin/metrics', { force: true }), api.get('/api/admin/usage-signals', { force: true }).catch((e) => ({ available: false, reason: e.message })), api.get('/api/health', { ttl: 0, force: true }).catch(() => null)]); }
-    else d = await api.get('/api/admin/accounts', { force: true });
+    else if (view === 'ownerreport') {
+      const q = new URLSearchParams(); ['owner_kind', 'owner_id'].forEach((k) => { if (params[k]) q.set(k, params[k]); });
+      d = await api.get(`/api/admin/owner-report${q.toString() ? `?${q}` : ''}`, { force: true, timeout: 20000 });
+    } else d = await api.get('/api/admin/accounts', { force: true });
     if (my !== seq || !live || !isOwner()) return;
     D.d = d;
   } catch (e) { if (my !== seq) return; D.err = e; D.d = null; }
@@ -202,7 +267,7 @@ async function load() {
 }
 
 export async function render(main, route) {
-  live = true; mainEl = main; view = route.view; D = {}; armedAll = null;
+  live = true; mainEl = main; view = route.view; D = {}; armedAll = null; params = route.params || {};
   document.title = `${TITLES[view]}, Optic`;
   main.addEventListener('click', async (e) => {
     const t = (s) => e.target.closest(s); let b;

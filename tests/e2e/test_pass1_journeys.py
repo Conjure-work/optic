@@ -280,7 +280,8 @@ def test_changing_the_level_closes_what_show_more_opened(chrome, server):
 def test_the_level_survives_a_reload_signed_out(chrome, server):
     ctx, page = open_page(chrome, server)
     home(page, server)
-    assert pressed(page) == "intermediate", "a first visit opens at Intermediate in this round"
+    # round three (2026-11-23): a first visit opens at Beginner; it opened at Intermediate in round one
+    assert pressed(page) == "beginner", "a first visit opens at Beginner"
     page.click("[data-v2-lc] [data-v2-level='advanced']")
     page.wait_for_function("() => document.querySelector('[data-v2-level-now]').dataset.v2LevelNow === 'advanced'")
     page.reload()

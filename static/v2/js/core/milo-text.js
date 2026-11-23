@@ -38,7 +38,7 @@ export const SOURCES = {
   auto_loaded: ['Loaded for your question', 'sources'],
 };
 const SYMBOL_VIEWS = { overview: '', chart: 'chart', swing: 'options', long: 'investing', earnings: 'earnings', news: 'news' };
-const PLAIN_VIEWS = { market: '#/macro', brief: '#/read', indices: '#/indices', compare: '#/compare', tracker: '#/portfolio', paper: '#/paper', watchlist: '#/watchlist', brokerage: '#/brokerage' };
+const PLAIN_VIEWS = { market: '#/macro', brief: '#/read', indices: '#/indices', compare: '#/compare', tracker: '#/models', portfolio: '#/portfolio', paper: '#/paper', watchlist: '#/watchlist', brokerage: '#/brokerage' };
 
 /** Where a source chip goes in v2, for the symbol on screen; null when it needs one and there is none. */
 export function sourceHref(view, symbol) {

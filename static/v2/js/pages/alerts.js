@@ -25,6 +25,8 @@ import { sectionHead } from './tabs.js';
 import { refreshUnread } from '../core/unread.js';
 import { localDefs, saveLocal } from '../core/watches.js';
 import * as SIG from './signals.js';
+import * as ALL from '../core/allalerts.js';
+import { separate } from '../core/investorpages.js';
 
 let S = {};
 let live = true;
@@ -270,11 +272,35 @@ const bookSub = () => {
   return html`Not yours: these fire on the Optic Portfolio's simulated books and on the ranked universe, the same for every reader. Each names the rule that tripped it and the readings it tripped on.${owner && n ? html` <b>${n} unread.</b>` : ''}`;
 };
 
+/* ---------------- round three: the three kinds gathered, one way of drawing them ----------------
+ * The Watchlist's Alerts view (#/alerts) starts with every alert of all three kinds in one list: the reader's own
+ * (set and fired), Optic's book and the linked brokerage's, each row the same shape: who it is from, the company,
+ * what happened and when. The sections below it keep each kind's own tools (edit, pause, why this fired). */
+function gatheredBlock() {
+  if (!S.all) return skeleton('rows', 3, 'Gathering your alerts');
+  const kind = S.allKind || 'all';
+  const items = ALL.ordered(S.all.items).filter((x) => kind === 'all' || x.kind === kind);
+  const counts = {}; S.all.items.forEach((x) => { counts[x.kind] = (counts[x.kind] || 0) + 1; });
+  const missing = (S.all.missing || []).map((k) => ALL.KIND_LABEL[k]);
+  return html`<div class="al-filters"><div class="chips chips-scroll" role="group" aria-label="Show alerts from">${[['all', 'All'], ...ALL.KINDS].map(([k, l]) => html`<button type="button" class="chip" data-v2-all-kind="${k}" aria-pressed="${kind === k}">${l} <span class="t-muted">${k === 'all' ? S.all.items.length : counts[k] || 0}</span></button>`)}</div></div>
+    ${missing.length ? html`<p class="stale" role="status">${missing.join(' and ')} could not be read just now; the rest are shown.</p>` : ''}
+    ${!items.length ? empty('No alerts here yet', kind === 'all' ? 'Your alerts, Optic\'s book and a linked brokerage\'s alerts all appear here, newest first.' : 'Nothing of this kind yet.')
+    : html`<ul class="hit-list al-all" data-v2-all-list>${items.slice(0, 40).map((x) => html`<li class="al-all-row" data-v2-all-item="${x.kind}">
+        <p class="hit-head"><span class="al-kind al-kind-${x.kind}">${ALL.KIND_LABEL[x.kind]}</span> ${x.symbol ? html`<a href="${hrefFor('overview', x.symbol)}"><b class="tick">${x.symbol}</b></a> ` : ''}${clean(x.title)}</p>
+        <small class="t-muted">${x.fired ? (x.at ? `Fired ${etTime(x.at)}` : 'Fired') : (x.active ? 'Watching' : 'Paused')}</small></li>`)}</ul>`}`;
+}
+async function loadGathered(main) {
+  try { S.all = await ALL.gather({ watches: S.watches, hits: S.hits, book: S.alerts && S.alerts.alerts }); }
+  catch (e) { S.all = { items: [], missing: ['yours', 'optic'] }; }
+  if (live) paint(main);
+}
+
 function paint(main) {
   const bk = !!getFlags().brokerage;
   const f = document.activeElement, keep = f && main.contains(f) ? [...f.attributes].map((a) => a.name).find((n) => n.startsWith('data-v2-al-') || n.startsWith('data-v2-book-') || n.startsWith('data-sg-') || n === 'data-v2-check') : null, kv = keep ? f.getAttribute(keep) : null;
   draw($('#al-body', main), html`
-    <section class="section first" aria-labelledby="h-w"><div class="section-head"><div><h2 class="t-h2" id="h-w">Your alerts</h2><p class="section-sub">${scheduleLine()}</p></div>
+    <section class="section first" aria-labelledby="h-all"><div class="section-head"><div><h2 class="t-h2" id="h-all">All alerts</h2><p class="section-sub">Yours, Optic's book and your linked brokerage's, in one list, newest first.</p></div></div>${gatheredBlock()}</section>
+    <section class="section" aria-labelledby="h-w"><div class="section-head"><div><h2 class="t-h2" id="h-w">Your alerts</h2><p class="section-sub">${scheduleLine()}</p></div>
       <button type="button" class="btn btn-primary" data-v2-al-new="">New alert</button></div>${watchesBlock()}</section>
     <section class="section" aria-labelledby="h-hits"><div class="section-head"><div><h2 class="t-h2" id="h-hits">What fired</h2><p class="section-sub">One entry per crossing: an alert fires again only after its condition has stopped being met.</p></div></div>${hitsBlock()}</section>
     <section class="section" aria-labelledby="h-sg"><div class="section-head"><div><h2 class="t-h2" id="h-sg">Signal history</h2><p class="section-sub">Every swing-setup alert of yours that fired, recorded when it fired and never edited. What the stock did next is added beside it as each completed candle prints. ${SIG.whereLine()}</p></div></div><div id="al-sg">${SIG.block()}</div></section>
@@ -416,6 +442,7 @@ async function loadAll(main) {
     jobs.push(api.get('/api/watches/hits?limit=60', { ttl: 0, force: true }).then((r) => { S.hits = r.hits || []; }, (e) => { S.hitsErr = e; }));
   } else S.watches = localDefs();
   await Promise.all(jobs.map((j) => j.finally(() => { if (live) paint(main); })));
+  if (live) await loadGathered(main);
 }
 
 export async function render(main, route) {
@@ -424,8 +451,11 @@ export async function render(main, route) {
   S = { checks: {}, fam: 'all', unseenOnly: false, undo: null, stops: [], bookOpen: new Set(), bookKind: 'all', bookUnread: false, confirmClear: false };
   SIG.fresh();
   provideContext(() => ({ view: 'alerts', alerts: (S.watches || []).map((w) => ({ symbol: w.symbol, condition: sentence(w), active: w.active !== false, last_met_at: w.last_met_at })) }));
-  document.title = 'Alerts, Optic';
-  draw(main, html`<header class="page-head">${sectionHead('follow', 'alerts')}</header><div id="al-body"></div>`);
+  // one place: headed Watchlist, the Alerts view of it; the owner's separate-pages setting heads it Alerts as before
+  const sep = await separate();
+  if (!live) return;
+  document.title = sep ? 'Alerts, Optic' : 'Watchlist, alerts, Optic';
+  draw(main, html`<header class="page-head">${sectionHead('follow', 'alerts', undefined, sep ? 'Alerts' : 'Watchlist')}</header><div id="al-body"></div>`);
   paint(main);
   wire(main);
   await loadAll(main);
@@ -526,6 +556,7 @@ function wire(main) {
       const again = $(`[data-v2-check="${sym}"]`, main); if (again) again.focus();
       return;
     }
+    if ((b = t('[data-v2-all-kind]'))) { S.allKind = b.dataset.v2AllKind; paint(main); const again = $(`[data-v2-all-kind="${b.dataset.v2AllKind}"]`, main); if (again) again.focus(); return; }
     if ((b = t('[data-v2-book-kind]'))) { S.bookKind = b.dataset.v2BookKind; if (b.hasAttribute('data-v2-book-all')) S.bookUnread = false; paint(main); return; }
     if ((b = t('[data-v2-book-why]'))) { const id = Number(b.dataset.v2BookWhy); if (S.bookOpen.has(id)) S.bookOpen.delete(id); else S.bookOpen.add(id); paint(main); return; }
     if ((b = t('[data-v2-book-seen]')) || t('[data-v2-book-seen-all]')) {
