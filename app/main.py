@@ -6171,7 +6171,11 @@ async def daily_bars(ticker: str) -> Dict[str, Any]:
         if df is None or df.empty:
             return {"available": False, "ticker": sym,
                     "reason": "No daily history for {}.".format(sym)}
-        return _bars_body(sym, df, 6)
+        out = _bars_body(sym, df, 6)
+        # how far back the free feed goes and what it adjusts, said under the chart (round three, app/chart_routes.py)
+        listed = (getattr(df, "attrs", None) or {}).get("first_trade_date")
+        out["history"] = chart_routes.history_limit(sym, out["dates"], listed=listed)
+        return out
     return await _run(build)
 
 

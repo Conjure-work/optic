@@ -2557,3 +2557,33 @@ details.whose > p { margin: 4px 0 6px; }
 .ws-named-row { display: flex; gap: 6px; justify-content: space-between; }
 /* the saved list's own slot, so it can redraw without the name box beside it (pages/workspace.js paintNamedList) */
 .ws-named-saved { display: contents; }
+
+/* Round three (2026-11-23): Fibonacci labels sit at the right edge beside the price scale, the golden pair (0.5 and
+   0.618) set heavier so they read first */
+.pc .lv-t.fib-gold, .pc .dr-t.fib-gold { font-weight: 600; }
+.pc .lv.fib-gold { stroke-width: 1.4; }
+
+/* Round three (2026-11-23): one, two or four charts (chart-grid.js). The page's own chart keeps its rails; the others
+   sit under it, each a compact chart with its own ticker, bar size and range. Below the 860 px breakpoint at most two,
+   stacked. */
+.ch-gridtools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.ch-favwrap { display: contents; }
+.ch-favs button, .ch-count-ctl button { min-width: 36px; }
+.ch-favset { border: 0; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ch-gridnote:not([hidden]) { margin-top: 8px; }
+.ch-slots { display: grid; gap: 12px; margin-top: 12px; }
+.ch-slots:empty { display: none; }
+.ch-slots[data-count="4"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1200px) { .ch-slots[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .ch-slots, .ch-slots[data-count="4"] { grid-template-columns: minmax(0, 1fr); } }
+.chg-slot { min-width: 0; border: 1px solid var(--c-line-2); border-radius: var(--r-md); background: var(--c-plane-2); padding: 8px; display: grid; gap: 6px; }
+.chg-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chg-head { display: flex; gap: 6px; align-items: center; }
+.chg-head input { width: 7em; text-transform: uppercase; }
+.chg-plot { min-height: 120px; min-width: 0; }
+/* the dock's pin, beside the close button */
+.chw-acts { display: flex; gap: 2px; }
+.chw-pin[aria-pressed="true"] { color: var(--c-ink); background: var(--c-active); }
+.chw-optviews { flex-wrap: wrap; }
+.chw-opt { display: grid; gap: 8px; min-width: 0; }
+.chw-opt h3 { font: 600 var(--t-sm)/1.2 var(--f-label); margin: 4px 0 0; }

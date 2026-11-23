@@ -158,6 +158,17 @@ export function navWindow(mode, w, d, N) {
 /** What the legend lists: the page's names (in its menu's order) that are on, the volume pane among them. */
 export const legendKeys = (names, overlays, panes) => Object.keys(names || {}).filter((k) => (k === 'volume' ? !!(panes || {}).volume : !!(overlays || {})[k]));
 const FIB = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+/** A Fibonacci ratio as the owner reads it: 0.5, 0.618, 1.618 (not 50.0% or 61.8%). */
+export const fibRatio = (r) => String(Number(Number(r).toFixed(3)));
+/** A level's label at the right edge: its ratio, then its price. Levels from the server carry `ratio`; older ones a
+ *  percent label ("61.8%", "127.2% ext"), read back into a ratio. */
+export function fibLabel(f) {
+  let r = Number(f && f.ratio);
+  if (!Number.isFinite(r)) { const m = /([0-9.]+)%/.exec(String((f && f.label) || '')); r = m ? Number(m[1]) / 100 : NaN; }
+  const ext = /ext/.test(String((f && f.label) || '')) || r > 1;
+  return `${Number.isFinite(r) ? fibRatio(r) : String((f && f.label) || '')}${ext ? ' ext' : ''} ${Number.isFinite(Number(f && f.price)) ? num(f.price) : ''}`.trim();
+}
+export const isGolden = (f) => !!(f && (f.is_golden || [0.5, 0.618].includes(Number(f.ratio))));
 
 /**
  * Market structure breaks. A swing high is a bar whose high is above the
@@ -348,7 +359,10 @@ export function createPriceChart(host, opts) {
     // a `crowd` label, and a band's, is left off where one already drawn on its side is within 15 px (the line stays)
     const taken = [], room = (side, y) => { if (taken.some((q) => q.side === side && Math.abs(q.y - y) < 15)) return false; taken.push({ side, y }); return true; };
     const hline = (v, cls, t, at = {}) => { if (!Number.isFinite(v) || v < ps.lo || v > ps.hi) return ''; const y = ps.Y(v).toFixed(1), ty = at.below ? Number(y) + 14 : y - 4; return `<line class="lv ${cls}" x1="0" x2="${W - layout.r}" y1="${y}" y2="${y}"/>${at.crowd && !room(at.end ? 'r' : 'l', Number(ty)) ? '' : `<text class="lv-t ${cls}" x="${at.end ? W - layout.r - 6 : 6}" y="${ty}"${at.end ? ' text-anchor="end"' : ''}>${esc(t)}</text>`}`; };
-    if (S.overlays.fib && L.fib) (L.fib.levels || []).forEach((f) => { o += hline(f.price, 'fib', `Fib ${f.label}`); });
+    // Fibonacci levels labelled at the right edge, beside the price scale, by their ratio (0.5, 0.618) and price, the
+    // golden pair (0.5 and 0.618) set heavier: the owner's November chart review asked for the labels on the right with
+    // 0.5 and 0.618 (round three, 2026-11-23); at the left they sat over the oldest bars
+    if (S.overlays.fib && L.fib) (L.fib.levels || []).forEach((f) => { o += hline(f.price, isGolden(f) ? 'fib fib-gold' : 'fib', fibLabel(f), { end: true }); });
     if (S.overlays.sr && L.sr) L.sr.slice(0, 8).forEach((s) => { o += hline(s.price, s.role === 'support' ? 'sup' : 'res', `${s.role === 'support' ? 'Support' : 'Resistance'} ${num(s.price)}`); });
     // lines a side widget asks for (the stop check's stop, buffered stop and round number)
     (S.lines || []).forEach((l) => { o += hline(l.price, l.cls, l.label, l); });
@@ -661,7 +675,7 @@ export function createPriceChart(host, opts) {
       else if (dr.kind === 'ray') { const k = (b.y - a.y) / ((b.x - a.x) || 1e-6), x2 = b.x >= a.x ? right : 0; out = `<line class="${cls}" x1="${a.x}" y1="${a.y}" x2="${x2}" y2="${a.y + k * (x2 - a.x)}"/>`; }
       else if (dr.kind === 'rect') out = `<rect class="${cls} dr-rect" x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}"/>`;
       // 0% at the first point, as the classic app draws it
-      else if (dr.kind === 'fibdraw') out = FIB.map((f) => { const pr = a.p + (b.p - a.p) * f, y = ps.Y(pr); return `<line class="${cls}" x1="${Math.min(a.x, b.x)}" x2="${right}" y1="${y}" y2="${y}"/>${lab(Math.min(a.x, b.x) + 4, y - 3, `${num(f * 100, 1)}% ${num(pr)}`)}`; }).join('');
+      else if (dr.kind === 'fibdraw') out = FIB.map((f) => { const pr = a.p + (b.p - a.p) * f, y = ps.Y(pr); return `<line class="${cls}" x1="${Math.min(a.x, b.x)}" x2="${right}" y1="${y}" y2="${y}"/>${lab(right - 4, y - 3, `${fibRatio(f)} ${num(pr)}`, [0.5, 0.618].includes(f) ? 'dr-t fib-gold' : 'dr-t', 'end')}`; }).join('');
       else if (dr.kind === 'channel') { const [l1, l2] = channel(q[0], q[1], q[2], last); out = `<path class="dr-fill" d="M${X(l1.i1).toFixed(1)} ${ps.Y(l1.p1).toFixed(1)}L${X(l1.i2).toFixed(1)} ${ps.Y(l1.p2).toFixed(1)}L${X(l2.i2).toFixed(1)} ${ps.Y(l2.p2).toFixed(1)}L${X(l2.i1).toFixed(1)} ${ps.Y(l2.p1).toFixed(1)}Z"/>${seg(l1)}${seg(l2)}`; }
       else if (dr.kind === 'fibext') { const x1 = Math.min(pts[0].x, pts[2].x); out = `<line class="${cls} dr-thin" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/><line class="${cls} dr-thin" x1="${b.x}" y1="${b.y}" x2="${pts[2].x}" y2="${pts[2].y}"/>` + fibExt(q[0], q[1], q[2]).map((l) => { const y = ps.Y(l.price); return `<line class="${cls}${l.r === 1 || l.r === 1.618 ? '' : ' dr-thin'}" x1="${x1}" x2="${right}" y1="${y}" y2="${y}"/>${lab(x1 + 4, y - 3, `${l.r} ${num(l.price)}`)}`; }).join(''); }
       else if (dr.kind === 'pitchfork') { const f = pitchfork(q[0], q[1], q[2], last); out = seg(f.handle, `${cls} dr-dash`) + f.tines.map((g, k) => seg(g, k ? `${cls} dr-thin` : cls)).join(''); }

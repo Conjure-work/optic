@@ -75,7 +75,8 @@ def test_every_move_has_an_arrow_and_a_sign(tmp_path):
 def test_the_moves_on_home_and_the_overview_use_it():
     for snippet in ("${mv(i.chg_1d, moveText(i))}", "${mv(f.chg, f.chgText)}", "move(r.change_pct)".replace("move", "mv"), "${mv(v)}</button>"):
         assert snippet in WS, snippet
-    assert 'aria-label="${r.label || r.name} (${r.symbol}), ${moveWords(v, signed(v))}"' in WS, "a heat-map tile says its move in words"
+    # its name starts with the words on its face (axe-core 4.14, label-content-name-mismatch, round three 2026-11-23)
+    assert 'aria-label="${r.label || r.name} ${signed(v)}, ${r.symbol}, ${moveWords(v, signed(v))}"' in WS, "a heat-map tile says its move in words"
     assert "<span class=\"mv-a\" aria-hidden=\"true\">${ARROW[dir(q.change_pct)]}</span>" in FRAME, "the company's price carries its arrow"
     assert "${ARROW[d]}" in OV and "'For' : 'Against'" in OV, "the bull and bear lines"
 

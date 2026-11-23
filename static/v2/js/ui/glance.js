@@ -72,8 +72,11 @@ export function donut(parts, { center = '', sub = '', label = '' } = {}) {
   }).join('');
   const share = (p) => Math.round((p.v / total) * 100);
   const words = label || data.map((p) => `${p.label} ${share(p)}%`).join(', ');
-  return html`<div class="donut"><span class="dn-fig"><svg class="dn" viewBox="0 0 132 132" width="132" height="132" role="img" aria-label="${words}"><g transform="rotate(-90 66 66)">${raw(arcs)}</g></svg>
-    ${center ? html`<span class="dn-c" aria-hidden="true"><b>${center}</b>${sub ? html`<small>${sub}</small>` : ''}</span>` : ''}</span>
+  // the figure in the ring's middle is drawn in the picture itself (round three, 2026-11-23): laid over the ring as HTML
+  // it had no background a contrast check could read, and axe-core 4.14 failed it on the stock page; its words are in
+  // the picture's label and the legend, so it stays hidden from a screen reader
+  const mid = center ? `<g class="dn-c" aria-hidden="true"><text x="66" y="${sub ? 64 : 71}" text-anchor="middle" class="dn-cb">${esc(center)}</text>${sub ? `<text x="66" y="82" text-anchor="middle" class="dn-cs">${esc(sub)}</text>` : ''}</g>` : '';
+  return html`<div class="donut"><span class="dn-fig"><svg class="dn" viewBox="0 0 132 132" width="132" height="132" role="img" aria-label="${words}"><g transform="rotate(-90 66 66)">${raw(arcs)}</g>${raw(mid)}</svg></span>
     <ul class="dn-key">${data.map((p, i) => html`<li><i class="sw ${DONUT[i] || 'mute'}" aria-hidden="true"></i><span>${p.label}</span><b>${share(p)}%</b></li>`)}</ul></div>`;
 }
 

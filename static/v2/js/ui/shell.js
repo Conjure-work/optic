@@ -79,7 +79,7 @@ export function mount(app) {
     <div class="stage">
       <header class="topbar">
         <a class="brand-sm" href="#/" aria-label="Optic Terminal, Home">${brandMark()}</a>
-        <button type="button" class="search-btn" data-v2-open-palette aria-label="Search companies, tickers and pages, or ask Milo">${icon('search')}<span class="sb-long">Search or ask</span><span class="sb-short" aria-hidden="true">Search</span><kbd>⌘K</kbd></button>
+        <button type="button" class="search-btn" data-v2-open-palette>${icon('search')}<span class="sb-long">Search or ask</span><span class="sb-short" aria-hidden="true">Search</span><kbd>⌘K</kbd><span class="sr">, for companies, tickers and pages, or ask Milo</span></button>
         <span class="spacer"></span><span class="session-chip" id="session-chip" role="status" aria-live="off"></span>
         <a class="icon-btn topbar-bell" href="#/alerts" data-v2-bell hidden aria-label="Alerts">${icon('bell')}<span class="bell-n" aria-hidden="true"></span></a>
         <button type="button" class="btn btn-milo btn-sm topbar-milo" data-v2-milo="" data-v2-milo-ctx="" data-v2-milo-sym="" aria-label="Ask Milo"><span class="scout-badge" aria-hidden="true"><span class="scout-badge-fig"></span></span><span class="tm-label" aria-hidden="true">Ask Milo</span></button>

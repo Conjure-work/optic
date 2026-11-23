@@ -30,6 +30,7 @@ import { kindOf } from '../core/instrument.js';
 import * as W from './chart-widgets.js';
 import * as ST from './chart-studies.js';
 import * as C from './chart-chrome.js';
+import * as G from './chart-grid.js';
 let lp = null;   // the header's price refresh (dossier-frame livePrice), stopped in dispose()
 
 const VIEW_KEY = 'optic.v2.chart.v1';
@@ -125,6 +126,9 @@ function visibleBars() {
 }
 
 let D = {}, V = {}, live = true, mainEl = null, chart = null, unsub = null, phoneMq = null;
+// round three (2026-11-23, chart-grid.js): the layout of one, two or four charts, the other charts, the favourite bar
+// sizes, the account's saved layouts and the last refusal saving one, and the subscription to drawings made elsewhere
+let GL = null, SLOTS = [], FAVS = G.DEFAULT_FAVS.slice(), SAVED = null, LAYERR = '', unBus = null;
 
 function readView() {
   const d = { interval: '60', range: '6M', style: 'candles', session: 'regular', read: false, layers: false, dock: [], overlays: { ma: true, ema: false, bb: false, fib: false, sr: false, gex: false, msb: false, events: true, ins: true, cloud921: false, cloud2150: false, keltner: false, donchian: false, sec: false, vwap: false, zones: false, accum: false, trends: false, vbp: false, sessions: false, stages: false, matrend: false }, panes: { volume: true, rsi: false, macd: false, tso: false, adx: false, stochastic: false, obv: false, mfi: false, rs: false, wavetrend: false }, msbK: 5 };
@@ -132,11 +136,21 @@ function readView() {
   if (!INTERVALS.some((x) => x.key === d.interval)) d.interval = '60';   // a first visit opens on hourly bars, as in the classic app
   try { d.snap = localStorage.getItem(SNAP_KEY) !== 'off'; } catch (e) { d.snap = true; }   // on, as it always was in the classic app
   d.dock = Array.isArray(d.dock) ? d.dock.filter((id, i, a) => W.IDS.includes(id) && a.indexOf(id) === i) : [];
+  // round three (2026-11-23): the dock is an accordion, one widget open at a time unless pinned; a view kept from
+  // before, with several open and none pinned, opens on the last one the reader opened
+  d.pinned = Array.isArray(d.pinned) ? d.pinned.filter((id, i, a) => d.dock.includes(id) && a.indexOf(id) === i) : [];
+  d.dock = openAfter(d.dock, d.pinned);
   d.compare = Array.isArray(d.compare) ? d.compare.filter((x, i, a) => typeof x === 'string' && /^[A-Z0-9.^=-]{1,12}$/.test(x) && a.indexOf(x) === i).slice(0, 3) : [];
   d.cmpAnchor = Number.isFinite(d.cmpAnchor) ? d.cmpAnchor : null;
   return d;
 }
-function saveView() { contextChanged(); try { localStorage.setItem(VIEW_KEY, JSON.stringify({ interval: V.wantInterval || V.interval, range: V.range, style: V.style, session: V.session, read: V.read, layers: V.layers, dock: V.dock, overlays: V.overlays, panes: V.panes, msbK: V.msbK, compare: V.compare, cmpAnchor: V.cmpAnchor })); } catch (e) { /* private */ } }
+/** The dock as an accordion: the pinned widgets, and of the rest only the last one opened. */
+export function openAfter(dock, pinned) {
+  const loose = dock.filter((id) => !pinned.includes(id)), last = loose[loose.length - 1];
+  return dock.filter((id) => pinned.includes(id) || id === last);
+}
+const mainSlot = () => ({ symbol: D.sym, interval: V.wantInterval || V.interval, range: V.range });
+function saveView() { contextChanged(); if (GL && D.sym) { GL.slots[0] = mainSlot(); G.saveLayout(GL); } try { localStorage.setItem(VIEW_KEY, JSON.stringify({ interval: V.wantInterval || V.interval, range: V.range, style: V.style, session: V.session, read: V.read, layers: V.layers, dock: V.dock, pinned: V.pinned, overlays: V.overlays, panes: V.panes, msbK: V.msbK, compare: V.compare, cmpAnchor: V.cmpAnchor })); } catch (e) { /* private */ } }
 
 function readDrawings(sym) {
   if (!holds(store.state.user)) return [];
@@ -189,7 +203,9 @@ async function loadBars() {
     } else if (V.range === 'All') {
       const d = await api.get(`/api/daily-bars/${enc}`, { ttl: 3600000, timeout: 60000 });
       bars = d.dates.map((t, i) => ({ t: Date.parse(t), o: d.open[i], h: d.high[i], l: d.low[i], c: d.close[i], v: d.volume[i] }));
-      note = 'Every daily bar since the listing.';
+      // what the free feed's history covers and how it is adjusted, from the bars themselves (app/chart_routes.py): "since
+      // the listing" claimed more than the feed has when its first bar is later than the listing
+      note = (d.history && d.history.sentence) || 'Every daily bar the free feed has for this symbol.';
     } else {
       const t = await tickerData();
       const ps = (t.technicals || {}).price_series || {};
@@ -517,7 +533,7 @@ function paintChart(over) {
     // an insider arrow opens the stock's insider filings, as Classic's markers did (openInsidersFor)
     onInsider: () => { location.hash = `#/insiders?symbol=${encodeURIComponent(D.sym)}&view=insiders`; },
     height: plotHeight(host),
-    onDrawings: (list) => { D.drawings = list; saveDrawings(D.sym, list); paintTools(); },
+    onDrawings: (list) => { D.drawings = list; saveDrawings(D.sym, list); G.bus.publish(D.sym, list, 'main'); paintTools(); },
     askText: (dr, done) => { D.textFor = done; paintTools(); const i = $('[data-v2-ch-text] input', mainEl); if (i) i.focus(); },
     onEscape: () => { V.tool = 'select'; chart.set({ tool: 'select' }); paintTools(); },
     // the legend names what the Indicators menu lists, in its order; folded or open is kept in the classic key
@@ -542,7 +558,10 @@ const navH = () => (isPhone() ? 44 : 40);
 // with every pane on, a phone's price and panes stay readable (the page scrolls to them).
 const paneRoom = () => Math.max(0, PANES.filter(([k]) => k !== 'volume' && V.panes[k]).length - 2) * (isPhone() ? 60 : 72);
 function plotHeight(host) { return baseHeight(host) + paneRoom(); }
+const gridCount = () => (GL ? G.forWidth(GL, isPhone()).count : 1);
 function baseHeight(host) {
+  // two or four charts (round three): the first is a fixed height, so the others fit under it
+  const n = gridCount(); if (n > 1 && !C.isMax()) return isPhone() ? 300 : n === 2 ? 420 : 360;
   const svg = $('.pc-svg', host), nav = navH() + 6;
   const top = (svg ? svg.getBoundingClientRect().top : host.getBoundingClientRect().top + 40) + window.scrollY;
   const room = Math.round(window.innerHeight - top - nav - 8);
@@ -638,6 +657,7 @@ function paintTools() {
   const a = document.activeElement, attr = a && mainEl.contains(a) ? [...a.attributes].find((x) => /^data-v2-(tool|ch-)/.test(x.name)) : null;
   const strip = $('#ch-draw .ch-draw', mainEl), left = strip ? strip.scrollLeft : 0;
   const h = $('#ch-tools', mainEl); if (h) draw(h, toolbar());
+  paintGridTools();
   const d = $('#ch-draw', mainEl); if (d) draw(d, drawbar());
   const s2 = $('#ch-draw .ch-draw', mainEl); if (s2 && left) s2.scrollLeft = left;
   if (attr) { const el = $(`[${attr.name}="${CSS.escape(attr.value)}"]`, mainEl); if (el && !el.disabled) el.focus({ preventScroll: true }); }
@@ -654,14 +674,85 @@ function paint() {
   draw(mainEl, html`${header(D.sym, D, 'chart', { bar: true })}${tabs(D.sym, 'chart', { fund: isFund(D) })}
     <section class="section chart-page" aria-label="${D.sym} chart">
       <p class="ch-title" id="ch-title">${chartTitle()}</p>
+      <div class="ctools ch-gridtools" id="ch-gridtools" role="group" aria-label="Charts and bar sizes">${gridTools()}</div>
       <div id="ch-tools">${toolbar()}</div>
       <div class="ch-stage"><div id="ch-draw">${drawbar()}</div><div id="ch-body"></div>
         <div class="ch-wrail" id="ch-wrail">${W.rail(shown(), isPhone())}${miloButton(html`<span class="sr">Ask Milo about the ${D.sym} chart</span>`, { context: `${D.sym} Dossier, Chart`, symbol: D.sym, cls: 'chw-milo' })}</div>
         <div class="ch-side" id="ch-side" ${V.read || shown().length ? '' : 'hidden'}><aside class="ch-read" id="ch-read" aria-labelledby="cr-h" ${V.read ? '' : 'hidden'}></aside></div></div>
+      <p class="asof ch-gridnote" id="ch-gridnote" role="status" hidden></p><div class="ch-slots" id="ch-slots"></div>
       <div class="ch-foot"><p class="asof" id="ch-note"></p><p class="asof ch-snote" id="ch-snote" aria-live="polite"></p>
         <p class="asof">${matchMedia('(pointer: coarse)').matches ? 'Pinch to zoom, drag sideways or the strip under the chart to move along, tap a bar to read it. Tap a drawing to select it, then drag it or a handle.' : 'Wheel or pinch to zoom, drag the chart or the strip under it to move along, arrows to read each bar, plus and minus to zoom. Click a drawing to select it; drag it to move it, or drag a handle to move one point.'}</p><div id="ch-wt"></div></div>
     </section>`);
-  applyColours(); paintChart(); paintRead(); syncSide();
+  applyColours(); paintChart(); paintRead(); syncSide(); mountSlots();
+}
+
+/* ---------------- one, two or four charts (chart-grid.js) ---------------- */
+function gridTools() {
+  const w = GL ? G.forWidth(GL, isPhone()) : { count: 1 };
+  return html`${G.countControl(w.count, isPhone())}<span class="ch-favwrap" id="ch-favrow">${G.favRow(FAVS, V.interval, 0)}</span>${G.favMenu(FAVS)}${G.layoutsMenu(store.signedIn(), SAVED, LAYERR)}`;
+}
+function paintGridTools() {
+  const h = $('#ch-gridtools', mainEl); if (!h) return;
+  const open = $$('details[open]', h).map((d) => d.dataset.chMenu);
+  draw(h, gridTools());
+  open.forEach((m) => { const d = $(`[data-ch-menu="${m}"]`, h); if (d) d.open = true; });
+}
+function paintFavRows() {
+  const r = $('#ch-favrow', mainEl); if (r) draw(r, G.favRow(FAVS, V.interval, 0));
+  SLOTS.forEach((x) => x.repaintHead());
+}
+function mountSlots() {
+  SLOTS.forEach((x) => x.destroy()); SLOTS = [];
+  const box = $('#ch-slots', mainEl); if (!box || !GL) return;
+  const w = G.forWidth(GL, isPhone());
+  box.dataset.count = String(w.count);
+  const note = $('#ch-gridnote', mainEl); if (note) { note.textContent = w.note; note.hidden = !w.note; }
+  box.innerHTML = '';
+  w.slots.slice(1).forEach((slot, k) => {
+    const host = document.createElement('div'); host.className = 'chg-host'; box.appendChild(host);
+    SLOTS.push(G.createSlot(host, slot, k + 1, { favs: () => FAVS, height: isPhone() ? 280 : w.count === 2 ? 380 : 300, canWrite: () => holds(store.state.user),
+      onChange: (i, sl) => { if (GL.slots[i]) { GL.slots[i] = sl; G.saveLayout(GL); } contextChanged(); } }));
+  });
+}
+function setCount(n) {
+  GL = G.withCount(GL, n, D.sym); GL.slots[0] = mainSlot(); G.saveLayout(GL);
+  paintGridTools(); mountSlots(); refit();
+  const b = $(`[data-v2-ch-count="${n}"]`, mainEl); if (b) b.focus();
+  announce(n === 1 ? 'One chart.' : `${n} charts${isPhone() ? ', stacked' : ''}. Drawings on a ticker show on every chart of it.`);
+}
+function setInterval0(key) { V.interval = key; V.wantInterval = null; if (V.interval === 'weekly' && !RANGES.weekly[V.range]) V.range = '1Y'; saveView(); paintTools(); loadBars(); }
+async function loadSaved() {
+  try { SAVED = ((await api.get('/api/chart/layouts', { ttl: 0, force: true, timeout: 15000 })) || {}).layouts || []; } catch (e) { SAVED = []; }
+  if (live) paintGridTools();
+}
+async function saveNamed(name) {
+  try {
+    const r = await api.put(`/api/chart/layouts/${encodeURIComponent(name)}`, { layout: { count: GL.count, slots: GL.slots } }, { timeout: 15000 });
+    SAVED = r.layouts || SAVED; LAYERR = '';
+    toast(`Chart layout saved as ${name}.`);
+  } catch (e) { LAYERR = clean((e && e.message) || api.explain(e, 'The save')); }
+  if (live) paintGridTools();
+}
+async function deleteNamed(name) {
+  try { SAVED = ((await api.del(`/api/chart/layouts/${encodeURIComponent(name)}`, { timeout: 15000 })) || {}).layouts || []; LAYERR = ''; toast(`Chart layout ${name} deleted.`); }
+  catch (e) { LAYERR = clean((e && e.message) || api.explain(e, 'The delete')); }
+  if (live) paintGridTools();
+}
+function openNamed(name) {
+  const l = (SAVED || []).find((x) => x.name === name); if (!l) return;
+  const first = l.slots[0] || {};
+  GL = G.sanitizeLayout({ count: l.count, slots: [{ symbol: D.sym, interval: first.interval, range: first.range }, ...l.slots.slice(1)] }, D.sym);
+  V.interval = GL.slots[0].interval; V.wantInterval = null; V.range = GL.slots[0].range;
+  saveView(); paintTools(); loadBars(); mountSlots(); refit();
+  const d = $('[data-ch-menu="layouts"]', mainEl); if (d) d.open = false;
+  toast(first.symbol && first.symbol !== D.sym ? `Opened ${name} with ${D.sym} as the first chart (it was saved with ${first.symbol}).` : `Opened ${name}.`);
+}
+async function setFavs() {
+  const list = $$('[data-v2-ch-favset]', mainEl).filter((x) => x.checked).map((x) => x.dataset.v2ChFavset);
+  const r = await G.pushFavs(list.length ? list : G.DEFAULT_FAVS, store.signedIn());
+  FAVS = r.favs.length ? r.favs : G.DEFAULT_FAVS.slice();
+  if (!r.ok) toast('Your favourites are kept in this browser; the account did not take them just now.');
+  if (live) paintFavRows();
 }
 // The chart read (ui/chartread.js), from the daily technicals this page already loads.
 // The chart's one title line: Chart read's own first words, the trend and the fact it rests on first (hierarchy change
@@ -690,23 +781,35 @@ function syncSide() {
   let prev = $('#ch-read', side);
   want.forEach((id) => {
     let el = $(`#chw-${id}`, side);
-    if (!el) { const tmp = document.createElement('div'); draw(tmp, W.panel(id)); el = tmp.firstElementChild; added.push(id); }
+    if (!el) { const tmp = document.createElement('div'); draw(tmp, W.panel(id, V.pinned.includes(id))); el = tmp.firstElementChild; added.push(id); }
     if (prev.nextElementSibling !== el) prev.after(el);
     prev = el;
   });
   side.hidden = !V.read && !want.length;
   added.forEach((id) => W.need(id));
+  added.forEach((id) => W.after(id, $(`#chw-${id}-b`, side)));
 }
 // Pressed states in place, so the button that was pressed keeps the focus.
 function paintRail() { const s = shown(); $$('[data-chw]', mainEl).forEach((b) => b.setAttribute('aria-pressed', String(s.includes(b.dataset.chw)))); }
 function toggleWidget(id) {
   const on = shown().includes(id);
-  V.dock = on ? V.dock.filter((x) => x !== id) : isPhone() ? [id] : [...V.dock.filter((x) => x !== id), id];
+  // one open at a time unless pinned (round three): opening a widget closes the others the reader did not pin
+  V.dock = on ? V.dock.filter((x) => x !== id) : isPhone() ? [id] : openAfter([...V.dock.filter((x) => x !== id), id], V.pinned);
+  if (on) V.pinned = V.pinned.filter((x) => x !== id);
   saveView(); paintRail(); syncSide(); paintExtras();
   if (on) { announce(`${W.label(id)} closed.`); return; }
   const el = $(`#chw-${id}`, mainEl);
   if (el) el.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
   announce(`${W.label(id)} opened${isPhone() ? ', under the chart' : ''}.`);
+}
+/** Pin or unpin an open widget: a pinned one stays open when the next one opens. */
+function togglePin(id) {
+  const on = V.pinned.includes(id);
+  V.pinned = on ? V.pinned.filter((x) => x !== id) : [...V.pinned, id];
+  saveView();
+  const b = $(`[data-chw-pin="${CSS.escape(id)}"]`, mainEl);
+  if (b) { b.setAttribute('aria-pressed', String(!on)); b.title = !on ? 'Pinned: stays open when another widget opens' : 'Pin: keep it open when another widget opens'; }
+  announce(`${W.label(id)} ${on ? 'unpinned: it closes when another widget opens' : 'pinned: it stays open when another widget opens'}.`);
 }
 // A widget's answer arrived: redraw its body after the event that caused it has settled (a change from Tab
 // fires before the focus moves), keeping the control that had the focus and any details left open.
@@ -722,7 +825,7 @@ function flushRepaints() {
     const sel = attr ? `[${attr.name}="${CSS.escape(attr.value)}"]` : null;
     const opened = $$('details[open] > summary', el).map((x) => x.textContent);
     if (id === 'notes') W.flush(el);
-    draw(el, W.body(id));
+    draw(el, W.body(id)); W.after(id, el);
     $$('details > summary', el).forEach((x) => { if (opened.includes(x.textContent)) x.parentElement.open = true; });
     const n = sel && $(sel, el); if (n) n.focus({ preventScroll: true });
   });
@@ -760,6 +863,13 @@ export async function render(main, route) {
   if (kind === 'ov' && id in V.overlays) { V.overlays[id] = true; if (id === 'stages' || id === 'matrend') V.style = 'candles'; }   // they colour candles
   if (kind === 'pane' && id in V.panes) V.panes[id] = true;
   D = { sym, drawings: readDrawings(sym) };
+  GL = G.readLayout(sym); GL.slots[0] = mainSlot(); G.saveLayout(GL);
+  FAVS = G.readFavs(); SAVED = null; LAYERR = '';
+  G.syncFavs(store.signedIn()).then((f) => { if (!live || D.sym !== sym) return; FAVS = f; paintFavRows(); paintGridTools(); });
+  if (store.signedIn()) loadSaved();
+  if (unBus) unBus();
+  // a drawing made or moved on another chart of this ticker, redrawn here in the same task (chart-grid.js bus)
+  unBus = G.bus.subscribe((s2, list, from) => { if (from === 'main' || s2 !== D.sym || !live) return; D.drawings = list; if (chart) chart.set({ drawings: list }); syncDrawButtons(); });
   W.bind({ sym: () => D.sym, t: () => D.t, tErr: () => D.tErr, phase, repaint: repaintWidget, chart: paintExtras,
     overlayOn: (k) => !!V.overlays[k], overlay: (k, on) => { V.overlays[k] = on; saveView(); paintTools(); if (chart) chart.set({ overlays: V.overlays }); } });
   W.reset();
@@ -776,7 +886,7 @@ export async function render(main, route) {
   document.title = `${sym} Chart, Optic`;
   if (lp) lp.stop();
   lp = livePrice(main, route.symbol, () => D, 'chart', { bar: true, every: 15000, onQuote });
-  provideContext(() => ({ view: 'chart', ticker: sym, chart: { symbol: sym, interval: V.interval, range: V.range, ...visibleBars(), indicators: chartIndicators(), layers: OVERLAYS.filter(([k]) => V.overlays[k] && !IND_KEYS.includes(k)).map(([, l]) => l), compared: V.compare.slice(), studies_on: OVERLAYS.filter(([k]) => V.overlays[k]).map(([, l]) => l).concat(PANES.filter(([k]) => V.panes[k] && k !== 'volume').map(([, l]) => l)), drawings: D.drawings.length, bars: (D.bars || []).length, market_structure_breaks: V.overlays.msb && chart ? { method: `Swing high or low with ${V.msbK || 5} bars either side. The swing forms at its own bar but is only known once the ${V.msbK || 5} bars after it have closed; a close beyond the latest known, unbroken swing is a break. Earlier breaks never change as new bars arrive.`, in_view: chart.structure().slice(-6) } : undefined }, technicals: D.t ? { bias: D.t.technicals.bias, rsi: D.t.technicals.rsi, macd: D.t.technicals.macd, support_resistance: D.t.technicals.support_resistance, moving_averages: D.t.technicals.moving_averages } : null, widgets: W.context(shown()) }));
+  provideContext(() => ({ view: 'chart', ticker: sym, chart: { symbol: sym, interval: V.interval, range: V.range, ...visibleBars(), indicators: chartIndicators(), layers: OVERLAYS.filter(([k]) => V.overlays[k] && !IND_KEYS.includes(k)).map(([, l]) => l), compared: V.compare.slice(), studies_on: OVERLAYS.filter(([k]) => V.overlays[k]).map(([, l]) => l).concat(PANES.filter(([k]) => V.panes[k] && k !== 'volume').map(([, l]) => l)), drawings: D.drawings.length, bars: (D.bars || []).length, others_on_screen: GL && gridCount() > 1 ? G.forWidth(GL, isPhone()).slots.slice(1) : undefined, market_structure_breaks: V.overlays.msb && chart ? { method: `Swing high or low with ${V.msbK || 5} bars either side. The swing forms at its own bar but is only known once the ${V.msbK || 5} bars after it have closed; a close beyond the latest known, unbroken swing is a break. Earlier breaks never change as new bars arrive.`, in_view: chart.structure().slice(-6) } : undefined }, technicals: D.t ? { bias: D.t.technicals.bias, rsi: D.t.technicals.rsi, macd: D.t.technicals.macd, support_resistance: D.t.technicals.support_resistance, moving_averages: D.t.technicals.moving_averages } : null, widgets: W.context(shown()) }));
   paint(); wire(main);
   core(sym).then((c) => { if (D.sym !== sym || !live) return; Object.assign(D, { quote: c.quote, session: c.session, quoteError: c.quoteError }); const h = $('.dhead', mainEl); if (h) { const tmp = document.createElement('div'); draw(tmp, header(sym, D, 'chart', { bar: true })); h.replaceWith(tmp.firstElementChild); } repaintWidget('stats'); });
   loadTicker(sym);
@@ -792,7 +902,7 @@ function afterTicker() { shown().forEach((id) => { if (W.FROM_TICKER.includes(id
 function onPhoneChange() {
   if (!live) return;
   const r = $('#ch-wrail', mainEl); if (r) draw(r, W.rail(shown(), isPhone()));
-  paintTools(); syncSide(); paintExtras(); refit();
+  paintTools(); syncSide(); paintExtras(); mountSlots(); refit();
 }
 export function dispose() { if (lp) { lp.stop(); lp = null; }
   live = false; W.flush(mainEl || document);
@@ -803,6 +913,8 @@ export function dispose() { if (lp) { lp.stop(); lp = null; }
   if (unsub) { unsub(); unsub = null; }
   if (phoneMq) { phoneMq.removeEventListener('change', onPhoneChange); phoneMq = null; }
   if (chart) { chart.destroy(); chart = null; }
+  SLOTS.forEach((x) => x.destroy()); SLOTS = [];
+  if (unBus) { unBus(); unBus = null; }
 }
 export const retry = Object.assign({ bars: () => loadBars(), ticker: () => { D.tPromise = null; D.tErr = null; afterTicker(); paintRead(); loadTicker(D.sym); } },
   Object.fromEntries(W.IDS.map((id) => [`w-${id}`, () => W.retry(id)])));
@@ -812,6 +924,9 @@ function wire(main) {
     const el = e.target;
     if (el.closest('.chw') && W.onChange(e)) return;
     if (el.matches('[data-v2-cc-pick]')) { pickColour(el.dataset.v2CcPick, el.value, `[data-v2-cc-pick="${el.dataset.v2CcPick}"]`); return; }
+    if (el.matches('[data-v2-chg-iv]')) { const x = SLOTS[Number(el.dataset.v2ChgIv) - 1]; if (x) x.set({ interval: el.value }); return; }
+    if (el.matches('[data-v2-chg-range]')) { const x = SLOTS[Number(el.dataset.v2ChgRange) - 1]; if (x) x.set({ range: el.value }); return; }
+    if (el.matches('[data-v2-ch-favset]')) { setFavs(); return; }
     if (el.matches('[data-v2-ch-sessionsel]')) { V.session = el.value; saveView(); loadBars(); return; }
     if (el.matches('[data-v2-ch-iv]')) { V.interval = el.value; V.wantInterval = null; if (V.interval === 'weekly' && !RANGES.weekly[V.range]) V.range = '1Y'; saveView(); paintTools(); loadBars(); return; }
     if (el.matches('[data-v2-ch-rangesel]')) { const was = V.range; V.range = el.value; saveView(); paintTools(); if (V.range === 'All' || was === 'All') loadBars(); else newRange(); return; }
@@ -822,7 +937,18 @@ function wire(main) {
   main.addEventListener('click', (e) => {
     const t = (s) => e.target.closest(s);
     let b;
+    if ((b = t('[data-v2-ch-count]'))) { setCount(Number(b.dataset.v2ChCount)); return; }
+    if ((b = t('[data-v2-ch-fav]'))) {
+      const i = Number(b.dataset.v2ChSlot || 0), k = b.dataset.v2ChFav;
+      if (!i) { setInterval0(k); const again = $(`#ch-favrow [data-v2-ch-fav="${CSS.escape(k)}"]`, mainEl); if (again) again.focus(); return; }
+      const x = SLOTS[i - 1]; if (x) { x.set({ interval: k }); const again = $(`[data-chg-slot="${i}"] [data-v2-ch-fav="${CSS.escape(k)}"]`, mainEl); if (again) again.focus(); }
+      return;
+    }
+    if ((b = t('[data-v2-chg-retry]'))) { const x = SLOTS[Number(b.dataset.v2ChgRetry) - 1]; if (x) x.reload(); return; }
+    if ((b = t('[data-v2-ch-layopen]'))) { openNamed(b.dataset.v2ChLayopen); return; }
+    if ((b = t('[data-v2-ch-laydel]'))) { deleteNamed(b.dataset.v2ChLaydel); return; }
     if ((b = t('[data-chw]'))) { toggleWidget(b.dataset.chw); return; }
+    if ((b = t('[data-chw-pin]'))) { togglePin(b.dataset.chwPin); return; }
     if ((b = t('[data-chw-close]'))) { const id = b.dataset.chwClose; toggleWidget(id); const r = $(`[data-chw="${id}"]`, mainEl); if (r) r.focus(); return; }
     if (t('.chw') && W.onClick(e)) return;
     if (t('[data-v2-ch-rebars]')) { loadBars(); return; }
@@ -881,6 +1007,16 @@ function wire(main) {
   main.addEventListener('toggle', (e) => { if (e.target.matches && e.target.matches('details.ch-colours') && e.target.open) { paintColours(); placeMenu(e.target); } }, true);
   main.addEventListener('submit', (e) => {
     if (e.target.closest('.chw') && W.onSubmit(e)) return;
+    const gs = e.target.closest('[data-v2-chg-sym]');
+    if (gs) {
+      e.preventDefault();
+      const sym = String((gs.s || {}).value || '').trim().toUpperCase().replace(/^\$/, ''), x = SLOTS[Number(gs.dataset.v2ChgSym) - 1];
+      if (!/^[A-Z0-9.^=-]{1,12}$/.test(sym)) { toast('That does not look like a ticker. Try letters such as SPY.'); return; }
+      if (x) { x.set({ symbol: sym }); const i = $(`[data-chg-slot="${gs.dataset.v2ChgSym}"] input[name="s"]`, mainEl); if (i) i.focus(); }
+      return;
+    }
+    const ls = e.target.closest('[data-v2-ch-laysave]');
+    if (ls) { e.preventDefault(); const n = String((ls.n || {}).value || '').trim(); if (n) saveNamed(n); return; }
     const cf = e.target.closest('[data-v2-ch-cmpform]');
     if (cf) { e.preventDefault(); addCompare(($('input', cf) || {}).value); return; }
     const f = e.target.closest('[data-v2-ch-text]'); if (!f) return;
