@@ -194,6 +194,7 @@ function persist() {
   const from = Math.max(0, S.conv.messages.length - MAX_MESSAGES);
   const messages = S.conv.messages.slice(-MAX_MESSAGES).map((m, k) => { const inf = meta.get(from + k) || {}, o = { role: m.role, content: String(m.content || '').slice(0, MAX_CHARS) };
     if (inf.policyLine) o.policy = String(inf.policyLine).slice(0, 400); if (inf.amended) o.amended = String(inf.amended).slice(0, 400); if (inf.level) o.level = String(inf.level).slice(0, 20);
+    if (inf.stance && inf.stance.label) o.stance = { id: String(inf.stance.id || '').slice(0, 20), label: String(inf.stance.label).slice(0, 60) }; if (inf.refused) o.refused = true;
     // what the answer was for (ticker, timeframe, indicators, tab), so a reopened answer still says it (Handoff 6)
     if (inf.used) o.context = keepUsed({ ...inf.used, at: ((inf.context || {}).focus || {}).captured_at }); return o; });
   const list = loadHistory().filter((c) => c.id !== S.conv.id);
@@ -203,7 +204,7 @@ function persist() {
 
 /* ---------------- state ---------------- */
 const blankConv = () => ({ id: newId(), messages: [], lastTicker: null, lastChart: null });
-const S = { files: [], web: false, deepHint: false, conv: blankConv(), items: [], busy: false, abort: null, scope: 'auto', pick: null, showHistory: false, showSettings: false, showInfo: false, allowance: null, personas: null, modes: null, draft: '', live: null, mounted: null, panel: null, toEnd: false, symbolAtAsk: null, dropped: new Set(), report: null, follow: true, view: null, lastTop: null, cutPaste: 0 };
+const S = { files: [], web: false, deepHint: false, conv: blankConv(), items: [], busy: false, abort: null, scope: 'auto', pick: null, showHistory: false, showSettings: false, showInfo: false, allowance: null, personas: null, modes: null, draft: '', live: null, mounted: null, panel: null, toEnd: false, symbolAtAsk: null, dropped: new Set(), report: null, follow: true, view: null, lastTop: null, cutPaste: 0, once: '', sendOnce: '' };
 // items: what the log shows this session: {kind:'msg', i} for conv.messages[i], or {kind:'note', text}; meta per message index
 const meta = new Map();
 /* ---------------- attachments (Classic parity B4b; Classic's app.js:46216-46345) ----------------
@@ -230,7 +231,7 @@ export function attachProblem({ type, size }, count) {
   return '';
 }
 export const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} bytes`);
-const persona = () => { try { return localStorage.getItem(PERSONA_KEY) || 'neutral'; } catch (e) { return 'neutral'; } };
+const persona = () => { if (S.sendOnce) return S.sendOnce; try { return localStorage.getItem(PERSONA_KEY) || 'neutral'; } catch (e) { return 'neutral'; } };
 const horizon = () => { try { return localStorage.getItem(HORIZON_KEY) || 'auto'; } catch (e) { return 'auto'; } };
 const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
 
@@ -472,7 +473,24 @@ async function loadAllowance() {
   try { S.allowance = await api.get('/api/ai-allowance', { force: true, timeout: 10000 }); const was = AVAIL; AVAIL = (S.allowance.ai || {}).enabled === false ? 'off' : 'on'; if (was !== AVAIL) markButtons(); } catch (e) { /* the panel still opens */ }
   paintChrome();
 }
+// Round three (2026-11-23): the personas as named stances, said in plain words. Picked for one answer in the compose row
+// (the next question only), or kept from Response settings; signed in, the kept one is on the account
+// (/api/milo/stance), and the account's wins over this browser's on the first open, as the level does.
+export const STANCES = [['neutral', "A neutral analyst's reading"], ['longterm', "A long-term investor's reading"], ['stoic', "A conservative investor's reading"], ['quant', "A statistician's reading"], ['skeptic', "A skeptic's reading"]];
+let stanceSynced = false;
+async function syncStance() {
+  if (stanceSynced || !store.signedIn()) return;
+  stanceSynced = true;
+  try { const r = await api.get('/api/milo/stance', { force: true, timeout: 8000 }); if (r && r.kept && r.kept.id && r.kept.id !== persona()) { setPref(PERSONA_KEY, r.kept.id); paintChrome(); const slot = host() && $('[data-v2-milo-stance-slot]', host()); if (slot) render(slot, stanceOnceHTML()); } } catch (e) { stanceSynced = false; }
+}
+function keepStance(id) { if (store.signedIn()) api.put('/api/milo/stance', { stance: id }).catch(() => { /* kept in this browser; the account catches up at the next pick */ }); }
+function stanceOnceHTML() {
+  const cur = STANCES.find(([id]) => id === persona()) || STANCES[0];
+  return html`<div class="milo-stance-once"><label class="t-label" for="milo-stance-once">Stance for this answer</label>
+    <select id="milo-stance-once" data-v2-milo-stance-once><option value="" ${S.once ? '' : 'selected'}>As kept: ${cur[1].replace(/^A /, 'a ')}</option>${STANCES.map(([id, label]) => html`<option value="${id}" ${S.once === id ? 'selected' : ''}>${label}</option>`)}</select></div>`;
+}
 async function loadChoices() {
+  syncStance();
   if (!S.personas) { try { S.personas = await api.get('/api/personas', { ttl: 3600000 }); } catch (e) { S.personas = { personas: [{ id: 'neutral', label: 'Neutral analyst' }], horizons: { horizons: [{ id: 'auto', label: 'Auto' }] } }; } }
   if (!S.modes) { try { S.modes = await api.get('/api/knowledge/modes', { ttl: 3600000 }); } catch (e) { S.modes = { modes: [] }; } }
   paintChrome();
@@ -501,8 +519,11 @@ function msgHTML(it) {
     ${levelNote(info, live)}
     ${info.deep ? html`<p class="milo-assumed">Deep research: read from live web sources.</p>` : info.web ? html`<p class="milo-assumed">Web search was on for this answer.</p>` : ''}
     ${info.notSent && info.notSent.length ? html`<p class="milo-not-sent" role="note"><b>Not sent with this question:</b> ${info.notSent.join('; ')}.</p>` : ''}
-    ${info.policyLine ? html`<p class="milo-policy" role="note">${info.policyLine}</p>` : ''}
+    ${info.stance && info.stance.label ? html`<p class="milo-stance-tag" data-v2-milo-stance-tag>${stanceTag(info.stance)}</p>` : ''}
+    ${info.policyLine && !info.refused ? html`<p class="milo-policy" role="note">${info.policyLine}</p>` : ''}
     <div class="milo-bubble">${raw(body)}</div>
+    ${!live && info.steps && info.steps.length ? raw(stepsHTML(info.steps, false)) : ''}
+    ${!live && citedLine(info.cited) ? html`<p class="milo-cited" data-v2-milo-cited>${citedLine(info.cited)}</p>` : ''}
     ${info.amended ? html`<p class="milo-amended" role="note">${info.amended}</p>` : ''}
     ${live ? html`<span class="activity" role="progressbar" aria-label="Milo is working on this answer"></span>` : ''}
     ${info.ended || /\[(Stopped by the reader|Cut off): incomplete\]$/.test(m.content || '') ? html`<p class="milo-ended" role="note">${(info.ended || (/Stopped by the reader/.test(m.content) ? 'stopped' : 'cut')) === 'stopped' ? 'Stopped by you. This answer is incomplete.' : 'The connection ended before Milo finished. This answer is incomplete.'}</p>` : ''}
@@ -1063,7 +1084,29 @@ let settleT = null;
  *  What he is DOING is on the companion above the log, so none of it is drawn twice. */
 function liveLinesHTML(L) {
   const got = (L.got || []).filter((r) => r && r.ok !== false).map((r) => r.label || (r.symbols || []).join(', ')).filter(Boolean);
-  return `${L.quiet ? `<p class="milo-quiet" role="status">${esc(QUIET_TEXT)}</p>` : ''}${got.length ? `<p class="milo-sofar">Looked up so far: ${esc([...new Set(got)].join('; '))}. Every source is listed when the answer is complete.</p>` : ''}`;
+  return `${stepsHTML(L.steps, true)}${L.quiet ? `<p class="milo-quiet" role="status">${esc(QUIET_TEXT)}</p>` : ''}${got.length ? `<p class="milo-sofar">Looked up so far: ${esc([...new Set(got)].join('; '))}. Every source is listed when the answer is complete.</p>` : ''}`;
+}
+/** Round three (2026-11-23): Milo's steps as they arrive, each source read and each lookup called and what it returned,
+ *  above the answer while it streams and kept, folded, under it after. Text only: under reduced motion nothing moves,
+ *  and the list is the same either way. */
+export function stepsHTML(steps, live) {
+  const list = (steps || []).filter((x) => x && x.text).slice(-12);
+  if (!list.length) return '';
+  const items = list.map((x) => `<li class="milo-step is-${x.kind === 'tool' ? 'tool' : 'source'}${x.ok === false ? ' is-miss' : ''}">${esc(x.text)}${x.source && !String(x.text).includes(x.source) ? ` <span class="t-muted">${esc(x.source)}</span>` : ''}</li>`).join('');
+  return live ? `<ol class="milo-steps" aria-label="What Milo is doing" data-v2-milo-steps>${items}</ol>`
+    : `<details class="more-inline milo-steps-done"><summary>Steps Milo took (${list.length})</summary><ol class="milo-steps" data-v2-milo-steps>${items}</ol></details>`;
+}
+/** The stance an answer was written in, in plain words ("A skeptic's reading"). */
+export function stanceTag(st) {
+  if (!st || !st.label) return '';
+  const l = String(st.label);
+  return l.charAt(0).toUpperCase() + l.slice(1);
+}
+/** Which lookup each figure in an answer came from (round three grounding): "$199.04 from AAPL quote (Yahoo Finance)". */
+export function citedLine(cited) {
+  const list = (cited || []).filter((c) => c && c.figure && c.label).slice(0, 6);
+  if (!list.length) return '';
+  return `Figures from: ${list.map((c) => `${c.figure} from ${c.label}${c.source ? ` (${c.source})` : ''}`).join('; ')}.`;
 }
 /** The end of an answer, on the companion. He stays: only the pose settles, a moment later. */
 function companionEnd(ok, ended) {
@@ -1227,6 +1270,9 @@ export async function send(text, { deep = false } = {}) {
   const quietT = setInterval(() => { if (S.live && !S.live.quiet && performance.now() - S.live.lastAt > QUIET_MS) { S.live.quiet = true; paintLive(); } }, 2000);
   try {
     const askedText = /^Deep research: /.test(text) && deep ? null : text;
+    // a stance picked for this answer only rides in this request (persona() reads it while it is set), then the row
+    // goes back to the kept stance
+    S.sendOnce = deep ? '' : takeOnce();
     const res = await fetch(deep ? '/api/research' : '/api/chat', {
       method: 'POST', credentials: 'same-origin', signal: ctl.signal,
       // the visitor id goes with a question so one asked without an account (where the owner allows it) is counted
@@ -1235,6 +1281,7 @@ export async function send(text, { deep = false } = {}) {
         ? { ticker: focusTicker || sym0 || null, question: askedText || (focusTicker || sym0 ? null : MARKET_BRIEF), context, mode: prefs.knowledge() }
         : { messages: S.conv.messages.slice(0, ai).map((m) => ({ role: m.role, content: m.content })), context, web: !!S.web, attachments, persona: persona(), mode: prefs.knowledge(), horizon: horizon() }),
     });
+    S.sendOnce = '';
     // the server has the question (and says its own first step at once)
     heard();
     // the chat route says its own first step at once ("gathering"); deep research has none, so the panel says this one
@@ -1267,10 +1314,13 @@ export async function send(text, { deep = false } = {}) {
           else if (ev === 'retrieved') { S.live.got = Array.isArray(p.items) ? p.items : []; S.live.act = actOn(S.live.act, 'retrieved', p.items); paintLive(); }
           // the advice policy (app/ai_policy.py): the server's own line for a question that asked for a personal decision,
           // and, after the stream, the answer with any sentence that read as personal advice taken out, said in a note
-          else if (ev === 'notice') { if (p.kind === 'policy' && p.text) { meta.get(ai).policyLine = String(p.text); paintLive(); } }
+          else if (ev === 'notice') { if (p.kind === 'policy' && p.text) { meta.get(ai).policyLine = String(p.text); if (p.refused) { meta.get(ai).refused = true; S.live.text = String(p.text); S.conv.messages[ai].content = S.live.text; } paintLive(); } }
+          // round three: the stance the answer is written in, and each step as it happens (a source read, a lookup)
+          else if (ev === 'stance') { if (p && p.label) { meta.get(ai).stance = { id: String(p.id || ''), label: String(p.label) }; paintLive(); } }
+          else if (ev === 'step') { if (p && p.text) { S.live.steps = [...(S.live.steps || []), { kind: String(p.kind || ''), text: String(p.text), source: p.source ? String(p.source) : '', ok: p.ok }]; meta.get(ai).steps = S.live.steps; paintLive(); } }
           else if (ev === 'amend') { if (typeof p.text === 'string') { S.live.text = p.text; S.live.amended = true; S.conv.messages[ai].content = p.text; meta.get(ai).amended = String(p.note || 'Milo removed a sentence that read as personal investment advice.'); paintLive(); } }
           else if (ev === 'error') { finished = true; failed = { text: p.message || 'Milo could not answer.' }; }
-          else if (ev === 'done') { finished = true; Object.assign(meta.get(ai), { citations: p.sources || p.citations || [], read: Array.isArray(p.read) ? p.read : [], retrieved: Array.isArray(p.retrieved) ? p.retrieved : [], loaded: Array.isArray(p.loaded) ? p.loaded : [], named: p.named && typeof p.named === 'object' ? p.named : null }); }
+          else if (ev === 'done') { finished = true; Object.assign(meta.get(ai), { citations: p.sources || p.citations || [], read: Array.isArray(p.read) ? p.read : [], retrieved: Array.isArray(p.retrieved) ? p.retrieved : [], loaded: Array.isArray(p.loaded) ? p.loaded : [], named: p.named && typeof p.named === 'object' ? p.named : null, cited: Array.isArray(p.cited) ? p.cited : [] }); if (p.stance && p.stance.label) meta.get(ai).stance = { id: String(p.stance.id || ''), label: String(p.stance.label) }; }
         }
       }
       if (!finished && !ended && !failed) ended = ctl.signal.aborted ? 'stopped' : 'cut';
@@ -1404,6 +1454,8 @@ async function runAction(a, card, i) {
 // it rather than in its place.
 const drawer = makeDrawer({ cls: 'drawer-milo', titleId: 'milo-title' });
 export const isOpen = () => drawer.isOpen();
+/** Collapse Milo to the strip (ui/milo-inline.js): the panel closes, the conversation is kept. */
+export function closeMilo() { drawer.close({ force: true }); }
 export const isDocked = () => drawer.isDocked();
 /* Docked beside the page, as in Classic (styles.css:6973), only while the research beside it keeps its usable width
  * (owner's amendment 8, 2026-10-21): CONTENT_MIN, measured. Every desktop page was laid out at narrower and narrower
@@ -1477,7 +1529,7 @@ export async function openMilo({ question = '', opener, send: sendNow = false, a
     body: html`<div class="milo"><div class="milo-chrome">${chromeHTML()}</div>
       <div class="milo-log-wrap"><div class="milo-log" role="log" aria-live="polite" aria-label="Conversation with Milo">${logHTML()}</div>
         <button type="button" class="milo-latest" data-v2-milo-latest hidden>${icon('arrowDown')}<span>Latest</span></button></div>
-      <form class="milo-form" data-v2-milo-form data-state="idle"><div class="milo-suggest-slot" data-v2-milo-suggest></div><div data-v2-milo-tools>${toolsHTML()}</div><div data-v2-milo-files>${filesHTML()}</div><div class="milo-compose">
+      <form class="milo-form" data-v2-milo-form data-state="idle"><div class="milo-suggest-slot" data-v2-milo-suggest></div><div data-v2-milo-tools>${toolsHTML()}</div><div data-v2-milo-files>${filesHTML()}</div><div data-v2-milo-stance-slot>${stanceOnceHTML()}</div><div class="milo-compose">
         <button type="button" class="milo-attach" data-v2-milo-attach aria-label="Attach an image or PDF" title="Attach an image or PDF: PNG, JPEG, GIF, WebP or PDF, up to 4 files of 5 MB each. You can also drop them here.">${icon('clip')}</button>
         <input type="file" hidden multiple accept="${Object.keys(ATTACH_TYPES).join(',')}" data-v2-milo-file tabindex="-1"><label class="sr" for="milo-q">Your question to Milo</label>
         <textarea id="milo-q" rows="1" maxlength="${MAX_Q}" placeholder="${placeholder()}" aria-describedby="milo-attached milo-allow milo-limit">${S.draft}</textarea>
@@ -1672,6 +1724,7 @@ function wire(root) {
     else if (e.key === 'Tab') setMenu(false);
   });
   // attachments: the button, the file picker, a tile's remove, and files dropped on the panel
+  root.addEventListener('change', (e) => { const sel = e.target.closest && e.target.closest('[data-v2-milo-stance-once]'); if (sel) { S.once = sel.value || ''; announce(S.once ? `${(STANCES.find(([id]) => id === S.once) || ['', ''])[1]} for your next question only.` : 'Your kept stance for your next question.'); } });
   root.addEventListener('change', (e) => { const inp = e.target.closest && e.target.closest('[data-v2-milo-file]'); if (inp) { addFiles(inp.files).then(() => { inp.value = ''; const b = $('[data-v2-milo-attach]', root); if (b && !b.disabled) b.focus(); }); } });
   root.addEventListener('dragover', (e) => { if (!e.dataTransfer || ![...(e.dataTransfer.types || [])].includes('Files') || blocked()) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; root.classList.add('is-drop'); });
   root.addEventListener('dragleave', (e) => { if (!root.contains(e.relatedTarget)) root.classList.remove('is-drop'); });
@@ -1727,7 +1780,7 @@ function wire(root) {
       const c = loadHistory().find((x) => x.id === b.dataset.v2MiloOpen); if (!c) return;
       S.conv = { id: c.id, messages: (c.messages || []).map((m) => ({ role: m.role, content: m.content })), lastTicker: c.ticker || null, lastChart: null }; S.report = null;
       meta.clear(); SC.rest = 'idle'; clearTimeout(settleT); S.items = S.conv.messages.map((m, i) => ({ kind: 'msg', i }));
-      S.conv.messages.forEach((m, i) => { if (m.role === 'assistant') { const saved = (c.messages || [])[i] || {}; meta.set(i, { question: (S.conv.messages[i - 1] || {}).content || '', symbol: c.ticker || null, policyLine: saved.policy || '', amended: saved.amended || '', used: keepUsed(saved.context), level: saved.level || '' }); } });
+      S.conv.messages.forEach((m, i) => { if (m.role === 'assistant') { const saved = (c.messages || [])[i] || {}; meta.set(i, { question: (S.conv.messages[i - 1] || {}).content || '', symbol: c.ticker || null, policyLine: saved.policy || '', amended: saved.amended || '', used: keepUsed(saved.context), level: saved.level || '' }); Object.assign(meta.get(i), { stance: saved.stance || null, refused: !!saved.refused }); } });
       S.showHistory = false; S.toEnd = true; S.follow = true; S.view = null; paintChrome(); paintLog(); const ta = $('#milo-q', root); if (ta) ta.focus(); return;
     }
     if ((b = t('[data-v2-milo-del]'))) { const id = b.dataset.v2MiloDel; if (S.busy && id === S.conv.id) { toast(WAIT_HISTORY); return; } saveHistory(loadHistory().filter((c) => c.id !== id)); if (S.conv.id === id && !S.busy) { S.conv = blankConv(); S.items = []; meta.clear(); } paintChrome(); paintLog(false); const hd = $('#milo-hist-h', root); if (hd) { hd.setAttribute('tabindex', '-1'); hd.focus({ preventScroll: true }); } return; }
@@ -1781,9 +1834,16 @@ function wire(root) {
     }
   });
 }
+/** The stance picked for one answer: used once, then the row goes back to the kept stance. */
+function takeOnce() {
+  const once = S.once; S.once = '';
+  const slot = host() && $('[data-v2-milo-stance-slot]', host()); if (slot && once) render(slot, stanceOnceHTML());
+  return once;
+}
 // a persona applies from the next question on; the answers already given are not touched
 function pickPersona(id, root, close = false) {
-  setPref(PERSONA_KEY, id); paintChrome();
+  setPref(PERSONA_KEY, id); paintChrome(); keepStance(id);
+  { const slot = $('[data-v2-milo-stance-slot]', root); if (slot) render(slot, stanceOnceHTML()); }
   // a press closes the menu and goes back to its button; the arrows keep the menu open on the new choice (the redraw
   // cannot reopen it itself: its button now names another persona)
   const menu = $('.milo-pp-pick', root);

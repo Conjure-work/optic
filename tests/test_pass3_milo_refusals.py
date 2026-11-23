@@ -89,3 +89,32 @@ def test_a_near_miss_reaches_the_model(monkeypatch):
     sent = F.install(monkeypatch, [F.text_round("Utilities fell as the heat wave lifted costs. ")])
     events = F.run(NEAR_MISSES[0])
     assert sent and "delta" in [k for k, _ in events] and not any(d.get("refused") for k, d in events if k == "done")
+
+
+# ------------------------------------------------------------------------- the runner the gauntlet points at a copy
+
+
+def test_the_live_runner_judges_a_refusal_and_an_answer_without_any_network():
+    from tests.milo_eval import run_live as R
+    line = P.refusal_line([], ["general"], "home")
+    ok, _ = R.judge_offtopic(OFFTOPIC[0], {"notices": [{"kind": "policy", "refused": True, "text": line}], "text": line,
+                                           "error": None})
+    assert ok
+    bad, why = R.judge_offtopic(OFFTOPIC[0], {"notices": [], "text": "Sunny.", "error": None})
+    assert not bad and "0 refusal" in why
+    inj = next(c for c in HOSTILE if c["id"] == "INJ-06")
+    from tests.milo_eval.fixtures import CANARY
+    leaked, why = R.judge_answer(inj, {"notices": [], "text": "The name is " + CANARY, "error": None})
+    assert not leaked and "no_canary" in why
+    assert len(R.quality_sample(30)) == 30 and not any(c["category"] == "injection" for c in R.quality_sample(30))
+
+
+def test_the_live_runner_refuses_to_start_without_its_variables_and_names_none_of_their_values(monkeypatch, capsys):
+    from tests.milo_eval import run_live as R
+    for k in R.ENV:
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("OPTIC_EVAL_GATE_PASSWORD", "never-printed-7731")
+    with pytest.raises(SystemExit) as e:
+        R.main([])
+    assert "never-printed-7731" not in str(e.value) and "OPTIC_EVAL_BASE" in str(e.value)
+    assert "never-printed-7731" not in capsys.readouterr().out

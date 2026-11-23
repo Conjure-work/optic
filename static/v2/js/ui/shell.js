@@ -85,6 +85,7 @@ export function mount(app) {
         <button type="button" class="btn btn-milo btn-sm topbar-milo" data-v2-milo="" data-v2-milo-ctx="" data-v2-milo-sym="" aria-label="Ask Milo"><span class="scout-badge" aria-hidden="true"><span class="scout-badge-fig"></span></span><span class="tm-label" aria-hidden="true">Ask Milo</span></button>
         <button type="button" class="account-btn" data-v2-account aria-haspopup="dialog">Sign in</button>
       </header>
+      <div id="milo-inline" class="milo-inline"></div>
       <main id="main" class="page" tabindex="-1"></main>
       <footer class="legal" id="legal-footer"><p class="app-status"><span id="app-status"></span><button type="button" class="textlink" data-v2-report-open>Report a problem</button></p>${legalFooter()}</footer>
     </div>
