@@ -8,10 +8,13 @@
 useDefault = true
 
 [allowlist]
-description = "storage key names, test fixtures, one docs path"
+description = "storage key names, test fixtures, one docs path, one setting name"
 regexes = [
   '''^optic\.[a-z0-9_.]+$''',
   '''phase09/recon/''',
+  # a setting's name, not a value: the billing module's docstring names the test-key-only switch (round three,
+  # 2026-11-23), and the generic rule reads NAME=true as a key
+  '''^BILLING_TEST_IGNORE_LEGAL_PLACEHOLDER$''',
 ]
 # the one test file whose registered fixture passwords match the generic rule; tests stay scanned otherwise
 paths = [
