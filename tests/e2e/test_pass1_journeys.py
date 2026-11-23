@@ -732,11 +732,18 @@ def test_one_primary_action_and_one_leading_figure(chrome, server, screen, level
     ctx, page = open_page(chrome, server, level=level, viewport=viewport)
     (home if screen == "home" else stock)(page, server)
     assert primaries(page) == ["milo bar"], primaries(page)
+    # Each figure is read in one pass once it is drawn: the page redraws itself whole as its answers arrive (the header
+    # is replaced up to five times in the first four seconds, measured 2026-11-23), and a node read while it was being
+    # replaced gave NaN, which is a race in the reading, not a size
     if screen == "stock":
-        px = page.eval_on_selector(".dhead .dh-px", "e => parseFloat(getComputedStyle(e).fontSize)")
-        heads = page.eval_on_selector_all("#main section.section h2", "els => els.map(e => parseFloat(getComputedStyle(e).fontSize))")
+        px, heads = page.wait_for_function("""() => { const e = document.querySelector('.dhead .dh-px');
+            const px = e && e.isConnected ? parseFloat(getComputedStyle(e).fontSize) : NaN;
+            const hs = [...document.querySelectorAll('#main section.section h2')].map(h => parseFloat(getComputedStyle(h).fontSize));
+            return Number.isFinite(px) && hs.length && hs.every(Number.isFinite) ? [px, hs] : null; }""").json_value()
         assert px >= 34 and px >= 1.8 * max(heads), (px, heads)
-    lc = page.eval_on_selector("[data-v2-lc] [aria-pressed='true']", "e => [parseFloat(getComputedStyle(e).fontSize), Math.round(e.getBoundingClientRect().height)]")
+    lc = page.wait_for_function("""() => { const e = document.querySelector("[data-v2-lc] [aria-pressed='true']");
+        const v = e && e.isConnected ? [parseFloat(getComputedStyle(e).fontSize), Math.round(e.getBoundingClientRect().height)] : null;
+        return v && Number.isFinite(v[0]) && v[1] > 0 ? v : null; }""").json_value()
     assert lc[0] == 14 and lc[1] <= 40, lc
     ctx.close()
 
