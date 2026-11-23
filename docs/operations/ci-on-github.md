@@ -7,7 +7,8 @@ job took about 33 minutes on a fast Mac and timed out at 40 on GitHub's shared m
 ## How it is split
 
 `tests/support/shards.py` assigns every test file to exactly one shard: the browser journeys (`tests/e2e`) are their
-own shards, and the Python files are split into ranges by name, sized from measured durations. A new test file lands
+ten shards of their own, dealt test by test, and the Python files run as one shard (about 8 minutes on the runner).
+Ten, because on the runner a journey takes about twice as long as on the Mac: six slices ran 15 to 21 minutes each. A new test file lands
 in a shard by its name with no change to the workflow, and `tests/test_ci_shards.py` fails if any file is in no shard
 or in two.
 

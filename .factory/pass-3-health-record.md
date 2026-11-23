@@ -48,11 +48,11 @@ journeys 1,809 s, of which `tests/e2e/test_pass1_journeys.py` alone took 1,112 s
 | Shard | What | Measured on the Mac | Tests (floor) |
 | --- | --- | --- | --- |
 | py | every Python file outside tests/e2e | about 5.5 min | 9,074 collected (9,073 passed, the one standing skip) |
-| e2e-1 to e2e-6 | the journeys dealt round-robin in collection order (`tests/support/shard_plugin.py --slice i/6`) | about 5 min each | 23, 23, 23, 23, 23, 22 |
+| e2e-1 to e2e-10 | the journeys dealt round-robin in collection order (`tests/support/shard_plugin.py --slice i/10`); ten since integration, when 221 journeys in six slices ran 15 to 21 min each on the runner | about 3 min each on the Mac | 23, then 22 each |
 
-`SUITE_FLOOR` 9,210 is the sum of the shard floors. Each shard checks its own floor; the `count` job adds the JUnit
+`SUITE_FLOOR` (9,605 at integration) is the sum of the shard floors. Each shard checks its own floor; the `count` job adds the JUnit
 files and fails on a missing shard, any failure, or a total under the floor. On GitHub's runner each shard is expected
-under 15 minutes including the install (timeout 30); the image and secrets jobs are unchanged. `tests/test_ci_shards.py`
+under 15 minutes including the install (timeout 45); the image and secrets jobs are unchanged. `tests/test_ci_shards.py`
 checks the matrix equals the shard list, every test file is in exactly one shard, the slices partition the journeys,
 and the floors add up. The two settings that are the repository owner's, with the clicks:
 `docs/operations/ci-on-github.md`. The floors are set again at the end of the pass, when every piece has landed.

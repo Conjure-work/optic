@@ -28,13 +28,16 @@ from typing import Dict, List
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = ROOT / "tests"
 
-E2E_SLICES = 6
+# Ten, not six (2026-11-23): on the GitHub macOS runner a journey takes about twice as long as on the ops Mac, and six
+# slices of 37 ran past 20 minutes each
+E2E_SLICES = 10
 
 # Each shard's floor: what it passed when the floors were last set (the one standing skip, test_live_qqq, is in py).
 # The workflow's SUITE_FLOOR is their sum.
 SHARD_FLOORS: Dict[str, int] = {
     "py": 9384,
-    "e2e-1": 37, "e2e-2": 37, "e2e-3": 37, "e2e-4": 37, "e2e-5": 37, "e2e-6": 36,
+    "e2e-1": 23, "e2e-2": 22, "e2e-3": 22, "e2e-4": 22, "e2e-5": 22, "e2e-6": 22, "e2e-7": 22, "e2e-8": 22,
+    "e2e-9": 22, "e2e-10": 22,
 }
 
 

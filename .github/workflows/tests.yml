@@ -34,11 +34,12 @@ jobs:
   # round-robin into six slices so the slowest file is shared out. Which test runs where: tests/support/shards.py.
   suite:
     runs-on: macos-latest
-    timeout-minutes: 30
+    # a journey slice measured 15 to 21 minutes on the runner with ten slices' worth of work in six; 45 leaves room
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        shard: [py, e2e-1, e2e-2, e2e-3, e2e-4, e2e-5, e2e-6]
+        shard: [py, e2e-1, e2e-2, e2e-3, e2e-4, e2e-5, e2e-6, e2e-7, e2e-8, e2e-9, e2e-10]
     env:
       # Optic's dates are market dates in New York; the suite was written and is run there (a UTC runner after 7 pm
       # New York time put "in 12 days" a day out in tests/test_v2_parity_b6a.py)
