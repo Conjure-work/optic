@@ -4,6 +4,7 @@
 // short interest, corporate actions, filings and congressional disclosures. Statements come with the shared
 // /api/ticker snapshot (company); the rest from /api/extras, /api/congress and
 // /api/segments. Funds have no Financials page, as in the classic app.
+import * as TM from '../ui/treemap.js';
 import { html, raw, render as draw, reducedMotion } from '../core/dom.js';
 import * as api from '../core/api.js';
 import * as store from '../core/store.js';
@@ -472,7 +473,7 @@ function paint() {
   if (D.na) body = notApplicable(sym, D.na);
   else if (D.tErr) body = failed('The financial statements', D.tErr, { retry: 'ticker' });
   else if (!D.t) body = skeleton('lines', 6, 'Loading the statements');
-  else body = html`${readings()}${jumpList()}${statements(sym)}${segments()}${record('earnings')}${ownership(sym)}${insiderHistory(sym)}${record('short')}${extras()}${filings()}${congress()}`;
+  else body = html`${readings()}${jumpList()}${statements(sym)}${segments()}${sectorMap()}${record('earnings')}${ownership(sym)}${insiderHistory(sym)}${record('short')}${extras()}${filings()}${congress()}`;
   // a section heading the reader was taken to (a jump, a link's ?section=) keeps focus while later figures redraw the page
   const was = document.activeElement, onHead = was && was.tagName === 'H2' && mainEl.contains(was) && was.closest('section[id]');
   draw(mainEl, html`<div class="dstick">${header(sym, D, 'financials')}${tabs(sym, 'financials', { fund: isFund(D) })}</div><div class="fin">${body}</div>`);
@@ -483,6 +484,12 @@ function paint() {
   if (wantSection && document.getElementById(wantSection)) { const id = wantSection; wantSection = null; requestAnimationFrame(() => jumpTo(mainEl, id)); }
 }
 
+// The market around the company (round three, 2026-11-23, held from Pass 2): the eleven sectors by weight with today's
+// move, as a picture and a table (ui/treemap.js). Loaded once per visit; the page redraws it with the same answer.
+function sectorMap() {
+  const w = Math.max(280, Math.min(1100, ((mainEl && mainEl.clientWidth) || 900) - 48));
+  return html`<section class="section" id="fin-sectors" aria-labelledby="fin-sectors-h">${TM.sectorFigure(D.smap, D.smapErr, w, '', html`<h2 class="t-h2" id="fin-sectors-h">The market around it: sectors by weight, today</h2>`)}</section>`;
+}
 function notApplicable(sym, kind) {
   const name = (D.quote || {}).name || sym;
   return html`<section class="section na" aria-labelledby="na-h"><h2 class="t-h2" id="na-h">Financials do not apply to ${sym}</h2>
@@ -531,6 +538,7 @@ export async function render(main, route) {
     main.addEventListener('change', (e) => { const sl = e.target.closest('[data-fin-jumpsel]'); if (sl && sl.value) { jump(sl.value); sl.value = ''; } });
   }
   paint();
+  TM.loadSectorMap().then((m) => { if (D.sym === sym && live) { D.smap = m; paint(); } }, (e) => { if (D.sym === sym && live) { D.smapErr = e; paint(); } });
   const c = await core(sym).catch(() => ({}));
   if (D.sym !== sym) return;
   Object.assign(D, { quote: c.quote, session: c.session, quoteError: c.quoteError });

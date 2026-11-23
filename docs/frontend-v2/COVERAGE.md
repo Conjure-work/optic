@@ -20,6 +20,7 @@ Status words:
 | Dossier | Earnings | `#/{SYM}/earnings` | Rebuilt |
 | Dossier | Financials | `#/{SYM}/financials` | Rebuilt |
 | Dossier | News | `#/{SYM}/news` | Rebuilt |
+| Dossier | Panels | `#/{SYM}/workspace` | Rebuilt |
 | Compare | Compare | `#/compare` | Rebuilt |
 | Markets | Read | `#/read` | Rebuilt |
 | Markets | Macro | `#/macro` | Rebuilt |

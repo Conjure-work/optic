@@ -39,6 +39,9 @@ import { poll } from '../core/poll.js';
 import { scoreLine, signedLine, toneSign, toneBand } from '../ui/score.js';
 import * as FIG from '../core/figures.js';
 import { fig } from '../ui/figure.js';
+// the company's tabs over its panels: the grid is one of the stock page's tabs since round three (2026-11-23)
+import { tabs as dossierTabs } from './dossier-frame.js';
+import * as TM from '../ui/treemap.js';
 
 const KEY = 'optic.v2.workspace.v1';
 const VERSION = 5;   // 5: each layout knows whether the reader changed it, panel settings are kept, and any older version carries over (2026-10-20)
@@ -47,6 +50,8 @@ const HEIGHTS = ['s', 'm', 'l'];
 const HEIGHT_WORDS = { s: 'compact', m: 'standard', l: 'tall' };
 
 /* ---------------- presets: [panel, span, height] ---------------- */
+/** The three trading layouts (round three): their ids, as the rail's Research labels name them in an address. */
+export const TRADING = ['technicals', 'derivatives', 'positions'];
 export const PRESETS = {
   // Each layout answers its own question with the most useful panels first (owner, 2026-10-19). A panel that
   // sizes to its content sits beside lists that fill the rest of the row (LIST below). Any other panel is one
@@ -59,6 +64,14 @@ export const PRESETS = {
   options: { label: 'Options Research', panels: [['quote', 8, 'm'], ['watch', 4, 's'], ['contracts', 12, 'l'], ['vol', 6, 'm'], ['gex', 6, 'm'], ['tearn', 6, 'm'], ['cnews', 6, 's']] },
   // Long-Term Investing: the business, its valuation, its financial trends, who owns it, what is happening.
   longterm: { label: 'Long-Term Investing', panels: [['quote', 8, 'm'], ['watch', 4, 's'], ['biz', 6, 'm'], ['value', 6, 'm'], ['fin', 6, 'm'], ['own', 6, 'm'], ['cnews', 12, 's'], ['portfolio', 12, 'm']] },
+  // The three trading screens (round three, 2026-11-23), each a layout on this grid so link groups, Customize and the
+  // layouts kept on the account work on them as on any other; the rail's Research labels open the first two.
+  // Charts and Technicals: the chart, the setup on it, the plan (the reader's thesis) and its expression.
+  technicals: { label: 'Charts and Technicals', panels: [['quote', 8, 'l'], ['setup', 4, 'l'], ['plan', 6, 'm'], ['expression', 6, 'm'], ['watch', 6, 's'], ['tearn', 6, 'm']] },
+  // Options and Derivatives: what the options price, the chain, the position, dealer gamma and the day's flow.
+  derivatives: { label: 'Options and Derivatives', panels: [['quote', 8, 'm'], ['vol', 4, 'm'], ['contracts', 12, 'l'], ['expression', 4, 'm'], ['gex', 4, 'm'], ['oflow', 4, 'm']] },
+  // Portfolio: the reader's positions against their plans, the setups on their lists, and alerts.
+  positions: { label: 'Portfolio', panels: [['portfolio', 12, 'm'], ['bookmix', 6, 'm'], ['plans', 6, 'm'], ['listsetups', 6, 'm'], ['alerts', 6, 'm'], ['watch', 12, 's']] },
   mine: { label: 'My Desk', panels: null },     // the reader's own; starts as a copy of Market Overview
   // A company's panels (Pass 2, #/SYM/workspace): Home's grid on the stock page, every panel following that company
   // in the Blue group; Gold and Teal still work for a second or third ticker beside it. Not one of Home's tabs.
@@ -69,7 +82,7 @@ export const PRESETS = {
 // their title and one line, and load only when opened.
 // The visual update (2026-11-11) opens the heat map, the Desk's bottom line and the market panels' figures on a phone too,
 // as the confirmed prototype's phone render draws them: each is a picture and a line, not a list to scroll.
-const ESSENTIAL = { stock: ['quote', 'tearn', 'value'], market: ['indices', 'regime', 'sentiment', 'expected', 'sectors', 'desk', 'quote', 'watch'], options: ['quote', 'contracts', 'vol'], longterm: ['quote', 'biz', 'value'], mine: ['indices', 'regime', 'sentiment', 'expected', 'sectors', 'desk', 'quote', 'watch'] };
+const ESSENTIAL = { technicals: ['quote', 'setup', 'plan'], derivatives: ['quote', 'vol', 'contracts'], positions: ['portfolio', 'bookmix', 'plans'], stock: ['quote', 'tearn', 'value'], market: ['indices', 'regime', 'sentiment', 'expected', 'sectors', 'desk', 'quote', 'watch'], options: ['quote', 'contracts', 'vol'], longterm: ['quote', 'biz', 'value'], mine: ['indices', 'regime', 'sentiment', 'expected', 'sectors', 'desk', 'quote', 'watch'] };
 const PHONE = '(max-width: 860px)';
 const isPhone = () => { try { return matchMedia(PHONE).matches; } catch (e) { return false; } };
 const folded = (id) => isPhone() && ((S.fold[S.preset] || {})[id] ?? !(ESSENTIAL[S.preset] || []).includes(id));
@@ -155,6 +168,8 @@ const BLURB = {
   regime: 'The market score with the factors that moved it.', sentiment: 'The sentiment gauge and its six parts.', expected: 'What index options price for one day.', sectors: 'The 11 sector funds by their move.',
   calendar: 'Scheduled U.S. releases this week.', desk: 'The day\'s Optic Desk edition.', earnings: 'Who reports this week and next.', movers: 'The largest one-month moves.',
   news: 'The day\'s wire headlines.', alerts: 'The scheduled scan\'s latest alerts.', economy: 'U.S. indicators with their history.', value: 'The linked ticker against its own valuation history.',
+  setup: 'The swing setups on the linked ticker\'s chart.', plan: 'Your plan for the linked ticker.', expression: 'How a position in the linked ticker would be expressed.',
+  oflow: 'The linked ticker\'s options activity today.', bookmix: 'Your Paper Desk book by value.', plans: 'Your positions against the plans you wrote.', listsetups: 'Setups on the names in your lists.',
   vol: 'What the linked ticker\'s options price.', gex: 'Dealer gamma walls and flip for the linked ticker.', tearn: 'The linked ticker\'s next report and its history.',
   biz: 'The linked company\'s business, graded.', fin: 'Four years of revenue, profit and cash flow.', own: 'Insider and institutional activity.',
   changes: 'What changed on your names since the session before.', trends: 'Index and sector funds against the prior session\'s range.', questions: 'Questions from today\'s market, to draft into Milo.',
@@ -167,6 +182,7 @@ let S = null;
 // panel of the layout is in it, hidden, one Add panel away in Customize; Advanced (Settings) shows the whole layout.
 // A layout the reader changed is theirs and is never touched.
 const SIMPLE = { market: ['indices', 'quote', 'watch', 'priority', 'desk', 'portfolio'], options: ['quote', 'watch', 'contracts', 'vol'],
+  technicals: ['quote', 'setup', 'plan', 'expression'], derivatives: ['quote', 'vol', 'contracts', 'expression', 'gex', 'oflow'], positions: ['portfolio', 'bookmix', 'plans', 'listsetups', 'alerts'],
   longterm: ['quote', 'watch', 'biz', 'value', 'portfolio'] };
 function defaultsFor(preset, dens) {
   const p = PRESETS[preset].panels || PRESETS.market.panels;
@@ -200,7 +216,8 @@ const ownLayout = () => S.preset !== 'market' || !!S.custom[S.preset];
 /** The panels Home shows at this level, in order, with any the reader opened by Show more after them. */
 function shownPanels() {
   const level = lvl();
-  if (STOCK || level === 'advanced' || EDIT || (level === 'intermediate' && ownLayout())) return layout().filter((x) => !x.hidden);
+  // a trading layout (round three) is shown whole at every level: the rail opened it by name
+  if (STOCK || TRADING.includes(S.preset) || level === 'advanced' || EDIT || (level === 'intermediate' && ownLayout())) return layout().filter((x) => !x.hidden);
   const base = (LEVEL_PANELS[level] || PRESETS.market.panels).map(([id, span, h]) => ({ id, span, h, hidden: false }));
   const have = new Set(base.map((x) => x.id));
   const extra = OPEN.list().filter((id) => PANELS[id] && !have.has(id)).map((id) => ({ id, span: PANELS[id].span || 6, h: 'm', hidden: false, opened: true }));
@@ -209,11 +226,11 @@ function shownPanels() {
 /** The panels this level leaves out (each listed with Show more), never the optional ones with nothing to show. */
 function leftOut() {
   const level = lvl();
-  if (STOCK || level === 'advanced' || EDIT || (level === 'intermediate' && ownLayout())) return [];
+  if (STOCK || TRADING.includes(S.preset) || level === 'advanced' || EDIT || (level === 'intermediate' && ownLayout())) return [];
   const shown = new Set(shownPanels().map((x) => x.id));
   // the market layout's panels first, then the company and options ones the Advanced layouts add
   const order = [...PRESETS.market.panels.map((x) => x[0]), ...Object.keys(PANELS)];
-  return [...new Set(order)].filter((id) => PANELS[id] && !shown.has(id) && !(PANELS[id].optional && (DATA[id] || {}).absent) && !PANELS[id].linkedOnly)
+  return [...new Set(order)].filter((id) => PANELS[id] && !shown.has(id) && !(PANELS[id].optional && (DATA[id] || {}).absent) && !PANELS[id].linkedOnly && !PANELS[id].presetOnly)
     .map((id) => ({ id, title: PANELS[id].title, blurb: BLURB[id] || '' }));
 }
 const trimmed = (id) => (LEVEL_TRIM[lvl()] || []).includes(id) && !OPEN.has(`${id}:full`) && !EDIT;
@@ -790,6 +807,122 @@ export const PANELS = {
     foot: (t) => ({ source: 'Optic dealer-gamma estimate from Yahoo Finance open interest', at: (t || {}).generated_at }),
     milo: (link) => `Where could options positioning hold or push ${link}'s price, and how reliable is that read?`,
   },
+  // ---- round three (2026-11-23): the trading screens' own panels. `presetOnly` keeps them out of the level matrix's
+  // Show more lists: they belong to the three trading layouts, one Add panel away in Customize elsewhere.
+  setup: {
+    title: 'Setup', span: 4, linked: true, presetOnly: true,
+    how: 'The swing setups Optic\'s scan finds on the linked ticker\'s completed daily candles: which, which way, where each stands, the level that triggers it and the level that ends it. A setup is a pattern with stated rules, not a recommendation.',
+    load: (link) => get(`/api/setups?symbols=${enc(link)}&timeframe=daily&status=recent`, { ttl: 300000, timeout: 90000 }),
+    body: (d, P, link) => {
+      const rows = ((d || {}).rows || []).slice(0, 6);
+      if (!rows.length) return html`<p class="ws-note">No setup on ${link}'s recent daily candles.</p><p><a class="textlink" href="#/${enc(link)}/options">Setups in full ${icon('arrow')}</a></p>`;
+      return html`<ul class="ws-news">${rows.map((r) => html`<li><span><b class="${r.direction === 'bull' ? 'up' : 'down'}">${r.direction === 'bull' ? 'Bullish' : 'Bearish'}</b> ${r.label}</span><span class="ws-rule">${capFirst(String(r.status || ''))}${isNum(r.trigger_level) ? `, triggers at ${num(r.trigger_level)}` : ''}${isNum(r.invalidation) ? `, ends below ${num(r.invalidation)}` : ''}</span></li>`)}</ul>
+        <p><a class="textlink" href="#/${enc(link)}/chart">${link} chart ${icon('arrow')}</a></p>`;
+    },
+    foot: (d) => ({ source: 'Optic setup scan on Yahoo Finance daily candles', at: (d || {}).generated_at }),
+    milo: (link) => `What setups are on the ${link} chart, and what would confirm or end each?`,
+  },
+  plan: {
+    title: 'Plan', span: 6, linked: true, presetOnly: true,
+    how: 'Your own plan for the linked ticker: the case for and against, what would change your mind. Written by you on the company\'s Overview; Optic never fills it in.',
+    load: async (link) => {
+      if (store.signedIn()) { const r = await get('/api/theses', { ttl: 30000 }); return { th: ((r || {}).theses || {})[link] || null, account: true }; }
+      let local = {}; try { local = JSON.parse(localStorage.getItem('optic.thesis.v1') || '{}') || {}; } catch (e) { local = {}; }
+      return { th: local[link] || null, account: false };
+    },
+    body: (d, P, link) => {
+      const th = (d || {}).th;
+      if (!th) return html`<p class="ws-note">No plan written for ${link} yet. <a class="textlink" href="#/${enc(link)}">Write one on its Overview</a>.</p>`;
+      return html`<dl class="ws-kv">${[['The case for', th.bull], ['The case against', th.bear], ['What would change my mind', th.invalidation], ['Catalysts', th.catalysts]].filter(([, v]) => v).map(([k, v]) => html`<div><dt>${k}</dt><dd class="ws-kv-note">${clean(v)}</dd></div>`)}</dl>`;
+    },
+    foot: (d) => ({ source: (d || {}).account ? 'Your plan, kept on your account' : 'Your plan, kept in this browser' }),
+    milo: (link) => `Check my ${link} plan against what the chart and the figures show now.`,
+  },
+  expression: {
+    title: 'Expression', span: 6, linked: true, presetOnly: true,
+    how: 'How a view on the linked ticker could be expressed, from Optic\'s entry rules: an example contract with its cost and breakeven, or why there is none now. Model output for research, not an order. Build your own position on the Options tab.',
+    load: (link) => tickerRead(link),
+    body: (t, P, link) => {
+      const ep = (t || {}).entry_plan || {}, r = ep.recommended || {};
+      if (!ep.headline && !ep.reason) return html`<p class="ws-note">No entry reading for ${link} right now.</p><p><a class="textlink" href="#/${enc(link)}/options">Build a position ${icon('arrow')}</a></p>`;
+      return html`<p class="ws-read"><b>${clean(ep.headline || 'No entry right now.')}</b> ${ep.actionable ? '' : clean(ep.reason || '')}</p>
+        ${ep.actionable && isNum(r.strike) ? html`<dl class="ws-kv"><div><dt>Example contract</dt><dd>${num(r.strike, 0)} ${ep.direction === 'short' ? 'put' : 'call'}, ${shortDate(r.expiry)}</dd></div><div><dt>Cost at the mid</dt><dd>${isNum(r.capital_per_contract) ? money(r.capital_per_contract, 0) : 'n/a'}</dd></div><div><dt>Breakeven</dt><dd>${num(r.breakeven)}</dd></div></dl>` : ''}
+        <p><a class="textlink" href="#/${enc(link)}/options">Build a position ${icon('arrow')}</a></p>`;
+    },
+    foot: (t) => ({ source: 'Optic entry rules on the Yahoo Finance option chain', at: (t || {}).generated_at }),
+    milo: (link) => `How could a view on ${link} be expressed, and what does each way risk?`,
+  },
+  oflow: {
+    title: 'Flow', span: 4, linked: true, presetOnly: true,
+    how: 'The linked ticker\'s options activity today from the delayed chain: calls traded per 100 puts, the put to call open interest, and the most active contracts. Nobody\'s side is known: a contract traded counts whether it was bought or sold.',
+    load: (link) => tickerRead(link),
+    body: (t, P, link) => {
+      const f = (t || {}).flow || {}, v = f.volume || {}, oi = f.open_interest || {};
+      if (f.error || !f.stance) return html`<p class="ws-note">${clean(f.error || `No options activity for ${link} yet today.`)}</p>`;
+      return html`<p class="ws-read"><b>${capFirst(f.stance)}.</b></p><dl class="ws-kv"><div><dt>Calls per 100 puts traded</dt><dd>${isNum(v.calls) && v.puts ? num((v.calls / v.puts) * 100, 0) : 'n/a'}</dd></div><div><dt>Put to call open interest</dt><dd>${num(oi.put_call_ratio, 2)}</dd></div></dl>
+        <p><a class="textlink" href="#/${enc(link)}/options">${link} flow in full ${icon('arrow')}</a></p>`;
+    },
+    foot: (t) => ({ source: 'Yahoo Finance option chain, delayed', at: (t || {}).generated_at }),
+    milo: (link) => `What is the options activity in ${link} today saying, and what can it not tell me?`,
+  },
+  bookmix: {
+    title: 'Your book', span: 6, presetOnly: true,
+    how: 'Your Paper Desk book (kept in this browser) by value at each position\'s entry price, largest first, as a donut with every share written beside it. A linked brokerage\'s holdings are in Your portfolio instead.',
+    load: async () => {
+      const st = await get('/api/brokerage/status', { ttl: 60000 }).catch(() => null);
+      const linked = !!(st && st.available && (st.connections || []).some((c) => c.status !== 'disconnected'));
+      return { linked, book: TM.paperBook() };
+    },
+    body: (d) => (d.linked ? html`<p class="ws-note">Your linked brokerage's holdings are in Your portfolio. <a class="textlink" href="#/paper">Paper Desk ${icon('arrow')}</a></p>`
+      : html`${TM.holdingsDonut(d.book, { label: 'Your Paper Desk by value', note: 'At each position\'s entry price; the Paper Desk marks them to today\'s prices.' })}<p><a class="textlink" href="#/paper">Paper Desk ${icon('arrow')}</a></p>`),
+    foot: () => ({ source: 'Your Paper Desk, kept in this browser' }),
+    milo: 'Is my Paper Desk book concentrated in one name or one sector?',
+  },
+  plans: {
+    title: 'Positions and plans', span: 6, presetOnly: true,
+    how: 'The names you hold or follow beside the plan you wrote for each: whether a plan exists and what would change your mind. Positions come from your linked brokerage; names from your lists. Optic never writes a plan for you.',
+    load: async () => {
+      const names = new Set(store.allSymbols());
+      let held = [];
+      const st = await get('/api/brokerage/status', { ttl: 60000 }).catch(() => null);
+      if (st && st.available && (st.connections || []).some((c) => c.status !== 'disconnected')) {
+        const ov = await get('/api/brokerage/workspace/overview', { ttl: 60000 }).catch(() => null);
+        held = ((ov || {}).holdings || (ov || {}).positions || []).map((h) => String(h.symbol || '').toUpperCase()).filter(Boolean);
+      }
+      held.forEach((x) => names.add(x));
+      let theses = {};
+      if (store.signedIn()) theses = ((await get('/api/theses', { ttl: 30000 }).catch(() => null)) || {}).theses || {};
+      else { try { theses = JSON.parse(localStorage.getItem('optic.thesis.v1') || '{}') || {}; } catch (e) { theses = {}; } }
+      Object.keys(theses).forEach((x) => names.add(x));
+      return { rows: [...names].slice(0, 12).map((sym) => ({ sym, held: held.includes(sym), th: theses[sym] || null })) };
+    },
+    body: (d) => {
+      const rows = (d || {}).rows || [];
+      if (!rows.length) return html`<p class="ws-note">No positions or followed names yet. Follow a name or link a brokerage, then write a plan on its Overview.</p>`;
+      return html`<table class="ws-t"><caption class="sr">Your names and whether each has a plan</caption><thead><tr><th scope="col">Name</th><th scope="col">Held</th><th scope="col">Plan</th></tr></thead><tbody>
+        ${rows.map((r) => html`<tr><td><a class="tick" href="#/${enc(r.sym)}">${r.sym}</a></td><td>${r.held ? 'Yes' : 'No'}</td><td>${r.th ? (r.th.invalidation ? html`<span class="ws-rule">Changes if: ${clean(r.th.invalidation)}</span>` : 'Written') : html`<a class="textlink" href="#/${enc(r.sym)}">Write one</a>`}</td></tr>`)}</tbody></table>`;
+    },
+    foot: () => ({ source: 'Your lists, your linked brokerage (read-only) and your plans' }),
+    milo: 'Which of my positions has no plan, and which plan does the chart now argue against?',
+  },
+  listsetups: {
+    title: 'Setups on your lists', span: 6, presetOnly: true,
+    how: 'The swing setups Optic\'s scan finds on the names in your lists, on completed daily candles, at most 40 names. A setup is a pattern with stated rules, not a recommendation.',
+    load: async () => {
+      if (store.state.lists === null) await store.loadLists().catch(() => {});
+      const syms = store.allSymbols().slice(0, 40);
+      if (!syms.length) return { empty: true };
+      return get(`/api/setups?symbols=${enc(syms.join(','))}&timeframe=daily&status=recent`, { ttl: 300000, timeout: 90000 });
+    },
+    body: (d) => {
+      if ((d || {}).empty) return html`<p class="ws-note">Your lists are empty. Follow a few names to see their setups here.</p>`;
+      const rows = ((d || {}).rows || []).slice(0, 8);
+      if (!rows.length) return html`<p class="ws-note">No setup on your names' recent daily candles.</p>`;
+      return html`<ul class="ws-news">${rows.map((r) => html`<li><a href="#/${enc(r.symbol)}/chart"><b class="tick">${r.symbol}</b> <span class="${r.direction === 'bull' ? 'up' : 'down'}">${r.direction === 'bull' ? 'Bullish' : 'Bearish'}</span> ${r.label}</a><span class="ws-rule">${capFirst(String(r.status || ''))}</span></li>`)}</ul>`;
+    },
+    foot: (d) => ({ source: 'Optic setup scan on Yahoo Finance daily candles', at: (d || {}).generated_at }),
+    milo: 'Which setups on my lists are closest to triggering, and what ends each?',
+  },
   tearn: {
     title: 'Earnings', span: 6, linked: true,
     how: 'The linked ticker\'s next report, what its options price for it, and how it has moved after past reports. Two different figures, kept apart: the implied move is a price today; the report-day average is history.',
@@ -1115,7 +1248,7 @@ function paintAll() {
     ${miloPrompt(homeAsk())}
     ${showOnboard() ? onboard() : ''}
     ${showBar ? bar() : ''}
-    <div class="ws-grid ${EDIT ? 'is-editing' : 'is-locked'}">${shown.length ? shown.map((x, i) => html`${!EDIT && level === 'advanced' && i === shown.findIndex((y) => PANELS[y.id].linked) ? linkRow() : ''}${panelShell(x, i, shown.length)}`) : html`<p class="ws-note">Every panel is hidden. Use Add panel, or Reset.</p>`}</div>
+    <div class="ws-grid ${EDIT ? 'is-editing' : 'is-locked'}">${shown.length ? shown.map((x, i) => html`${!EDIT && (level === 'advanced' || TRADING.includes(S.preset)) && i === shown.findIndex((y) => PANELS[y.id].linked) ? linkRow() : ''}${panelShell(x, i, shown.length)}`) : html`<p class="ws-note">Every panel is hidden. Use Add panel, or Reset.</p>`}</div>
     ${moreList(leftOut(), { heading: 'More on Home', screen: 'home' })}</div>`);
   if (naming) { const box = root.querySelector('#ws-named-name'); if (box) { box.focus({ preventScroll: true }); try { box.setSelectionRange(caret[0], caret[1]); } catch (e) { /* not a text box */ } } }
   shown.forEach((x) => { if (DATA[x.id] !== undefined || ERR[x.id]) paintBody(x.id); if (!folded(x.id)) loadPanel(x.id, { quiet: DATA[x.id] !== undefined }); });
@@ -1128,6 +1261,7 @@ function paintStock() {
   const shown = shownPanels();
   draw(root, html`<div class="ws-page ws-stock" data-v2-level-now="${lvl()}">
     <header class="ws-pagehead page-lead"><h1 class="t-h2" tabindex="-1">${STOCK} panels</h1><p class="ws-sub"><a class="textlink" href="#/${encodeURIComponent(STOCK)}">${STOCK}'s stock page</a></p></header>
+    ${dossierTabs(STOCK, 'stockgrid')}
     ${bar()}
     <div class="ws-grid ${EDIT ? 'is-editing' : 'is-locked'}">${shown.map((x, i) => panelShell(x, i, shown.length))}</div></div>`);
   shown.forEach((x) => { if (DATA[x.id] !== undefined || ERR[x.id]) paintBody(x.id); if (!folded(x.id)) loadPanel(x.id, { quiet: DATA[x.id] !== undefined }); });
@@ -1720,6 +1854,14 @@ export async function render(main, route) {
   STOCK = route && route.view === 'stockgrid' && route.symbol ? route.symbol : null;
   HOME = STOCK ? { preset: S.preset, link: S.link, linkChosen: S.linkChosen } : null;
   if (STOCK) { S.preset = 'stock'; S.link = STOCK; Object.keys(DATA).forEach((k) => { if (PANELS[k] && PANELS[k].linked) DATA[k] = undefined; }); }
+  // a trading layout named in the address (the rail's Research labels, round three): that layout, on that ticker
+  const want = !STOCK && route && route.params ? route.params : {};
+  if (want.preset && TRADING.includes(want.preset)) {
+    S.preset = want.preset;
+    const sym = String(want.symbol || '').toUpperCase();
+    if (/^[A-Z0-9.^=-]{1,12}$/.test(sym) && sym !== S.link) { S.link = sym; S.linkChosen = true; Object.keys(DATA).forEach((k) => { if (PANELS[k] && PANELS[k].linked) DATA[k] = undefined; }); }
+    save();
+  }
   // the level, from this page's control, Settings, Milo or another tab: Home draws the new level's panels, and what
   // Show more opened closes again (it was opened past the old level)
   if (unLevel) unLevel();

@@ -28,6 +28,7 @@ import { toast } from '../ui/toast.js';
 import * as TR from '../core/track.js';
 import * as FIG from '../core/figures.js';
 import { fig } from '../ui/figure.js';
+import * as OPT from './chart-options.js';
 
 /* The classic marks, drawn to the rail's recipe: a 24-unit box, no fill, a 1.8 stroke, round caps. */
 export const WIDGETS = [
@@ -118,6 +119,7 @@ export function need(id) {
   if (id === 'stopcheck') runStop();
   if (id === 'pairs') { fetchInto(S, 'peers', `/api/pairs/${enc}/peers`, { ttl: 3600000, timeout: 45000 }, 'pairs'); runPair(); }
   if (id === 'backtest') runBacktest();
+  if (id === 'options') OPT.need(C.sym(), () => C.repaint('options'));
 }
 /** "Try again" on a widget that failed. */
 export function retry(id) {
@@ -334,9 +336,11 @@ const BODY = {
     }
     const atm = ((t.greeks || {}).atm_greeks || []).find((x) => x && x.call && isNum(x.call.iv));
     if (atm) rows.push([`ATM IV, ${num(atm.dte, 0)} days`, `${num(atm.call.iv * 100, 1)}%`]);
-    if (!rows.length) return html`${none('No option chain for this symbol.')}${more(`#/${sym}/options`, `Options for ${sym}`)}`;
+    // Round three (2026-11-23): Options inside Charting. The figures above stay as the widget's first lines; under them
+    // the Options tab's own five views (readings, chain, builder, gamma, flow) in the dock (chart-options.js)
+    if (!rows.length) return html`${none('No option chain figures in this symbol\'s snapshot.')}${OPT.body(sym, t, '')}`;
     const note = String((g.regime || {}).note || ''), cut = note.indexOf('. ');
-    return html`${kv(rows)}${note ? fine(clean(cut > 0 ? note.slice(0, cut + 1) : note)) : ''}${more(`#/${sym}/options`, `Options for ${sym}`)}`;
+    return html`${kv(rows)}${note ? fine(clean(cut > 0 ? note.slice(0, cut + 1) : note)) : ''}${OPT.body(sym, t, '')}`;
   },
 
   levels() {
@@ -679,11 +683,15 @@ export function rail(shown, horizontal) {
   const first = Math.max(0, IDS.findIndex((id) => shown.includes(id)));
   return html`<div class="chw-rail" role="toolbar" aria-label="Widgets" aria-orientation="${horizontal ? 'horizontal' : 'vertical'}">${WIDGETS.map((w, i) => html`<button type="button" class="chw-btn" data-chw="${w.id}" aria-pressed="${shown.includes(w.id)}" aria-label="${w.label}" title="${w.label}" tabindex="${i === first ? '0' : '-1'}">${mark(w)}<span class="chw-lab">${w.short || w.label}</span></button>`)}</div>`;
 }
-export function panel(id) {
+/** One widget in the dock. Round three (2026-11-23): the dock is an accordion, one widget open at a time, and a
+ *  widget the reader pins stays open beside the next one opened (`pinned`). */
+export function panel(id, pinned = false) {
   const w = byId(id);
   if (!w) return '';
-  return html`<section class="chw" id="chw-${id}" data-chw-panel="${id}" aria-labelledby="chw-${id}-h"><header class="chw-head"><h3 class="chw-t" id="chw-${id}-h">${mark(w)}<span>${w.label}</span></h3><button type="button" class="ch-tool chw-close" data-chw-close="${id}" aria-label="Close ${w.label}" title="Close">${icon('close')}</button></header><div class="chw-body" id="chw-${id}-b">${body(id)}</div></section>`;
+  return html`<section class="chw" id="chw-${id}" data-chw-panel="${id}" aria-labelledby="chw-${id}-h"><header class="chw-head"><h3 class="chw-t" id="chw-${id}-h">${mark(w)}<span>${w.label}</span></h3><span class="chw-acts"><button type="button" class="ch-tool chw-pin" data-chw-pin="${id}" aria-pressed="${!!pinned}" aria-label="Keep ${w.label} open" title="${pinned ? 'Pinned: stays open when another widget opens' : 'Pin: keep it open when another widget opens'}">${icon('pin')}</button><button type="button" class="ch-tool chw-close" data-chw-close="${id}" aria-label="Close ${w.label}" title="Close">${icon('close')}</button></span></header><div class="chw-body" id="chw-${id}-b">${body(id)}</div></section>`;
 }
+/** After a widget's body is drawn: anything that needs it on the page (the Options views' charts). */
+export function after(id, el) { if (id === 'options' && C) OPT.after(el, C.sym(), C.t()); }
 /** One widget's contents. A fault in one is kept to that one, not the column. */
 export function body(id) {
   try { return BODY[id] ? BODY[id]() : ''; } catch (e) { console.error(e); return none('This panel could not be drawn from the figures that arrived.'); }
@@ -714,6 +722,7 @@ export function onClick(e) {
   if ((b = t('[data-chw-watchadd]'))) { follow(b.dataset.chwWatchadd); return true; }
   if (t('[data-chw-btrun]')) { runBacktest(true); return true; }
   if ((b = t('[data-chw-pick]'))) { setPeer(b.dataset.chwPick); return true; }
+  if (t('[data-chw-optview],[data-chw-optside],[data-chw-opttpl]')) return OPT.onClick(e, C.sym(), () => C.repaint('options'));
   return false;
 }
 function follow(s) {

@@ -23,6 +23,8 @@ export const GROUPS = [
     { view: 'earnings', label: 'Earnings', slug: 'earnings', v2: true },
     { view: 'financials', label: 'Financials', slug: 'financials', v2: true },
     { view: 'news', label: 'News', slug: 'news', v2: true },
+    // the company grid (Home's panels on this company, Pass 2's #/SYM/workspace) as its own tab (round three, 2026-11-23)
+    { view: 'stockgrid', label: 'Panels', slug: 'workspace', v2: true },
   ] },
   { id: 'analyse', label: 'Compare', icon: 'compare', pages: [{ view: 'compare', label: 'Compare', slug: 'compare', v2: true }] },
   { id: 'market', label: 'Markets', icon: 'markets', pages: [
@@ -116,8 +118,10 @@ export function visibleGroups({ admin, brokerage }) {
 export const RESEARCH = [
   { label: 'Company Overview', view: 'overview', icon: 'grid' },
   { label: 'Financials & Valuation', view: 'financials', icon: 'layers' },
-  { label: 'Charts & Technicals', view: 'chart', icon: 'research' },
-  { label: 'Options & Derivatives', view: 'swing', icon: 'optionsCurve' },
+  // round three (2026-11-23): these two open their trading layouts on Home's panel grid (pages/workspace.js TRADING),
+  // on the company open on this visit; the Chart and Options tabs stay one press away on the company's tabs
+  { label: 'Charts & Technicals', view: 'chart', preset: 'technicals', icon: 'research' },
+  { label: 'Options & Derivatives', view: 'swing', preset: 'derivatives', icon: 'optionsCurve' },
   { label: 'Filings & Ownership', view: 'insiders', icon: 'filing', filter: true },
 ];
 export const LISTS = [
@@ -133,6 +137,7 @@ export const RAIL_MORE = [
 ];
 /** Where a Research entry goes for this symbol (or the company search when none is open). */
 export function researchHref(entry, symbol) {
+  if (entry.preset) return `#/?preset=${entry.preset}${symbol ? `&symbol=${encodeURIComponent(symbol)}` : ''}`;
   if (entry.filter) return symbol ? `#/insiders?symbol=${encodeURIComponent(symbol)}` : '#/insiders';
   return symbol ? hrefFor(entry.view, symbol) : '#/dossier';
 }
