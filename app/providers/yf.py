@@ -60,7 +60,13 @@ def _persist_timezones(data_dir: Optional[str]) -> Optional[str]:
     return path
 
 
-_persist_timezones(os.environ.get("TRACKER_DATA_DIR"))
+_TZ_DIR = _persist_timezones(os.environ.get("TRACKER_DATA_DIR"))
+
+# yfinance's own caches hold one SQLite connection per thread for the thread's life (four open files per thread);
+# app/providers/yf_caches.py holds the same answers with one connection per write. The timezones stay on the volume
+# when TRACKER_DATA_DIR is set, as _persist_timezones intended (2026-11-23, memory and open files at rest).
+from . import yf_caches  # noqa: E402
+yf_caches.install(_TZ_DIR)
 
 
 def _remember_timezone(symbol: str, doc: Optional[Dict[str, Any]]) -> None:

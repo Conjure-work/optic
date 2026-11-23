@@ -3,7 +3,8 @@
 # - suite: the Python tests and the browser journeys (tests/e2e) on macOS, because about a thousand of the tests run
 #   the front end's modules in JavaScriptCore, which macOS has and Linux does not (they skip without it). Outbound
 #   HTTP is pinned to a closed local port, so no test can reach a real provider; Anthropic is a recording stub.
-#   The count it ran is written to the run's summary, and the run fails below the floor this pass closed with.
+#   Since 2026-11-23 it runs as seven parallel shards (tests/support/shards.py), each with its own floor.
+# - count: adds the shards' counts together, writes them to the run's summary, and fails below SUITE_FLOOR.
 # - image: builds the Dockerfile, as a deploy does.
 # - secrets: gitleaks over the full history, with .gitleaks.toml's allowlist (storage key names, test fixtures).
 name: tests
@@ -22,16 +23,27 @@ concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # the suite's floor: the sum of the shards' floors in tests/support/shards.py (SHARD_FLOORS), checked by
+  # tests/test_ci_shards.py. Lower it only with a reason in the pull request.
+  SUITE_FLOOR: "9210"
+
 jobs:
+  # The suite in parallel shards (2026-11-23): as one job it took about 33 minutes on a fast Mac and timed out at 40
+  # on GitHub's shared macOS runner. `py` is every Python file (about five minutes); the browser journeys are dealt
+  # round-robin into six slices so the slowest file is shared out. Which test runs where: tests/support/shards.py.
   suite:
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [py, e2e-1, e2e-2, e2e-3, e2e-4, e2e-5, e2e-6]
     env:
-      # the floor: what Pass 1 closed with. Lower it only with a reason in the pull request.
-      MIN_PASSED: "8994"
       # Optic's dates are market dates in New York; the suite was written and is run there (a UTC runner after 7 pm
       # New York time put "in 12 days" a day out in tests/test_v2_parity_b6a.py)
       TZ: America/New_York
+      SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -51,31 +63,34 @@ jobs:
         run: |
           export HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 http_proxy=http://127.0.0.1:9 https_proxy=http://127.0.0.1:9
           export NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost
-          python -m pytest -q -p no:cacheprovider --junitxml=junit.xml
+          python -m pytest -q -p no:cacheprovider --junitxml=junit-$SHARD.xml $(python -m tests.support.shards $SHARD)
       - name: Count
         if: always()
-        run: |
-          python - <<'PY'
-          import os, xml.etree.ElementTree as ET
-          root = ET.parse("junit.xml").getroot()
-          suites = [root] if root.tag == "testsuite" else list(root)
-          total = sum(int(s.get("tests", 0)) for s in suites)
-          failed = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
-          skipped = sum(int(s.get("skipped", 0)) for s in suites)
-          passed = total - failed - skipped
-          line = f"Tests: {passed} passed, {failed} failed, {skipped} skipped, {total} in all"
-          print(line)
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
-              f.write(f"### {line}\n\nFloor: {os.environ['MIN_PASSED']} passed.\n")
-          floor = int(os.environ["MIN_PASSED"])
-          if passed < floor:
-              raise SystemExit(f"{passed} passed is below the floor of {floor}")
-          PY
+        run: python -m tests.support.ci_count shard $SHARD junit-$SHARD.xml
       - uses: actions/upload-artifact@v5
         if: always()
         with:
-          name: junit
-          path: junit.xml
+          name: junit-${{ matrix.shard }}
+          path: junit-${{ matrix.shard }}.xml
+
+  # The shards added together: the run fails unless every shard ran, nothing failed, and the total passed is at least
+  # SUITE_FLOOR. The summary shows each shard's line and the total.
+  count:
+    needs: suite
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: junit-*
+          merge-multiple: true
+      - name: Total
+        run: python -m tests.support.ci_count total .
 
   image:
     runs-on: ubuntu-latest

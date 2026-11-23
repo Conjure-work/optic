@@ -15,15 +15,19 @@ clear message instead of failing, and the rest of the terminal is unaffected.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
+import hashlib
 import json
 import math
 import os
 import re
 import threading
 import time
+import weakref
 import zlib
+from collections import OrderedDict
 from datetime import date, datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
@@ -985,11 +989,70 @@ not invent price targets: "growth at this rate is not what the multiple is price
 "I would not trust this rally" is their call to make."""
 
 
+# One client per configuration, shared (2026-11-23, memory and open files at rest). A client owns an HTTP connection
+# pool; one was built for every chat, every /api/health read (`_assistant_status`) and every brief, and none was ever
+# closed, so each left its pool to the garbage collector. The async client is kept per event loop (an httpx pool is
+# bound to the loop it was opened on, and the suite runs many loops); the sync one per configuration. The key holds a
+# digest of the credential variables, never their values, so a changed key or base address gets a new client.
+_SHARED_LOCK = threading.Lock()
+_SHARED_MAX = 8
+_SHARED_SYNC: "OrderedDict[Tuple[Any, ...], Any]" = OrderedDict()
+_SHARED_ASYNC: "weakref.WeakKeyDictionary[Any, OrderedDict]" = weakref.WeakKeyDictionary()
+_CREDENTIAL_VARIABLES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_WORKSPACE_ID")
+
+
+def _shared_key(cls: Any, kwargs: Dict[str, Any]) -> Tuple[Any, ...]:
+    digest = hashlib.sha256("\x00".join(os.environ.get(k) or "" for k in _CREDENTIAL_VARIABLES).encode()).hexdigest()
+    # the class itself, not its id: a test that patches the class and lets it go must not hand its id to the next one
+    return (cls, digest, repr(sorted(kwargs.items())))
+
+
+def _shared(cls: Any, kwargs: Dict[str, Any], bucket: "OrderedDict[Tuple[Any, ...], Any]") -> Any:
+    key = _shared_key(cls, kwargs)
+    with _SHARED_LOCK:
+        hit = bucket.get(key)
+        if hit is not None:
+            bucket.move_to_end(key)
+            return hit
+        made = cls(**kwargs)
+        bucket[key] = made
+        # Past eight configurations the oldest is dropped, not closed: another thread may be mid-call on it, and the
+        # SDK closes a client's pool when the last reference goes
+        while len(bucket) > _SHARED_MAX:
+            bucket.popitem(last=False)
+        return made
+
+
+def _sync_client(**kwargs: Any) -> Any:
+    """The shared synchronous Anthropic client for these settings (max_retries, timeout, default_headers)."""
+    from anthropic import Anthropic
+    return _shared(Anthropic, kwargs, _SHARED_SYNC)
+
+
+def shared_clients() -> Dict[str, int]:
+    """How many shared clients exist, for the memory test and the runbook."""
+    with _SHARED_LOCK:
+        return {"sync": len(_SHARED_SYNC), "async": sum(len(b) for b in list(_SHARED_ASYNC.values()))}
+
+
+def close_shared_clients() -> None:
+    """Close the shared synchronous clients on shutdown (the async ones close with their loop)."""
+    with _SHARED_LOCK:
+        clients = list(_SHARED_SYNC.values())
+        _SHARED_SYNC.clear()
+    for c in clients:
+        try:
+            c.close()
+        except Exception:                                       # noqa: BLE001 - shutting down
+            pass
+
+
 def _client():
     """Return an AsyncAnthropic client, or None if no credentials are available.
 
     The SDK resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or an `ant auth
     login` profile on its own, so we construct it bare and let it decide.
+    Inside an event loop the client is shared for that loop (see _SHARED_ASYNC).
     """
     try:
         from anthropic import AsyncAnthropic
@@ -1022,7 +1085,16 @@ def _client():
         workspace = (os.environ.get("ANTHROPIC_WORKSPACE_ID") or "").strip()
         if workspace:
             kwargs["default_headers"] = {"anthropic-workspace-id": workspace}
-        return AsyncAnthropic(**kwargs)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return AsyncAnthropic(**kwargs)                     # outside a loop: nothing to share it with
+        with _SHARED_LOCK:
+            bucket = _SHARED_ASYNC.get(loop)
+            if bucket is None:
+                bucket = OrderedDict()
+                _SHARED_ASYNC[loop] = bucket
+        return _shared(AsyncAnthropic, kwargs, bucket)
     except Exception:
         return None
 
@@ -1282,7 +1354,7 @@ def key_usable() -> bool:
         workspace = (os.environ.get("ANTHROPIC_WORKSPACE_ID") or "").strip()
         if workspace:
             kwargs["default_headers"] = {"anthropic-workspace-id": workspace}
-        Anthropic(**kwargs).models.list(limit=1)
+        _sync_client(**kwargs).models.list(limit=1)
         usable = True
     except Exception as exc:                                    # noqa: BLE001
         # 400 is the unscoped personal key, 401 a bad or expired one, 403 one
@@ -2291,7 +2363,7 @@ def write_portfolio_brief(facts: Dict[str, Any], level: Optional[str] = None) ->
     if status.get("enabled") is not True:
         return {"available": False, "reason": "The assistant is not switched on here."}
     try:
-        client = Anthropic(max_retries=2)
+        client = _sync_client(max_retries=2)
         msg = _ask(client, "portfolio_brief", model=PULSE_MODEL, max_tokens=PORTFOLIO_BRIEF_MAX_TOKENS,
                    system=[{"type": "text", "text": PORTFOLIO_BRIEF_PROMPT},
                            {"type": "text", "text": knowledge.prompt_for(level)}],
@@ -2406,7 +2478,7 @@ def _write_earnings_brief(ticker: str, facts: Dict[str, Any], key: str) -> Optio
         return {"available": False, "reason": refused, "refused": "daily_ceiling"}
 
     try:
-        client = Anthropic(max_retries=3)
+        client = _sync_client(max_retries=3)
     except Exception as exc:
         log.warning("earnings brief skipped: client construction failed: %s: %s",
                     type(exc).__name__, exc)
@@ -2576,7 +2648,7 @@ def _write_sector_read(symbol: str, facts: Dict[str, Any]) -> Optional[Dict[str,
     if refused:
         return {"available": False, "reason": refused, "refused": "daily_ceiling"}
     try:
-        client = Anthropic(max_retries=3)
+        client = _sync_client(max_retries=3)
     except Exception as exc:
         log.warning("sector read skipped: client construction failed: %s", exc)
         return {"available": False, "reason": _human_error(exc)}
@@ -2722,7 +2794,7 @@ def write_weekly_update(week_key: str, facts: Dict[str, Any],
         log.warning("weekly update skipped: assistant not enabled")
         return None
     try:
-        client = Anthropic(max_retries=3)
+        client = _sync_client(max_retries=3)
     except Exception as exc:
         log.warning("weekly update skipped: client construction failed: %s", exc)
         return {"available": False, "reason": _human_error(exc)}
@@ -2933,7 +3005,7 @@ def extract_catalysts(stories: List[Dict[str, Any]],
         log.warning("catalyst extraction skipped: assistant not enabled")
         return None
     try:
-        client = Anthropic(max_retries=3)
+        client = _sync_client(max_retries=3)
     except Exception as exc:
         log.warning("catalyst extraction skipped: client construction failed: %s", exc)
         return {"available": False, "reason": _human_error(exc)}
@@ -3045,7 +3117,7 @@ def _write_catalyst_read(key: str, facts: Dict[str, Any]) -> Optional[Dict[str, 
     if refused:
         return {"available": False, "reason": refused, "refused": "daily_ceiling"}
     try:
-        client = Anthropic(max_retries=3)
+        client = _sync_client(max_retries=3)
     except Exception as exc:
         log.warning("catalyst read skipped: client construction failed: %s", exc)
         return None
@@ -3313,7 +3385,7 @@ def write_edition(outline: Dict[str, Any], evidence: List[Dict[str, Any]],
                                                  "whole edition as JSON:\n- " + "\n- ".join(errors[:40])}]
     t0 = time.time()
     try:
-        client = Anthropic(max_retries=2)
+        client = _sync_client(max_retries=2)
         msg = _ask(client, "edition", model=MODEL, max_tokens=EDITION_MAX_TOKENS,
                    system=[{"type": "text", "text": system}], messages=messages)
     except Exception as exc:                                    # noqa: BLE001
@@ -3373,7 +3445,7 @@ def write_morning_desk(facts: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                     status.get("credential_source"))
         return None
     try:
-        client = Anthropic(max_retries=3)
+        client = _sync_client(max_retries=3)
     except Exception as exc:                                    # noqa: BLE001
         log.warning("morning desk prose skipped: client construction failed: %s: %s",
                     type(exc).__name__, exc)
@@ -3460,7 +3532,7 @@ def write_morning_read(facts: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        client = Anthropic(max_retries=3)
+        client = _sync_client(max_retries=3)
     except Exception as exc:
         log.warning("morning note skipped: client construction failed: %s: %s",
                     type(exc).__name__, exc)
@@ -3554,7 +3626,7 @@ def read_scan_request(text: str, vocabulary: Dict[str, Any]) -> Optional[Dict[st
     if available().get("enabled") is not True:
         return {"available": False, "reason": "The assistant is not configured here."}
     try:
-        client = Anthropic(max_retries=2)
+        client = _sync_client(max_retries=2)
     except Exception as exc:                                    # noqa: BLE001
         return {"available": False, "reason": _human_error(exc)}
     try:

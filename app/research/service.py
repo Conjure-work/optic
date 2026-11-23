@@ -26,6 +26,7 @@ import pandas as pd
 from . import METHOD_VERSION, earnings_view, forecasts, policy as policy_mod, quality, swing_setup
 from .. import delays
 from .. import session as session_mod
+from ..boundcache import BoundedCache
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -36,7 +37,8 @@ ET = ZoneInfo("America/New_York")
 # (NVDA, 2026-10-14). Milo's hook has its own, shorter limit in main.py.
 FETCH_BUDGET_SECONDS = 45.0
 CACHE_TTL = 600.0
-_CACHE: Dict[str, Any] = {}
+# Bounded (2026-11-23): at most 256 research packs, none past CACHE_TTL
+_CACHE: Dict[str, Any] = BoundedCache(maxsize=256, max_age=CACHE_TTL)
 _LOCK = threading.Lock()
 
 # The sector ETF each Yahoo sector is measured against for relative strength.

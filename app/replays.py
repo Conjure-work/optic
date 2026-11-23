@@ -33,6 +33,7 @@ import pandas as pd
 from . import session as session_mod
 from . import shortlist as shortlist_mod
 from .analytics import setups as setups_mod
+from .boundcache import BoundedCache
 
 VERSION = "replays-2026-10-22.1"
 LEAD = 20          # sessions revealed before the decision
@@ -60,9 +61,10 @@ LIBRARY: List[Dict[str, Any]] = [
      "question": "The rule flagged the RSI recovering from oversold. Would you take it, and where would you be wrong?", "start_hint": "February 2023"},
 ]
 
-_CACHE: Dict[str, Any] = {}
 _LOCK = threading.Lock()
 _TTL = 6 * 3600.0
+# Bounded (2026-11-23): each entry is a full-history price frame, so at most 16 symbols are kept, none past the TTL
+_CACHE: Dict[str, Any] = BoundedCache(maxsize=16, max_age=_TTL)
 
 
 def entry(rid: str) -> Optional[Dict[str, Any]]:

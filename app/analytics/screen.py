@@ -31,6 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import numpy as np
 import pandas as pd
+from ..boundcache import BoundedCache
 
 # Symbols per batched download. 150 comes out around 4 seconds; much larger and
 # Yahoo starts truncating the response, which shows up as symbols silently
@@ -296,7 +297,8 @@ def _rank(provider, symbols: Sequence[str], min_price: float, min_dollar_volume:
 # scheduled one reuses the ranking instead of re-earning a throttle.
 CACHE_TTL_SECONDS = float(os.environ.get("SCREEN_CACHE_MINUTES", "90")) * 60.0
 
-_CACHE: Dict[str, Any] = {}
+# Bounded (2026-11-23): one ranking per file, at most 8, none past the TTL
+_CACHE: Dict[str, Any] = BoundedCache(maxsize=8, max_age=CACHE_TTL_SECONDS)
 _CACHE_LOCK = threading.RLock()
 
 # One build of a ranking file at a time. The tracker's scheduled scan and a

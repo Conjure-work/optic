@@ -4654,6 +4654,8 @@ async def _stop_tracker() -> None:
         task = getattr(app.state, name, None)
         if task:
             task.cancel()
+    # the shared Anthropic clients' connection pools (app/ai.py, 2026-11-23)
+    ai.close_shared_clients()
 
 
 # --------------------------------------------------- naming a ticker in chat
