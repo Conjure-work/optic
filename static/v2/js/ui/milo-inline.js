@@ -52,6 +52,11 @@ export const OFFERS = {
   accounts: 'Summarise the sign-ups on this page',
   metrics: 'Explain the figures on this Metrics page',
   notfound: 'Help me find the company I was looking for',
+  // the screens round three added beside this module (Investor mode)
+  portfolio: 'Explain how diversified my books are',
+  calendar: "Explain what this week's calendar holds for the market",
+  ownerreport: 'Explain the signals on this owner report',
+  welcome: 'Explain what each level changes in Optic',
 };
 const DEFAULT_OFFER = 'Explain what is on this page';
 

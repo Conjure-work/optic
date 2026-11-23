@@ -940,7 +940,7 @@ _RESEARCH_VIEWS = ("home", "overview", "swing", "long", "earnings", "financials"
                    "roth", "brokerage", "watchlist", "alerts", "earningsweek", "dossierstart", "stockgrid", "sheet",
                    "investigate", "saved", "portfolio", "calendar", "welcome")
 _PLAIN_VIEWS = ("settings", "signin", "terms", "privacy", "reports", "usage", "accounts", "metrics", "notfound",
-                "owner-report")
+                "ownerreport")
 SCREEN_TOOLS: Dict[str, Tuple[str, ...]] = {
     **{v: MARKET_TOOLS + PERSONAL_TOOLS for v in _RESEARCH_VIEWS},
     **{v: GENERAL_TOOLS + ("get_my_watchlists",) for v in _PLAIN_VIEWS},

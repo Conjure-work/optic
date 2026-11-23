@@ -39,8 +39,12 @@ def _signed_in(chrome, server, viewport=DESKTOP, **kw):
     return open_page(chrome, server, level="advanced", viewport=viewport, cookies=jar, **kw)
 
 
+# Walked signed in, not as a guest: the level questions send a guest to sign in first (pages/levelquiz.js)
+SIGNED_IN_ONLY = {"welcome"}
+
+
 def test_every_route_has_milo_docked_with_an_offer_naming_its_screen(chrome, server):
-    views = route_views()
+    views = [v for v in route_views() if v not in SIGNED_IN_ONLY]
     assert len(views) > 30
     # as a guest, so the sign-in page is a page (a signed-in reader is sent from it to Home)
     ctx, page = open_page(chrome, server, level="advanced", viewport=DESKTOP)
@@ -74,10 +78,27 @@ def test_every_route_has_milo_docked_with_an_offer_naming_its_screen(chrome, ser
                        label: s.getAttribute('aria-label'), inMain: !!document.querySelector('#main [data-v2-milo-strip]') }; }""")
             seen[view] = got["offer"]
             assert got["offer"] and got["offer"] == got["want"], (view, got)
+            # every screen names itself: the generic sentence is only for a page added without one (round three's
+            # Portfolio and Calendar shipped on it once, found on the evaluation copy 2026-11-23)
+            assert got["offer"] != "Explain what is on this page", (view, got)
             assert got["toggle"] in ("true", "false") and got["label"] == "Milo on this screen" and not got["inMain"], view
         # each company screen names its company; the account and legal screens name what they are
         assert "AAPL" in seen["financials"] and "Financials" in seen["financials"]
         assert seen["settings"].startswith("Explain what each of these settings")
+        assert not page.errors, page.errors[:3]
+    finally:
+        ctx.close()
+
+
+def test_the_signed_in_only_screens_have_milo_docked_with_their_own_offer(chrome, server):
+    ctx, page = _signed_in(chrome, server)
+    try:
+        for view in sorted(SIGNED_IN_ONLY):
+            page.goto(server["base"] + "/#/" + view, wait_until="domcontentloaded")
+            page.wait_for_function("v => { const s = document.querySelector('[data-v2-milo-strip]'); return s && s.dataset.v2MiloScreen === v; }",
+                                   arg=view, timeout=30000)
+            offer = page.inner_text("[data-v2-milo-strip] [data-v2-milo-offer-text]").strip()
+            assert offer and offer != "Explain what is on this page", (view, offer)
         assert not page.errors, page.errors[:3]
     finally:
         ctx.close()
