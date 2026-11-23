@@ -660,7 +660,8 @@ def set_preferences(user_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
 # them (chart intervals, Milo's stance, the sign-up questions, the reader's alert digest) cannot store something no
 # page can read. Unknown or malformed values are dropped, never stored.
 
-STANCES = ("neutral", "longterm", "stoic", "quant")
+# Milo has five personas in app/ai.py (the plan said four; the skeptic is the fifth), so five stances
+STANCES = ("neutral", "longterm", "stoic", "quant", "skeptic")
 _INTERVAL = re.compile(r"^[0-9]{1,3}(m|h|d|wk|mo)$")
 _QUIZ_OUTCOMES = ("accepted", "skipped", None)
 

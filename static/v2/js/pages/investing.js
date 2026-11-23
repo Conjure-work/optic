@@ -18,6 +18,7 @@ import { nyDate, weekMonday } from '../ui/studies.js';
 import { icon } from '../ui/icons.js';
 import { skeleton, empty, failed } from '../ui/states.js';
 import { button as miloButton, provideContext } from '../ui/milo.js';
+import { watchInView } from '../ui/inview.js';
 import { toast } from '../ui/toast.js';
 import { core, header, tabs, isFund, livePrice } from './dossier-frame.js';
 import * as VS from './valuation-scenarios.js';
@@ -28,6 +29,7 @@ import { fig } from '../ui/figure.js';
 import { mountDcf, disposeDcf, dcfContext } from './dcf.js';
 import { scoreLine, tone100, toneBand } from '../ui/score.js';
 import { convictionPhrase } from '../core/research-words.js';
+let seen = null;  // what the reader is looking at, for Milo (ui/inview.js; round three, as Financials does)
 let lp = null;   // the header's price refresh (dossier-frame livePrice), stopped in dispose()
 
 const RANGES = { '1Y': 52, '3Y': 156, '5Y': 260, '10Y': 520, All: Infinity };
@@ -78,7 +80,7 @@ function trend(sym) {
   const st = ((D.fv || {}).stars) || {}, vh = h.valuation_history || {};
   const conv = (((D.fw || {}).long_term) || {}).conviction || {};
   const clash = s !== null && s >= 60 && ((st.available && st.stars <= 2) || (vh.available && vh.percentile >= 80));
-  return html`<section class="section" aria-labelledby="lt-h">
+  return html`<section class="section" data-v2-metric="" aria-labelledby="lt-h">
     <div class="section-head"><div><h2 class="t-h2" id="lt-h">Long-term trend score, from price history</h2><p class="section-sub">${scoreScope(h, kindOf(sym, D) === 'fund' ? 'fund' : 'stock')}</p></div>${ask(sym, 'Ask Milo about this score', `What is ${sym}'s long-term trend score built from, and what does it leave out?`)}</div>
     <div class="figure"><p class="t-display-m ${tone}">${s === null ? 'n/a' : num(s, 0)} <small class="t-muted">of 100</small></p>${scoreLine(s, { tone })}<p class="delta"><span>${capFirst(h.conviction || '')} on the trend model, the same score the Overview shows as its long-term reading</span><span class="t-muted">${capFirst((h.long_trend || {}).phase || '')}</span></p></div>
     <p><b>The model's reading:</b> ${clean(h.plan || '')}</p>${TR.historySlot('long_term')}
@@ -93,7 +95,7 @@ function trend(sym) {
 function returnsRisk() {
   const h = (D.lt || {}).holding; if (!h) return '';
   const hz = h.horizons || {}, r = h.risk || {};
-  return html`<section class="section" aria-labelledby="rr-h"><h2 class="t-h2" id="rr-h">Return and risk</h2>
+  return html`<section class="section" data-v2-metric="" aria-labelledby="rr-h"><h2 class="t-h2" id="rr-h">Return and risk</h2>
     ${kv([['1 year', html`<span class="${dir(hz.return_1y_pct)}">${signed(hz.return_1y_pct, 1)}</span>`], ['3 years, a year', signed(hz.cagr_3y_pct, 1)], ['5 years, a year', signed(hz.cagr_5y_pct, 1)], ['Against the S&P 500, 5 years', html`${signed(h.excess_cagr_5y_pct, 1)} a year <span class="t-muted">(index ${signed(h.benchmark_cagr_5y_pct, 1)})</span>`]], 4)}
     ${kv([['Volatility, a year', pct(r.annualised_vol_pct)], ['Downside volatility', pct(r.downside_vol_pct)], ['Return per unit of risk', num(r.sharpe_proxy, 2)], ['Downside-adjusted', num(r.sortino_proxy, 2)], ['Beta to the S&P 500', num(r.beta_vs_spy, 2)], ['Correlation', num(r.correlation_vs_spy, 2)], ['Best day', signed(r.best_day_pct)], ['Worst day', signed(r.worst_day_pct)], ['Up days', pct(r.pct_positive_days)]], 3)}
   </section>`;
@@ -103,7 +105,7 @@ function weekly(sym) {
   const h = (D.lt || {}).holding; if (!h) return '';
   const lt = h.long_trend || {}, range = ltRange(), iv = ltIv(), style = ltStyle(), unit = iv === 'monthly' ? 'month' : 'week';
   const lv = [['fib', 'Retracements'], ['sr', 'Support and resistance'], ['vol', 'Volume']], n = lv.filter(([k]) => lvlOn(k)).length;
-  return html`<section class="section" aria-labelledby="ws-h"><div class="section-head"><div><h2 class="t-h2" id="ws-h">Weekly structure</h2><p class="section-sub">${clean(lt.guidance || '')} The 40-${unit} and 200-${unit} averages are the lines that separate secular bull phases from bear ones.</p></div></div>
+  return html`<section class="section" data-v2-metric="" aria-labelledby="ws-h"><div class="section-head"><div><h2 class="t-h2" id="ws-h">Weekly structure</h2><p class="section-sub">${clean(lt.guidance || '')} The 40-${unit} and 200-${unit} averages are the lines that separate secular bull phases from bear ones.</p></div></div>
     <div class="ctools lt-tools" role="toolbar" aria-label="Weekly structure settings">
       <div class="seg" role="group" aria-label="Interval">${[['weekly', 'Weekly'], ['monthly', 'Monthly']].map(([k, l]) => html`<button type="button" data-v2-lt-iv="${k}" aria-pressed="${iv === k}">${l}</button>`)}</div>
       <div class="seg" role="group" aria-label="Range">${Object.keys(RANGES).map((k) => html`<button type="button" data-v2-lt-range="${k}" aria-pressed="${range === k}">${k}</button>`)}</div>
@@ -201,7 +203,7 @@ function ltLegend() {
 function drawdown() {
   const h = (D.lt || {}).holding; if (!h || !h.drawdown) return '';
   const dd = h.drawdown;
-  return html`<section class="section" aria-labelledby="dd-h"><h2 class="t-h2" id="dd-h">Drawdown, daily</h2>
+  return html`<section class="section" data-v2-metric="" aria-labelledby="dd-h"><h2 class="t-h2" id="dd-h">Drawdown, daily</h2>
     ${kv([['From the high now', signed(dd.current_drawdown_pct, 1)], ['Largest drawdown', html`${signed(dd.max_drawdown_pct, 1)} <span class="t-muted">${fullDate(dd.max_drawdown_date)}</span>`], ['All-time high', html`${num(dd.all_time_high)} <span class="t-muted">${fullDate(dd.ath_date)}</span>`]], 3)}
     <div class="chart-slot" data-chart="dd"></div></section>`;
 }
@@ -214,7 +216,7 @@ function ddMaker() {
 function multiple(sym) {
   const pe = D.pe, h = (D.lt || {}).holding || {}, vh = h.valuation_history || {}, rm = h.revenue_multiple || {};
   if (pe === undefined) return html`<section class="section">${skeleton('lines', 3, 'Loading the multiple history')}</section>`;
-  return html`<section class="section" aria-labelledby="pe-h"><div class="section-head"><div><h2 class="t-h2" id="pe-h">The multiple against its own history</h2><p class="section-sub">${pe && pe.available ? `${num(pe.weeks / 52, 0)} years of weekly trailing P/E from the company's filings.` : 'No P/E history for this company.'}</p></div>${ask(sym, 'Ask Milo about the multiple', `Is ${sym}'s P/E high against its own history, and why might that be?`)}</div>
+  return html`<section class="section" data-v2-metric="" aria-labelledby="pe-h"><div class="section-head"><div><h2 class="t-h2" id="pe-h">The multiple against its own history</h2><p class="section-sub">${pe && pe.available ? `${num(pe.weeks / 52, 0)} years of weekly trailing P/E from the company's filings.` : 'No P/E history for this company.'}</p></div>${ask(sym, 'Ask Milo about the multiple', `Is ${sym}'s P/E high against its own history, and why might that be?`)}</div>
     ${pe && pe.available ? html`${kv([['Trailing P/E now', html`${num(pe.pe_current, 1)} <span class="t-muted">${ordinal(pe.pe_percentile)} percentile</span>`], ['Its own median, 5 years', html`${num(pe.pe_median, 1)} <span class="t-muted">quartiles ${num((pe.pe_bands || {})[25], 1)} to ${num((pe.pe_bands || {})[75], 1)}</span>`], ['Cross-check with the quote feed', (pe.anchor || {}).available ? `${num(pe.anchor.provider, 1)} (${pe.anchor.agrees ? 'agrees' : 'differs'})` : 'n/a']], 3)}
       <div class="chart-slot" data-chart="pe"></div><p class="legend-line"><span><i></i>Trailing P/E</span><span><i class="o1"></i>Median</span><span><i class="o3"></i>25th and 75th percentile</span></p>
       ${(pe.revenue_growth || []).length ? html`<details class="more-inline"><summary>Revenue growth, last 8 quarters</summary><div class="tscroll"><table class="t"><thead><tr><th>Quarter</th><th>Revenue</th><th>Growth, year on year</th></tr></thead><tbody>${pe.revenue_growth.slice(-8).map((r) => html`<tr><td>${r.label}</td><td>${compact(r.revenue)}</td><td>${signed(r.growth_pct)}</td></tr>`)}</tbody></table></div></details>` : ''}
@@ -238,7 +240,7 @@ function fairValue(sym) {
   if (!d) return '';
   const fv = d.fair_value || {}, st = d.stars || {}, an = d.analysts || {}, dv = d.dividend || {}, ms = d.morningstar || {};
   const price = (D.quote || {}).price || fv.price;
-  return html`<section class="section" aria-labelledby="fv-h"><div class="section-head"><div><h2 class="t-h2" id="fv-h">Fair value and stars</h2><p class="section-sub">${clean(st.note || '')}</p></div>${ask(sym, 'Ask Milo about fair value', `How should I read ${sym}'s fair value range and star rating?`)}</div>
+  return html`<section class="section" data-v2-metric="" aria-labelledby="fv-h"><div class="section-head"><div><h2 class="t-h2" id="fv-h">Fair value and stars</h2><p class="section-sub">${clean(st.note || '')}</p></div>${ask(sym, 'Ask Milo about fair value', `How should I read ${sym}'s fair value range and star rating?`)}</div>
     ${st.available ? html`<p class="stars">${raw(`<svg class="star-row" viewBox="0 0 120 22" aria-hidden="true">${[0, 1, 2, 3, 4].map((i) => `<path class="${i < st.stars ? 'on' : 'off'}" transform="translate(${i * 24} 0)" d="M11 1.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L11 16.4 5.1 19.5l1.2-6.5L1.5 8.4l6.6-.9z"/>`).join('')}</svg>`)}<span class="sr">${st.stars} of 5 stars.</span> <b>${clean(st.word)}</b></p><p class="asof">${clean(st.rule)}</p>` : html`<p><b>No star rating.</b> ${clean(st.reason || '')}</p>`}
     ${fv.available ? html`${!fv.wide ? raw(meter({ lo: fv.low, mid: fv.mid, hi: fv.high, price, w: 420, showMid: true })) : ''}
       ${kv([['Fair value range', `${num(fv.low)} to ${num(fv.high)}`], ['Middle', num(fv.mid)], ['Price now', html`${num(price)} <span class="t-muted">${isNum(fv.gap_to_mid_pct) ? signed(fv.gap_to_mid_pct, 1) + ' against the middle' : ''}</span>`]], 3)}
@@ -255,7 +257,7 @@ function fundValuation(sym) {
   const h = (D.lt || {}).holding; if (!h) return '';
   const v = h.valuation || {}, q = D.quote || {};
   const y = isNum(q.dividend_yield) ? q.dividend_yield * 100 : isNum(v.dividend_yield) ? v.dividend_yield * 100 : null;
-  return html`<section class="section" aria-labelledby="fvl-h"><div class="section-head"><div><h2 class="t-h2" id="fvl-h">What its holdings cost</h2><p class="section-sub">The fund's holdings, weighted by size. A fund has no fair value range, cash-flow model or P/E history of its own.</p></div></div>
+  return html`<section class="section" data-v2-metric="" aria-labelledby="fvl-h"><div class="section-head"><div><h2 class="t-h2" id="fvl-h">What its holdings cost</h2><p class="section-sub">The fund's holdings, weighted by size. A fund has no fair value range, cash-flow model or P/E history of its own.</p></div></div>
     ${kv([['P/E of the holdings, trailing', num(v.trailing_pe, 1)], ['Price to book', num(v.price_to_book, 2)], ['Distribution yield', isNum(y) ? `${num(y, 2)}%` : 'n/a']])}
     <p class="asof">${clean(v.caveat || '')} Source: Yahoo Finance's fund figures.</p></section>`;
 }
@@ -263,14 +265,14 @@ function fundValuation(sym) {
 function scenarios(sym) {
   if (D.vin === undefined) return html`<section class="section">${skeleton('lines', 3, 'Loading valuation inputs')}</section>`;
   if (!D.vin || !D.vin.available) return '';
-  return html`<section class="section" aria-labelledby="vs-h"><div class="section-head"><div><h2 class="t-h2" id="vs-h">Valuation scenarios</h2></div>${ask(sym, 'Ask Milo about these scenarios', `Do my ${sym} bear, base and bull assumptions look reasonable against its history?`)}</div>
+  return html`<section class="section" data-v2-metric="" aria-labelledby="vs-h"><div class="section-head"><div><h2 class="t-h2" id="vs-h">Valuation scenarios</h2></div>${ask(sym, 'Ask Milo about these scenarios', `Do my ${sym} bear, base and bull assumptions look reasonable against its history?`)}</div>
     ${VS.view(sym, D.vin, D.vsBody, D.vsStatus)}</section>`;
 }
 
 function accumulation() {
   const h = (D.lt || {}).holding; if (!h) return '';
   const z = h.accumulation_zones || [], va = h.valuation || {};
-  return html`<section class="section" aria-labelledby="ac-h"><h2 class="t-h2" id="ac-h">Valuation and long-term price levels</h2>
+  return html`<section class="section" data-v2-metric="" aria-labelledby="ac-h"><h2 class="t-h2" id="ac-h">Valuation and long-term price levels</h2>
     ${kv([['Forward P/E', FIG.ok((va.figures || {}).forward_pe) ? fig(va.figures.forward_pe, { sym: D.sym }) : 'n/a'], ['Trailing P/E', num(va.trailing_pe, 1)], ['Price to book', num(va.price_to_book, 1)], ['Dividend yield', isNum(va.dividend_yield) ? pct(va.dividend_yield * 100, 2) : 'n/a'], ['Analysts\' average target', num(((h.fundamentals || {}).analyst_target))]], 3)}
     <ul class="plain">${(va.notes || []).map((n) => html`<li>${clean(n)}</li>`)}</ul><p class="asof">${clean(va.caveat || '')}</p>
     ${z.length ? html`<div class="tscroll"><table class="t"><thead><tr><th>Level</th><th>Price</th><th>Distance</th><th>Role</th></tr></thead><tbody>${z.map((l) => html`<tr><td>${l.label}${l.is_golden ? ' (golden zone)' : ''}</td><td>${num(l.price)}</td><td>${signed(l.distance_pct)}</td><td>${capFirst(l.kind)}</td></tr>`)}</tbody></table></div>
@@ -307,7 +309,10 @@ export async function render(main, route) {
   document.title = `${sym} Investing, Optic`;
   if (lp) lp.stop();
   lp = livePrice(main, route.symbol, () => D, 'long', undefined);
-  provideContext(() => ({ view: 'long', ticker: sym, quote: FIG.quoteForMilo(D.quote), track_record: TR.context(), long_term: D.lt, fair_value: D.fv, valuation: dcfContext(), scenarios: D.vsBody }));
+  if (seen) seen.stop();
+  seen = watchInView(main);
+  const inView = () => { const v = seen && seen.get(); return v && v.metric ? { metric: v.metric, period: null } : null; };
+  provideContext(() => ({ view: 'long', ticker: sym, quote: FIG.quoteForMilo(D.quote), track_record: TR.context(), long_term: D.lt, fair_value: D.fv, valuation: dcfContext(), scenarios: D.vsBody, in_view: inView() }));
   paint(); wire(main);
   // the strip, folds and Panels (Classic parity B3); the two specialist sections open from Advanced, as Classic's did
   sections(main, 'long', { levels: { 'the multiple against its own history': 2, 'valuation and long-term price levels': 2 }, norm: (t) => { const n = ((main.querySelector('.dhead .name span') || {}).textContent || '').trim(); return n ? t.split(n).join('the company') : t; } });
@@ -329,7 +334,7 @@ async function loadAll() {
   try { D.allWeeks = await api.get(`/api/weekly-bars/${encodeURIComponent(D.sym)}?span=max`, { ttl: 3600000, timeout: 45000 }); } catch (e) { toast('The full weekly history did not load.'); }
   paint();
 }
-export function dispose() { if (lp) { lp.stop(); lp = null; } live = false; if (WK.chart) WK.chart.destroy(); WK = { chart: null, host: null, key: '' }; disposeDcf(); }
+export function dispose() { if (seen) { seen.stop(); seen = null; } if (lp) { lp.stop(); lp = null; } live = false; if (WK.chart) WK.chart.destroy(); WK = { chart: null, host: null, key: '' }; disposeDcf(); }
 export const retry = { lt: (m, r) => { api.invalidate('/api/longterm'); render(m, r); } };
 
 function wire(main) {

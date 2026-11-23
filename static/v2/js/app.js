@@ -15,6 +15,7 @@ import * as drawer from './ui/drawer.js';
 import { openShortcuts } from './ui/shortcuts.js';
 import * as motion from './ui/motion.js';
 import { openMilo, resetContext, checkAvailability, markButtons, panelFigures } from './ui/milo.js';
+import * as miloInline from './ui/milo-inline.js';   // Milo on every screen (round three)
 import { toggleWatch } from './ui/company.js';
 import { linkHome } from './core/homelink.js';
 import { toast } from './ui/toast.js';
@@ -238,6 +239,7 @@ async function show(route) {
   if (from && from.view === 'home' && route.symbol && (groupOf(route.view) || {}).id === 'security') track('home_stock_open', { symbol: route.symbol, screen: 'home' });
   current = { page, view, route };
   shell.paint(route);
+  miloInline.paint(route);
   // Milo forgets the last page before this one renders (it registers its own context as it renders)
   resetContext(route);
   scrollmem.arrive();
@@ -390,6 +392,7 @@ async function boot() {
   // another tab (or the classic app in one) changed a setting
   window.addEventListener('storage', (e) => { if (/^optic\.(theme|ui\.scale\.v1|v2\.motion\.v1)$/.test(e.key || '')) { prefs.applyTheme(); prefs.applyScale(); prefs.applyMotion(); } });
   shell.mount($('#app'));
+  miloInline.wire();
   watchTables($('#app'));   // every shared table aligned by what its columns hold (ui/align.js)
   wireGlobal();
   watchBuild();

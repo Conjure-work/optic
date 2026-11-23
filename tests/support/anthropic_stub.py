@@ -6,6 +6,9 @@ assert what Milo was sent, and the stub plays the provider's behaviours a test a
 * ``ok``: a streamed answer, the Messages API's own server-sent events, a short fixed text.
 * ``error``: HTTP 529 overloaded, with ``x-should-retry: false`` so the SDK reports it at once.
 * ``timeout``: holds the request open past the client's timeout and never answers.
+* ``tool`` (round three, 2026-11-23): the first round asks for one tool (``tool_name`` with ``tool_input``, a quote by
+  default), and the round after the tool result waits ``text_delay`` seconds before the answer, so a journey can see
+  Milo's steps arrive before any answer text.
 
 The base address is a setting (ANTHROPIC_BASE_URL) that the tests point here; nothing reaches the real host.
 """
@@ -30,6 +33,9 @@ class AnthropicStub:
         self.requests: List[Dict[str, Any]] = []
         self.mode = "ok"
         self.hold = 30.0
+        self.tool_name = "get_quote"
+        self.tool_input: Dict[str, Any] = {"ticker": "AAPL"}
+        self.text_delay = 1.5
         self._lock = threading.Lock()
         stub = self
 
@@ -88,6 +94,14 @@ class AnthropicStub:
                                      "content": [{"type": "text", "text": ANSWER}], "stop_reason": "end_turn",
                                      "stop_sequence": None, "usage": {"input_tokens": 10, "output_tokens": 10}})
                     return
+                answered_tool = any(isinstance(m.get("content"), list) and any(
+                    isinstance(b, dict) and b.get("type") == "tool_result" for b in m["content"])
+                    for m in body.get("messages") or [] if isinstance(m, dict))
+                if mode == "tool" and not answered_tool and any(t.get("name") == stub.tool_name for t in body.get("tools") or []):
+                    self._stream_tool(body)
+                    return
+                if mode == "tool":
+                    time.sleep(stub.text_delay)
                 self.send_response(200)
                 self.send_header("content-type", "text/event-stream")
                 self.send_header("cache-control", "no-cache")
@@ -102,6 +116,30 @@ class AnthropicStub:
                     _sse("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": ANSWER}}),
                     _sse("content_block_stop", {"type": "content_block_stop", "index": 0}),
                     _sse("message_delta", {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                                           "usage": {"output_tokens": 12}}),
+                    _sse("message_stop", {"type": "message_stop"}),
+                ):
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+                self.close_connection = True
+
+            def _stream_tool(self, body: Dict[str, Any]) -> None:
+                self.send_response(200)
+                self.send_header("content-type", "text/event-stream")
+                self.send_header("cache-control", "no-cache")
+                self.send_header("connection", "close")
+                self.end_headers()
+                model = body.get("model", "claude-stub")
+                for chunk in (
+                    _sse("message_start", {"type": "message_start", "message": {"id": "msg_stub_t", "type": "message", "role": "assistant",
+                                                                             "model": model, "content": [], "stop_reason": None,
+                                                                             "stop_sequence": None, "usage": {"input_tokens": 10, "output_tokens": 1}}}),
+                    _sse("content_block_start", {"type": "content_block_start", "index": 0, "content_block": {
+                        "type": "tool_use", "id": "toolu_stub_1", "name": stub.tool_name, "input": {}}}),
+                    _sse("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {
+                        "type": "input_json_delta", "partial_json": json.dumps(stub.tool_input)}}),
+                    _sse("content_block_stop", {"type": "content_block_stop", "index": 0}),
+                    _sse("message_delta", {"type": "message_delta", "delta": {"stop_reason": "tool_use", "stop_sequence": None},
                                            "usage": {"output_tokens": 12}}),
                     _sse("message_stop", {"type": "message_stop"}),
                 ):

@@ -1536,3 +1536,26 @@ th .pbadge, dt .pbadge, .k .pbadge { margin-left: 6px; vertical-align: 1px; }
 .target-range .tr-end, .target-range .tr-mid { stroke: var(--c-ink-2); stroke-width: 2; }
 .target-range .tr-now { fill: var(--c-accent, var(--c-ink)); stroke: var(--c-surface, #fff); stroke-width: 2; }
 .target-range .tr-l { fill: var(--c-ink-2); font: 500 var(--t-xs)/1 var(--f-label); }
+
+/* ---------------- Milo on every screen (round three, 2026-11-23, ui/milo-inline.js): a strip under the top bar with
+   the screen's one offer and the control that opens Milo beside the page or collapses it back here. Quiet by design:
+   the screen's own primary action stays the one gold thing; the strip is the page's colour with a hairline under it.
+   The offer truncates on one line rather than wrapping the strip taller on a phone. */
+.milo-inline { min-width: 0; }
+.milo-strip { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px clamp(20px, 4vw, 56px); border-bottom: 1px solid var(--c-line-2); background: transparent; max-width: var(--page); min-width: 0; }
+.milo-strip-k { display: inline-grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: var(--r-pill); background: var(--c-sunk); color: var(--c-ink-2); }
+.milo-strip-k svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.milo-strip-offer { flex: 1 1 auto; min-width: 0; min-height: var(--tap, 44px); display: flex; align-items: center; gap: 6px; padding: 0 6px; border: 0; background: none; color: var(--c-ink); font: inherit; text-align: left; cursor: pointer; border-radius: var(--r-sm, 6px); }
+.milo-strip-offer:hover .milo-strip-q { text-decoration: underline; }
+.milo-strip-ask { flex: none; font-weight: 600; color: var(--c-ink-2); }
+.milo-strip-q { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.milo-strip-toggle { flex: none; min-height: var(--tap, 44px); }
+@media (max-width: 719px) { .milo-strip { padding: 2px 12px; gap: 6px; } .milo-strip-ask { display: none; } }
+@media print { .milo-inline { display: none; } }
+/* the steps Milo took, the stance an answer was written in, and where its figures came from */
+.milo-steps { margin: 4px 0 8px; padding-left: 1.2em; font-size: var(--t-sm); color: var(--c-ink-2); }
+.milo-step.is-miss { color: var(--c-ink-3); }
+.milo-stance-tag { margin: 0 0 4px; font-size: var(--t-sm); font-weight: 600; color: var(--c-ink-2); }
+.milo-cited { margin: 6px 0 0; font-size: var(--t-sm); color: var(--c-ink-2); }
+.milo-stance-once { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.milo-stance-once select { min-height: 36px; max-width: 100%; font: inherit; color: var(--c-ink); background: var(--c-raised); border: 1px solid var(--c-line); border-radius: var(--r-sm, 6px); padding: 0 8px; }

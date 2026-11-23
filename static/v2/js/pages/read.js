@@ -17,26 +17,43 @@ import { sectionHead } from './tabs.js';
 import { etDay } from '../core/marketTime.js';
 import * as TR from '../core/track.js';
 import { scoreLine, toneBand } from '../ui/score.js';
+import { PANELS } from './workspace.js';
 
 let D = {}, live = true, mainEl = null, tabState = { g: 0, s: {} }, cal = { impact: 'all', range: 'week' }, cat = { status: 'relevant', category: '', sector: '', theme: '', q: '' };
 const ask = (label, q) => miloButton(label, { ask: q, context: 'Markets, Read' });
 const kv = (rows, n = 3) => html`<dl class="kv" style="--kv:${n}">${rows.filter(Boolean).map(([k, v]) => html`<div><dt>${k}</dt><dd>${v}</dd></div>`)}</dl>`;
 const etTime = (iso) => { try { return new Date(iso).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET'; } catch (e) { return ''; } };
 
-/* ---------------- the Desk edition ---------------- */
-function desk() {
+/* ---------------- the Desk ---------------- */
+// The Read page's Desk is the shared Optic Desk panel (round three, 2026-11-23): the same edition, bottom line, "the
+// whole desk" fold and the side column (what it is built from, the reader's saved research, questions for Milo) that
+// Home and the workspace draw from pages/workspace.js PANELS.desk, so the three never disagree. It reads /api/home's
+// morning_desk, as the panel does; its source and time line is the panel's own foot.
+// The full written edition with its cited sources, folded under the shared panel: the panel carries the edition's
+// headline and bottom line, and this keeps every section and citation one press away, as the Read had them.
+function fullEdition() {
   const d = D.desk;
   if (!d || !d.available) return '';
   const e = d.edition || {};
   const ev = new Map((e.evidence || []).map((x) => [x.id, x]));
   const cites = (ids) => (ids || []).map((id) => ev.get(id)).filter(Boolean).map((x) => html` <a class="cite" href="${x.url}" target="_blank" rel="noopener" title="${x.label || ''}">${x.source || 'source'}</a>`);
-  return html`<section class="section desk" aria-labelledby="dk-h"><p class="t-label">Optic Desk, ${e.slot_label || ''}${e.test_edition ? ', a test edition' : ''}</p>
-    <h2 class="t-display-m" id="dk-h">${clean(e.headline || '')}</h2>${generated(e, { at: e.written_at || e.gathered_at })}
+  return html`<details class="more desk-full" data-v2-fold="read-edition"><summary>The full edition, with its sources ${icon('chev')}</summary><div class="inner">
+    <p class="t-label">Optic Desk, ${e.slot_label || ''}${e.test_edition ? ', a test edition' : ''}</p>
+    <h3 class="t-h3">${clean(e.headline || '')}</h3>${generated(e, { at: e.written_at || e.gathered_at })}
     ${e.summary ? html`<p class="lede-line">${clean(e.summary)}</p>` : ''}
-    ${(e.sections || []).map((s) => html`<div class="desk-sec"><h3>${clean(s.title || capFirst(s.id || ''))}</h3>
-      ${(s.items || s.claims || []).map((c) => html`<p>${clean(c.text || c)}${cites(c.cites)}</p>`)}</div>`)}
+    ${(e.sections || []).map((x) => html`<div class="desk-sec"><h4>${clean(x.title || capFirst(x.id || ''))}</h4>
+      ${(x.items || x.claims || []).map((c) => html`<p>${clean(c.text || c)}${cites(c.cites)}</p>`)}</div>`)}
     <details class="more-inline"><summary>How this edition was made</summary><p>${clean(((e.outline || {}).limits || []).join(' '))}</p><p class="asof">Written by ${e.written_by || e.voice || 'the desk'}; gathered ${ago(e.gathered_at)}.</p></details>
-  </section>`;
+  </div></details>`;
+}
+function desk() {
+  const P = PANELS.desk;
+  const head = html`<h2 class="t-h2" id="dk-h">${P.title}</h2>`;
+  if (D.home === undefined) return html`<section class="section desk desk-shared" data-v2-desk="shared" aria-labelledby="dk-h">${head}${skeleton('lines', 4, 'Loading the Desk')}</section>`;
+  const foot = P.foot ? P.foot(D.home) : null;
+  return html`<section class="section desk desk-shared" data-v2-desk="shared" data-v2-metric="Optic Desk" aria-labelledby="dk-h">${head}
+    ${P.body(D.home)}
+    ${foot && foot.at ? html`<p class="asof">${foot.source}. ${foot.verb} ${ago(foot.at)}.</p>` : ''}${fullEdition()}</section>`;
 }
 
 /* ---------------- the Read ---------------- */
@@ -333,6 +350,8 @@ export async function render(main) {
   const step = (p, ok, bad, repaintAll) => p.then(ok, bad).finally(() => { if (live) (repaintAll ? paint() : paintMore()); });
   step(api.get('/api/brief?cached=true', { ttl: 60000, timeout: 30000 }), (d) => { D.brief = d; }, (e) => { D.briefErr = e; }, true);
   step(api.get('/api/desk/edition', { ttl: 300000 }), (d) => { D.desk = d; }, () => { D.desk = null; }, true);
+  // the shared Desk panel's data, as Home reads it (round three)
+  step(api.get('/api/home', { ttl: 60000, timeout: 30000 }), (d) => { D.home = d; }, () => { D.home = null; }, true);
   loadPriority();
   step(api.get('/api/catalyst-mode?cached=true', { ttl: 600000, timeout: 45000 }), (d) => { D.catmode = d; }, () => { D.catmode = null; });
   step(api.get('/api/weekly?cached=true', { ttl: 600000, timeout: 30000 }), (d) => { D.weekly = d; }, () => { D.weekly = null; });
