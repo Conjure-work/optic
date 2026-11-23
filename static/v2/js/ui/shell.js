@@ -79,7 +79,7 @@ export function mount(app) {
     <div class="stage">
       <header class="topbar">
         <a class="brand-sm" href="#/" aria-label="Optic Terminal, Home">${brandMark()}</a>
-        <button type="button" class="search-btn" data-v2-open-palette aria-label="Search companies, tickers and pages, or ask Milo">${icon('search')}<span class="sb-long">Search or ask</span><span class="sb-short" aria-hidden="true">Search</span><kbd>⌘K</kbd></button>
+        <button type="button" class="search-btn" data-v2-open-palette title="Search companies, tickers and pages, or ask Milo">${icon('search')}<span class="sb-long">Search or ask</span><span class="sb-short" aria-hidden="true">Search</span><kbd>⌘K</kbd></button>
         <span class="spacer"></span><span class="session-chip" id="session-chip" role="status" aria-live="off"></span>
         <a class="icon-btn topbar-bell" href="#/alerts" data-v2-bell hidden aria-label="Alerts">${icon('bell')}<span class="bell-n" aria-hidden="true"></span></a>
         <button type="button" class="btn btn-milo btn-sm topbar-milo" data-v2-milo="" data-v2-milo-ctx="" data-v2-milo-sym="" aria-label="Ask Milo"><span class="scout-badge" aria-hidden="true"><span class="scout-badge-fig"></span></span><span class="tm-label" aria-hidden="true">Ask Milo</span></button>
@@ -176,7 +176,9 @@ export function paintAccount() {
     const ini = ((u.first_name || u.email || '?')[0] + ((u.last_name || '')[0] || '')).toUpperCase();
     b.textContent = ini.slice(0, 2);
     b.classList.add('avatar');
-    b.setAttribute('aria-label', `Account: ${u.name || u.email}`);
+    // the name starts with the letters on the button (WCAG 2.5.3, label in name: a voice user says what they see);
+    // axe-core 4.14 (axe-playwright-python 0.1.9, installed 2026-11-23) reports "Account: <name>" over initials as label-content-name-mismatch
+    b.setAttribute('aria-label', `${ini.slice(0, 2)}, account: ${u.name || u.email}`);
   } else {
     b.textContent = 'Sign in';
     b.classList.remove('avatar');

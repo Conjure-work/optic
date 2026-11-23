@@ -92,7 +92,9 @@ function permissions(st, open) {
 }
 function upgrade(ent) {
   const b = S.billing || {}, paid = (S.status || {}).paid_limits || {};
-  if (b.available === false) return html`<section class="section first"><h2 class="t-h2">Link your brokerage</h2><p>Linking is part of the paid plan. ${billingOff(b.reason, !!(store.state.me && store.state.me.admin))}</p></section>`;
+  // billing off: no plan, price or paywall wording for a reader (round three: "with nothing set, nothing shows");
+  // the owner still reads which variables are missing
+  if (b.available === false) return html`<section class="section first"><h2 class="t-h2">Link your brokerage</h2><p>${store.state.me && store.state.me.admin ? html`Linking is part of the paid plan. ${billingOff(b.reason, true)}` : 'Linking a brokerage is not open on this site yet.'}</p></section>`;
   const syncs = paid.brokerage_manual_syncs_per_day || 1;
   return html`<section class="section first"><h2 class="t-h2">Link your brokerage with Pro</h2>
     <p>Connect up to ${paid.brokerage_connections || 3} brokerages read-only, see every account in one portfolio, and ask Milo about your actual holdings: concentration, upcoming earnings, what changed since the last sync.</p>
