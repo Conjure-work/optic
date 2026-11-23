@@ -296,17 +296,140 @@ def classify_request(question: str) -> List[str]:
     return found
 
 
-def reader_line(kinds: Iterable[str]) -> str:
-    """The fixed sentence the panel shows above an answer to a declined request."""
-    kinds = [k for k in kinds if k in REQUEST_KINDS]
-    if not kinds:
+# ---------------------------------------------------------------- off-topic requests (round three, 2026-11-23)
+#
+# Milo answers about markets, companies and Optic's own data. A question with nothing of that in it (the weather, a
+# recipe, an essay, a medical worry, a program to write) is declined before any model is called: the reader is told
+# in one sentence what Milo can do instead, and nothing is charged to the model. The patterns are written for the
+# request, never for a word alone: "write python to compute RSI" is code, "what is a coding error in a 10-K" is not;
+# a question that also names a ticker, a market word or the page is left to Milo, which answers the market part.
+# tests/milo_eval/offtopic.py is the set these patterns are held to, and test_pass3_milo_refusals.py also runs every
+# quality case through them so a research question is never caught.
+
+OFFTOPIC_VERSION = "offtopic-2026-11-23"
+
+OFFTOPIC_KINDS: Dict[str, str] = {
+    "general": "answer questions outside markets, companies and Optic's data",
+    "other_product": "do work for other products or tasks outside Optic, such as essays, emails or translations",
+    "personal": "give medical, legal or personal-life advice",
+    "code": "write, fix or explain code",
+}
+
+_OFF = {
+    "general": [
+        re.compile(r"\b(?:weather|forecast\s+for\s+(?:today|tomorrow|the\s+weekend)\s+in|temperature\s+in|will\s+it\s+rain)\b", _I),
+        re.compile(r"\b(?:recipe|how\s+(?:do\s+i|to)\s+(?:cook|bake|make\s+(?:pasta|pizza|bread|a\s+cake)))\b", _I),
+        re.compile(r"\b(?:who\s+won|score\s+of|final\s+score)\b[^.?!]{0,40}\b(?:game|match|super\s?bowl|world\s+cup|nba|nfl|"
+                   r"premier\s+league|playoffs?|final)\b", _I),
+        re.compile(r"\btell\s+me\s+a\s+(?:joke|story|riddle)\b(?![^.?!]{0,40}\b(?:market|stock|invest|trad|earnings|fed)\w*)", _I),
+        re.compile(r"\b(?:write|compose)\s+(?:me\s+)?a\s+(?:poem|song|haiku|limerick)\b(?![^.?!]{0,40}\b(?:market|stock|invest|"
+                   r"trad|earnings)\w*)", _I),
+        re.compile(r"\b(?:plan|book)\s+(?:me\s+)?a\s+(?:trip|vacation|holiday|flight|hotel)\b|\bbest\s+(?:restaurants?|hotels?|"
+                   r"beaches)\s+in\b", _I),
+        re.compile(r"\b(?:what(?:'s|\s+is)\s+the\s+capital\s+of|how\s+tall\s+is\s+(?:mount|the\s+eiffel)|who\s+(?:wrote|painted)\s+"
+                   r"(?:the\s+)?(?:mona|hamlet|odyssey|starry))\b", _I),
+        re.compile(r"\b(?:what\s+movie|which\s+(?:movie|show|series)\s+should\s+i\s+watch|recommend\s+(?:me\s+)?a\s+(?:movie|"
+                   r"book|show|song|game))\b", _I),
+    ],
+    "other_product": [
+        re.compile(r"\b(?:write|draft)\s+(?:me\s+)?(?:an?\s+|my\s+)?(?:essay|cover\s+letter|resume|cv|email|"
+                   r"wedding\s+speech|tweet|linkedin\s+post|homework|term\s+paper)\b", _I),
+        re.compile(r"\btranslate\b[^.?!]{0,60}\b(?:into|to)\s+(?:french|spanish|german|chinese|japanese|italian|arabic|"
+                   r"portuguese|korean|hindi|russian)\b", _I),
+        re.compile(r"\b(?:netflix\s+password|reset\s+my\s+(?:iphone|gmail|instagram|facebook)|my\s+(?:wifi|printer|router)\s+"
+                   r"(?:is|isn'?t|won'?t|keeps))\b", _I),
+        re.compile(r"\b(?:act|pretend|role-?play)\s+as\s+(?:chatgpt|a\s+general\s+assistant|siri|alexa|my\s+(?:girlfriend|"
+                   r"boyfriend|friend))\b", _I),
+    ],
+    "personal": [
+        re.compile(r"\b(?:symptoms?|diagnos\w*|prescri\w*|dosage|ibuprofen|antibiotics?|rash|migraine|fever)\b"
+                   r"(?![^.?!]{0,30}\b(?:stocks?|company|companies|sector|pharma|biotech|fda|trial|drug\s?maker)\b)", _I),
+        re.compile(r"\b(?:should\s+i\s+(?:divorce|break\s+up|marry|quit\s+my\s+job)|my\s+(?:girlfriend|boyfriend|wife|husband|"
+                   r"partner)\s+(?:is|isn'?t|won'?t|doesn'?t|keeps))\b", _I),
+        re.compile(r"\b(?:sue\s+my|my\s+landlord\s+(?:is|isn'?t|won'?t|keeps|refuses)|custody\s+of|draft\s+(?:a|my)\s+(?:will|lease|contract)|am\s+i\s+liable)\b", _I),
+    ],
+    "code": [
+        re.compile(r"\b(?:write|fix|debug|refactor|code)\s+(?:me\s+)?(?:a|an|this|my|some)?\s*(?:python|javascript|java|c\+\+|"
+                   r"rust|go|sql|bash|typescript|react|html|css)?\s*(?:script|program|function|class|code|app|query|regex|"
+                   r"website|bot)\b", _I),
+        re.compile(r"\b(?:in|using)\s+(?:python|javascript|java|c\+\+|rust|typescript|pandas|excel\s+vba)\b[^.?!]{0,40}"
+                   r"\b(?:write|code|implement|script|function|backtest)\b|\b(?:write|implement|code)\b[^.?!]{0,40}\b(?:in|"
+                   r"using)\s+(?:python|javascript|java|c\+\+|rust|typescript|pandas)\b", _I),
+        re.compile(r"\b(?:stack\s+trace|syntax\s+error|segfault|null\s+pointer|traceback|compile\s+error)\b", _I),
+    ],
+}
+
+
+# A question that names the market, a company or a filing is Milo's to answer, whatever else it mentions ("how has
+# the weather hurt utility stocks", "drugmaker stocks on the trial's symptoms data"): general chat and personal advice
+# step aside for it. A request for code or for another product's work does not; it is declined with the reason.
+_MARKET_ANCHOR = re.compile(r"\b(?:stocks?|shares?|equit\w*|earnings|revenue|market|ticker|sectors?|compan(?:y|ies)|"
+                            r"drug\s?makers?|pharma\w*|biotech|index(?:es)?|etfs?|funds?|fed|yields?|bonds?|invest\w*|"
+                            r"trad(?:e|es|ing)|portfolio|prices?|10-[kq]|filings?|dividends?|options?|s&p|nasdaq|dow|"
+                            r"utilit(?:y|ies))\b|\$[A-Z]{1,5}\b", _I)
+
+
+def classify_offtopic(question: str) -> List[str]:
+    """The kinds of off-topic request in a question, in OFFTOPIC_KINDS order; empty for anything about markets."""
+    q = " ".join(str(question or "").split())
+    if not q:
+        return []
+    anchored = bool(_MARKET_ANCHOR.search(q))
+    return [kind for kind in OFFTOPIC_KINDS
+            if not (anchored and kind in ("general", "personal")) and any(rx.search(q) for rx in _OFF[kind])]
+
+
+# What Optic can do instead, by the screen the question was asked from (the v2 route's view). The refusal always ends
+# with one of these, so a declined reader is never left at a dead end.
+INSTEAD: Dict[str, str] = {
+    "home": "explain today's market moves, the names you follow and the figures on Home",
+    "financials": "walk you through this company's statements, margins, cash flow and filings",
+    "long": "explain this company's long-term figures, valuation history and fair value range",
+    "earnings": "explain this company's reports, estimates and what options price for the next one",
+    "chart": "read the chart in view, its levels, studies and price history",
+    "swing": "explain the options chain, the expected move and the positioning on screen",
+    "overview": "explain why this company is moving and what its figures show",
+    "brokerage": "describe the holdings, concentration and events in your linked accounts",
+    "watchlist": "explain the moves, alerts and upcoming events on your watchlist",
+    "brief": "explain today's Read, the calendar and what moved",
+}
+INSTEAD_DEFAULT = ("explain the figures on this page, look up a company's quotes, filings and news, and show the research "
+                   "that bears on a decision")
+
+_POLICY_REASON = ("make personal investment decisions for you, such as which investment to buy or sell, how much, "
+                  "or when")
+_OVERRIDE_REASON = "set its rules aside, and they stay on for every question"
+_POLICY_INSTEAD = "show the research that bears on the decision, and the decision stays yours"
+
+# The one sentence shape every refusal takes: "Milo can't <reasons>; it can <instead>." Tests hold every case in the
+# hostile, red-team and off-topic sets to it.
+REFUSAL_SHAPE = re.compile(r"^Milo can't [^.;!?]+; it can [^.;!?]+\.$")
+
+
+def refusal_line(policy_kinds: Iterable[str] = (), offtopic_kinds: Iterable[str] = (),
+                 screen: Optional[str] = None) -> str:
+    """One refusal sentence: the policy's reason first, the off-topic reason second, then what Optic can do instead.
+
+    Empty when nothing was declined. One composer, so a question that is both off-policy and off-topic reads as one
+    product, never two refusals in two voices."""
+    pk = [k for k in policy_kinds if k in REQUEST_KINDS]
+    ok = [k for k in offtopic_kinds if k in OFFTOPIC_KINDS]
+    if not pk and not ok:
         return ""
-    if kinds == ["override_policy"]:
-        return ("Milo's rules stay on for every question: it describes what the data shows and "
-                "never decides trades, amounts or timing for you.")
-    return ("Milo can't make personal investment decisions for you, such as which investment to buy "
-            "or sell, how much, or when. It can show the research that bears on the decision, "
-            "and the decision stays yours.")
+    reasons: List[str] = []
+    if pk:
+        reasons.append(_OVERRIDE_REASON if pk == ["override_policy"] else _POLICY_REASON)
+    reasons += [OFFTOPIC_KINDS[k] for k in ok]
+    if ok:
+        instead = INSTEAD.get(str(screen or ""), INSTEAD_DEFAULT)
+    else:
+        instead = _POLICY_INSTEAD
+    return "Milo can't {}; it can {}.".format(", or ".join(reasons), instead)
+
+
+def reader_line(kinds: Iterable[str]) -> str:
+    """The fixed sentence the panel shows above an answer to a declined request (refusal_line, policy only)."""
+    return refusal_line(kinds, ())
 
 
 def turn_instruction(kinds: Iterable[str]) -> str:
@@ -1105,3 +1228,91 @@ def has_policy(system: Any) -> bool:
     if isinstance(system, str):
         return POLICY_TEXT in system
     return any(isinstance(b, dict) and POLICY_TEXT in str(b.get("text") or "") for b in (system or []))
+
+
+# ---------------------------------------------------------------- grounding (round three, 2026-11-23)
+#
+# A figure in a Milo answer has data behind it: the page's CONTEXT or a tool Milo called. Money figures ("$199.04",
+# "$394 billion") must match a number in that evidence at the precision written (0.5 percent either way, for
+# rounding and units). A percentage is cited when it matches but never removed: a change worked out from two figures
+# in the evidence is research, not invention, and a pattern cannot tell the two apart (a limit, said in the runbook
+# record). A sentence whose
+# figure has nothing behind it is taken out, with a note, as an advice-policy sentence is. Each supported figure is
+# returned with where it came from, so the panel can name the tool under the answer.
+
+GROUND_NOTE = ("Milo removed a sentence with a figure that no Optic data behind this answer supports. Every figure "
+               "it gives comes from the page or a lookup listed under the answer.")
+_FIG = re.compile(r"(?<![\w.])(?P<money>\$\s?)?(?P<num>-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)"
+                  r"\s?(?P<unit>%|percent\b|trillion\b|billion\b|million\b|thousand\b|tn\b|bn\b|[TBMK]\b)?", _I)
+_EV_NUM = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+_SCALE = {"thousand": 1e3, "k": 1e3, "million": 1e6, "m": 1e6, "billion": 1e9, "bn": 1e9, "b": 1e9,
+          "trillion": 1e12, "tn": 1e12, "t": 1e12}
+
+
+def _evidence_numbers(text: str) -> List[float]:
+    out = []
+    for m in _EV_NUM.finditer(str(text or "").replace(",", "")):
+        try:
+            out.append(float(m.group(0)))
+        except ValueError:
+            continue
+    return sorted(set(out))
+
+
+def _near(values: List[float], target: float, tol: float) -> bool:
+    import bisect
+    i = bisect.bisect_left(values, target - tol)
+    return i < len(values) and values[i] <= target + tol
+
+
+def figures_in(text: str) -> List[Dict[str, Any]]:
+    """The money and percentage figures in a text, each with the values it may stand for."""
+    found = []
+    for m in _FIG.finditer(str(text or "")):
+        unit = (m.group("unit") or "").lower()
+        money, pct = bool(m.group("money")), unit in ("%", "percent")
+        if not (money or pct):
+            continue
+        raw = m.group("num").replace(",", "")
+        try:
+            v = float(raw)
+        except ValueError:
+            continue
+        dp = len(raw.split(".")[1]) if "." in raw else 0
+        scale = _SCALE.get(unit, 1.0)
+        cands = [v * scale] + ([v / 100.0] if pct else [])
+        found.append({"text": m.group(0).strip(), "kind": "percent" if pct else "money", "values": cands,
+                      "step": 0.5 * (10 ** -dp) * scale})
+    return found
+
+
+def ground(answer: str, context_text: str, tool_texts: List[Tuple[Dict[str, Any], str]]
+           ) -> Dict[str, Any]:
+    """{text, removed, cited, note}: the answer with unsupported-figure sentences taken out, and the source of each
+    supported figure (`tool` and `label` for a lookup, "page" for the page's own figures)."""
+    sources = [({"tool": "page", "label": "The page's figures"}, _evidence_numbers(context_text))]
+    sources += [({"tool": rec.get("tool") or "", "label": rec.get("label") or "", "source": rec.get("source")},
+                 _evidence_numbers(body)) for rec, body in tool_texts]
+    kept, removed, cited = [], [], []
+    for sent in sentences(answer):
+        bad = False
+        for fig in figures_in(sent):
+            hit = None
+            for meta, nums in sources:
+                for c in fig["values"]:
+                    if _near(nums, c, fig["step"] + abs(c) * 0.005):
+                        hit = meta
+                        break
+                if hit:
+                    break
+            if hit:
+                if hit["tool"] != "page" and not any(x["figure"] == fig["text"] for x in cited):
+                    cited.append(dict(hit, figure=fig["text"]))
+                continue
+            if fig["kind"] == "money":
+                bad = True
+        (removed if bad else kept).append(sent)
+    if not removed:
+        return {"text": answer, "removed": 0, "cited": cited, "note": None}
+    return {"text": "\n\n".join(kept) if "\n" in answer else " ".join(kept), "removed": len(removed),
+            "cited": cited, "note": GROUND_NOTE}

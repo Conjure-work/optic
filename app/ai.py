@@ -204,6 +204,24 @@ PERSONAS: Dict[str, Dict[str, str]] = {
 
 DEFAULT_PERSONA = "neutral"
 
+# The personas as named stances (round three, 2026-11-23): each answer is labelled with the stance it was written in,
+# in plain words, so a reader knows whose reading they have. A stance explains; it never rates or targets (the advice
+# policy's rules outrank every persona). The reader picks one per answer or keeps one; signed in, the kept one is on
+# the account (user_preferences.milo_stance, app/milo_routes.py).
+STANCE_LABELS: Dict[str, str] = {
+    "neutral": "a neutral analyst's reading",
+    "longterm": "a long-term investor's reading",
+    "stoic": "a conservative investor's reading",
+    "quant": "a statistician's reading",
+    "skeptic": "a skeptic's reading",
+}
+
+
+def stance_of(persona: Any) -> Dict[str, str]:
+    """{id, label} for a persona id; an unknown one is the neutral stance, as build_chat_request treats it."""
+    pid = persona if persona in PERSONAS else DEFAULT_PERSONA
+    return {"id": pid, "label": STANCE_LABELS[pid], "name": PERSONAS[pid]["label"]}
+
 # The output shape. Separate from the personas because it applies to all of them:
 # a persona changes the voice, this changes the structure, and mixing the two
 # would mean re-stating the format five times and letting them drift.
@@ -3604,6 +3622,15 @@ def _question_text(turn: Optional[Dict[str, Any]]) -> str:
     return ""
 
 
+def screen_of(context: Optional[Dict[str, Any]]) -> Optional[str]:
+    """The v2 view the question was asked from (`focus.view`, else the page's `view`), or None."""
+    if not isinstance(context, dict):
+        return None
+    focus = context.get("focus") if isinstance(context.get("focus"), dict) else {}
+    view = focus.get("view") or context.get("view")
+    return str(view)[:32] if isinstance(view, str) and view else None
+
+
 def build_chat_request(
     history: List[Dict[str, str]],
     context: Optional[Dict[str, Any]] = None,
@@ -3701,7 +3728,14 @@ def build_chat_request(
     # no level, horizon or persona block reads after it.
     declined = ai_policy.classify_request(last_user)
     policy_turn = ai_policy.turn_instruction(declined)
-    meta.update({"policy_kinds": declined, "policy_line": ai_policy.reader_line(declined)})
+    # Round three (2026-11-23): a question with nothing about markets or Optic in it is declined before the model, and
+    # one refusal composer (ai_policy.refusal_line) says why in one sentence, the policy's reason first, then the
+    # off-topic one, then what Optic can do on this screen
+    offtopic = ai_policy.classify_offtopic(last_user)
+    screen = screen_of(context)
+    meta.update({"policy_kinds": declined, "offtopic_kinds": offtopic, "screen": screen,
+                 "policy_line": ai_policy.refusal_line(declined, offtopic, screen),
+                 "stance": stance_of(persona)})
 
     kwargs: Dict[str, Any] = {
         "model": PULSE_MODEL,
@@ -3831,6 +3865,21 @@ async def stream_chat(
     # `started`: when the route took the request, so the clock includes the page's context being gathered
     clock = StreamClock(started)
     clock.mark("context_ready")
+    # An off-topic question is declined before any model is called (round three): the one refusal sentence, the
+    # stance it would have been answered in, and a `done` that says it was refused. Checked before the client, so a
+    # deployment with Milo switched off still says what Milo is for.
+    pre_kwargs, pre_meta = build_chat_request(history, context=context, use_web=use_web, attachments=attachments,
+                                              persona=persona, mode=mode, horizon=horizon)
+    if pre_kwargs is not None and pre_meta.get("offtopic_kinds"):
+        yield _sse("stance", pre_meta["stance"])
+        yield _sse("notice", {"kind": "policy", "text": pre_meta["policy_line"], "refused": True,
+                              "categories": (pre_meta.get("policy_kinds") or [])
+                              + ["offtopic:" + k for k in pre_meta["offtopic_kinds"]],
+                              "policy": ai_policy.POLICY_VERSION, "offtopic": ai_policy.OFFTOPIC_VERSION})
+        yield _sse("done", {"refused": True, "stance": pre_meta["stance"], "citations": [], "read": [],
+                            "retrieved": [], "loaded": [], "named": {}, "cited": [],
+                            "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0}})
+        return
     client = _client()
     if client is None:
         yield _sse(
@@ -3846,9 +3895,7 @@ async def stream_chat(
         )
         return
 
-    kwargs, meta = build_chat_request(history, context=context, use_web=use_web,
-                                      attachments=attachments, persona=persona,
-                                      mode=mode, horizon=horizon)
+    kwargs, meta = pre_kwargs, pre_meta
     if kwargs is None:
         yield _sse("error", {"message": "No message to send."})
         return
@@ -3864,10 +3911,18 @@ async def stream_chat(
                            "horizon_source": meta.get("horizon_source")})
     # A question that asked for a personal decision gets the server's own line
     # before any model text, so the reader is told whatever the model writes.
+    # The stance this answer is written in, named before it starts (round three)
+    yield _sse("stance", meta["stance"])
     if meta.get("policy_line"):
         yield _sse("notice", {"kind": "policy", "text": meta["policy_line"],
                               "categories": meta.get("policy_kinds") or [],
                               "policy": ai_policy.POLICY_VERSION})
+    # The steps, as they happen (round three): each source the page's research pack was read from, then each lookup
+    # as it is called and what it returned. The panel lists them above the answer while it streams.
+    for src in sources_read(kwargs):
+        yield _sse("step", {"kind": "source", "text": "Read {}".format(src.get("what") or src.get("source") or "a source"),
+                            "source": src.get("source"), "url": src.get("url") or "", "period": src.get("period") or ""})
+    tool_texts: List[Tuple[Dict[str, Any], str]] = []
     answer_parts: List[str] = []
     # Held back by at most one sentence, so a sentence that breaks the advice policy is never sent
     # (app/ai_policy.py StreamGate); the end-of-stream amend below still reads the whole answer.
@@ -3903,8 +3958,10 @@ async def stream_chat(
                             yield _sse("status", {"state": "thinking"})
                         elif btype == "server_tool_use":
                             yield _sse("status", {"state": "searching the web"})
+                            yield _sse("step", {"kind": "tool", "tool": "web_search", "text": "Searching the web"})
                         elif btype == "web_search_tool_result":
                             yield _sse("status", {"state": "reading results"})
+                            yield _sse("step", {"kind": "source", "tool": "web_search", "text": "Reading web results"})
                         elif btype == "tool_use" and will_fetch:
                             # The model has stopped reasoning and started naming what it wants looked up.
                             # Nothing used to be sent between the top of the round and the tool actually
@@ -3982,9 +4039,22 @@ async def stream_chat(
                     except milo_tools.InvalidInput:
                         words = "Looking that up"
                     yield _sse("status", {"state": words})
+                    yield _sse("step", {"kind": "tool", "tool": b.name, "text": words})
                     ran = time.perf_counter()
+                    before = len(toolbox.records)
                     content, is_error, _ = await toolbox.run(b.name, b.input)
                     clock.tools.append((b.name, time.perf_counter() - ran))
+                    rec = toolbox.records[-1].public() if len(toolbox.records) > before else None
+                    if rec is not None:
+                        rec = dict(rec, tool=b.name)
+                        tool_texts.append((rec, content))
+                        yield _sse("step", {"kind": "source", "tool": b.name, "ok": rec.get("ok"),
+                                            "text": "{} {}".format("Read" if rec.get("ok") else "Could not read",
+                                                                   rec.get("label") or b.name),
+                                            "source": rec.get("source"), "as_of": rec.get("as_of")})
+                    else:
+                        yield _sse("step", {"kind": "source", "tool": b.name, "ok": False,
+                                            "text": "Not run: that lookup is not available on this screen"})
                     # what has been looked up so far, as it is attached: the panel lists it while the answer streams
                     yield _sse("retrieved", {"items": toolbox.retrieved()})
                     result = {"type": "tool_result", "tool_use_id": b.id, "content": content}
@@ -4010,6 +4080,19 @@ async def stream_chat(
             answer_parts.append(tail)
             yield _sse("delta", {"text": tail})
         amend = ai_policy.amend_for_stream("".join(answer_parts), withheld=gate.findings)
+        # Grounding (round three): every money figure has the page or a lookup behind it, and each lookup that
+        # produced a figure is named under the answer (`cited`)
+        grounded = ai_policy.ground(amend["text"] if amend else "".join(answer_parts),
+                                    json.dumps(first_messages, default=str), tool_texts)
+        if grounded["removed"]:
+            log.warning("ai policy: pulse: removed %s sentence(s) with unsupported figures", grounded["removed"])
+            if amend:
+                amend = dict(amend, text=grounded["text"], removed=amend["removed"] + grounded["removed"],
+                             rules=sorted(set(amend["rules"]) | {"unsupported_figure"}),
+                             note="{} {}".format(amend["note"], grounded["note"]))
+            else:
+                amend = {"text": grounded["text"], "removed": grounded["removed"], "rules": ["unsupported_figure"],
+                         "note": grounded["note"], "policy": ai_policy.POLICY_VERSION}
         if amend:
             log.warning("ai policy: pulse: removed %s sentence(s) (%s)", amend["removed"], ", ".join(amend["rules"]))
             yield _sse("amend", amend)
@@ -4031,6 +4114,9 @@ async def stream_chat(
                 "usage": usage_sum,
                 # where the time went, measured here (StreamClock); the panel does not show it
                 "timing": timing,
+                # round three: the stance the answer was written in, and the lookup behind each figure it gives
+                "stance": meta["stance"],
+                "cited": grounded["cited"],
             },
         )
     except Exception as exc:  # surfaced to the UI rather than swallowed

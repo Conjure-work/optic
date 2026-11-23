@@ -50,6 +50,7 @@ from . import usage as usage_mod
 from .auth import admin as auth_admin
 from .auth import config as auth_config
 from .auth import deps as auth_deps
+from .auth import store as auth_store
 from .auth import ratelimit as auth_ratelimit
 from . import feedback as feedback_mod
 from . import ai_store
@@ -8935,6 +8936,10 @@ def _milo_toolbox(request: Request, context: Optional[Dict[str, Any]] = None,
             focus.get("view") == "brokerage" or any(_asks_about_own_portfolio(t) for t in (history or [])
                                                     if isinstance(t, dict) and t.get("role") != "assistant")):
         runners.pop("get_my_portfolio")
+    # Round three: only the tools this screen allows (milo_tools.SCREEN_TOOLS); a tool outside the list is never
+    # offered, and Toolbox.run refuses it if a model names it anyway
+    allowed = set(milo_tools.allowed_for(ai.screen_of(context)))
+    runners = {k: v for k, v in runners.items() if k in allowed}
     return milo_tools.Toolbox(runners=runners)
 
 
@@ -9048,7 +9053,15 @@ async def chat(request: Request,
     context = payload.get("context")
     use_web = bool(payload.get("web"))
     attachments = payload.get("attachments")
-    persona = str(payload.get("persona") or ai.DEFAULT_PERSONA)
+    persona = str(payload.get("persona") or "")
+    if not persona:
+        # a page that sent no stance: the signed-in reader's kept one (round three, user_preferences.milo_stance)
+        try:
+            who = auth_deps.current_user(request)
+            persona = (auth_store.round_three_preferences(who["id"])["milo_stance"] if who else None) or ""
+        except Exception:                                           # noqa: BLE001 - the stance is not worth a failure
+            persona = ""
+    persona = persona or ai.DEFAULT_PERSONA
     # The level and the lens are separate axes and arrive separately. Both are
     # normalised rather than trusted: they come from localStorage, which the
     # reader can edit, and an unknown value has to answer with something.

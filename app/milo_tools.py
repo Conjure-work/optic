@@ -851,6 +851,10 @@ class Toolbox:
 
     async def run(self, name: str, raw_input: Any) -> Tuple[str, bool, Dict[str, Any]]:
         """(content for the tool_result, is_error, cleaned args)."""
+        # A tool this answer was not offered (the screen's list, the reader's own tools' rules) is refused before its
+        # input is even read, and leaves no record: nothing ran (round three, 2026-11-23)
+        if name not in self.runners:
+            return json.dumps({"status": "unsupported", "error": "That tool is not available here."}), True, {}
         try:
             args = validate(name, raw_input)
         except InvalidInput as exc:
@@ -915,3 +919,34 @@ def _as_of(result: Any) -> Optional[str]:
         return None
     fr = result.get("freshness") if isinstance(result.get("freshness"), dict) else {}
     return fr.get("quote_as_of_utc") or result.get("as_of_utc") or result.get("as_of")
+
+
+# ---------------------------------------------------------------- the tools each screen allows (round three)
+#
+# Each v2 screen names the tools Milo may call there, so an answer stays on Optic's data for what the reader is
+# looking at. A research screen (a company's tabs, Markets, Home, Compare, the lists and books) allows every market
+# tool; the account, legal and owner screens allow the four that answer a general market question and nothing that
+# screens, models or reads a company in depth. The reader's own tools (watchlists, the linked portfolio) keep their
+# own rules on top (main._milo_toolbox). An unknown view allows the market tools, never fewer than today, so a new
+# page is not silently cut off; tests/test_pass3_milo_grounding.py asserts every route in the v2 route table is named
+# here, so a new page has to be placed on purpose.
+MARKET_TOOLS = ("get_quote", "get_options", "get_chart_levels", "get_fundamentals", "get_valuation", "get_earnings",
+                "get_news", "get_market", "compare", "get_assessment", "screen_stocks", "lookup_company",
+                "get_price_history", "get_filings", "get_financials")
+PERSONAL_TOOLS = ("get_my_watchlists", "get_my_portfolio")
+GENERAL_TOOLS = ("lookup_company", "get_quote", "get_market", "get_news")
+_RESEARCH_VIEWS = ("home", "overview", "swing", "long", "earnings", "financials", "news", "chart", "brief", "market",
+                   "indices", "instrument", "explore", "scan", "insiders", "analysts", "compare", "tracker", "paper",
+                   "roth", "brokerage", "watchlist", "alerts", "earningsweek", "dossierstart", "stockgrid", "sheet",
+                   "investigate", "saved", "portfolio", "calendar", "welcome")
+_PLAIN_VIEWS = ("settings", "signin", "terms", "privacy", "reports", "usage", "accounts", "metrics", "notfound",
+                "owner-report")
+SCREEN_TOOLS: Dict[str, Tuple[str, ...]] = {
+    **{v: MARKET_TOOLS + PERSONAL_TOOLS for v in _RESEARCH_VIEWS},
+    **{v: GENERAL_TOOLS + ("get_my_watchlists",) for v in _PLAIN_VIEWS},
+}
+
+
+def allowed_for(screen: Optional[str]) -> Tuple[str, ...]:
+    """The tools Milo may call on `screen` (a v2 route view)."""
+    return SCREEN_TOOLS.get(str(screen or ""), MARKET_TOOLS + PERSONAL_TOOLS)
