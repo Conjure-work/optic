@@ -418,7 +418,9 @@ def test_labels_use_the_readers_timezone_and_follow_a_change(tmp_path):
     assert got["ny"] == "Delayed 15 min · as of 1:46 PM EST"
     assert got["la"] == "Delayed 15 min · as of 10:46 AM PST"
     assert got["tokyo"] == "Delayed 15 min · as of 3:46 AM GMT+9", "Tokyo's own clock and abbreviation"
-    assert got["london"] == "Delayed 15 min · as of 6:46 PM GMT"
+    # London's winter abbreviation is the platform's to spell: JavaScriptCore on the ops Mac writes "GMT", the GitHub
+    # macOS runner's writes "GMT+0" (round three, 2026-11-23, the first time this ran on the runner); same clock, same zone
+    assert got["london"] in ("Delayed 15 min · as of 6:46 PM GMT", "Delayed 15 min · as of 6:46 PM GMT+0")
     assert got["before"] == "Delayed 15 min · as of 1:00 PM EDT" and got["after"] == "Delayed 15 min · as of 12:00 PM EST"
     assert got["dayOld"] == "Delayed 15 min · as of Nov 3, 3:59 PM EST", "no session given: no stale claim, the date said"
     src = (JS / "core/delays.js").read_text()
