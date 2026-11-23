@@ -62,7 +62,8 @@ def test_amounts_in_other_currencies_and_cents_read_plainly():
 def test_settings_shows_a_reader_nothing_while_billing_is_off_and_never_a_blank_price():
     src = (V2 / "js" / "pages" / "settings.js").read_text()
     assert "store.state.me && store.state.me.admin ? html`<span class=\"set-row-note\">${billingOff((b || {}).reason, true)}</span>` : ''" in src
-    assert "Upgrade to Pro${b.price_label ? `, ${b.price_label}` : ''}" in src
+    # the one Pro button became one button per plan in the ladder (round three); still never a blank price
+    assert "Choose ${p.label}${p.price_label ? `, ${p.price_label}` : ''}" in src
 
 
 def test_the_runbook_names_every_variable_and_holds_no_value():

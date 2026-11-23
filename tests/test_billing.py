@@ -27,7 +27,12 @@ PRICE = "price_optic_pro_test"
 
 
 @pytest.fixture(autouse=True)
-def env(accounts, monkeypatch):
+def env(accounts, monkeypatch, tmp_path):
+    # Round three refuses Checkout while the terms are the placeholder (app/legal_text.py, its own tests in
+    # tests/test_pass3_legal.py); these tests are about Checkout's mechanics, so they run with final-text fixtures
+    for doc in ("terms", "privacy"):
+        (tmp_path / (doc + ".md")).write_text("# Fixture {}\n\nFixture text, not legal text.\n".format(doc))
+    monkeypatch.setenv("LEGAL_TEXT_DIR", str(tmp_path))
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_abc")
     monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
     monkeypatch.setenv("STRIPE_PRICE_ID", PRICE)

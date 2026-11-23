@@ -4,6 +4,7 @@
 // law, a minimum age of 13. Not reviewed by a lawyer: the owner was told so, and LAUNCH-REQUIREMENTS.md L1 keeps
 // that review open. A change here changes EFFECTIVE, and a significant one is announced before it applies.
 import { html, render as draw } from '../core/dom.js';
+import * as api from '../core/api.js';
 
 export const IN_FORCE = true;
 export const EFFECTIVE = 'October 19, 2026';
@@ -155,14 +156,62 @@ const DOCS = {
   privacy: { title: 'Privacy policy', sections: PRIVACY },
 };
 
+// Round three (2026-11-23): counsel's text comes from legal/terms.md and legal/privacy.md (app/legal_text.py). While a
+// file still carries the placeholder marker the page says the text is being prepared with counsel, above the draft
+// published on October 19, which stays readable: nothing public is taken down while the final text is written.
+// Counsel's Markdown is drawn as headings, paragraphs and lists, every piece of text escaped by the html helper; a
+// link is kept only when it is https or mailto.
+const LINK = /\[([^\]]+)\]\(((?:https:\/\/|mailto:)[^)\s]+)\)/g;
+function inline(text) {
+  const parts = []; let last = 0, m;
+  LINK.lastIndex = 0;
+  while ((m = LINK.exec(text))) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(out(m[2], m[1]));
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+export function fromMarkdown(md) {
+  const blocks = []; let para = [], list = [];
+  const flush = () => {
+    if (para.length) { blocks.push(html`<p>${inline(para.join(' '))}</p>`); para = []; }
+    if (list.length) { blocks.push(html`<ul>${list.map((i) => html`<li>${inline(i)}</li>`)}</ul>`); list = []; }
+  };
+  for (const raw of String(md || '').replace(/<!--[\s\S]*?-->/g, '').split('\n')) {
+    const line = raw.trim();
+    let m;
+    if (!line) { flush(); continue; }
+    if ((m = /^(#{1,3})\s+(.*)$/.exec(line))) { flush(); blocks.push(m[1].length === 1 ? html`<h2>${m[2]}</h2>` : html`<h3>${m[2]}</h3>`); continue; }
+    if ((m = /^[-*]\s+(.*)$/.exec(line))) { if (para.length) { const keep = list; list = []; flush(); list = keep; } list.push(m[1]); continue; }
+    if (list.length) flush();
+    para.push(line);
+  }
+  flush();
+  return blocks;
+}
+
 let live = false;
 export async function render(main, route) {
   live = true;
-  const doc = DOCS[route.view] || DOCS.terms;
+  const which = route.view === 'privacy' ? 'privacy' : 'terms';
+  const doc = DOCS[which];
   document.title = `${doc.title}, Optic`;
+  const other = which === 'privacy' ? html`See also the <a class="textlink" href="#/terms">Terms of use</a>.` : html`See also the <a class="textlink" href="#/privacy">Privacy policy</a>.`;
+  let text = null;
+  try { text = await api.get(`/api/legal-text/${which}`, { ttl: 60000 }); } catch (e) { text = null; }
   if (!live) return;
+  if (text && text.state === 'counsel' && text.markdown) {
+    draw(main, html`<header class="page-head"><h1 class="t-display-m">${doc.title}</h1><p class="section-sub">${other}</p></header>
+      <article class="legal-doc" data-v2-legal="counsel">${fromMarkdown(text.markdown)}</article>`);
+    return;
+  }
+  // the placeholder (or the text could not be read): the notice, then the published draft
+  const pending = (text && text.pending) || "Optic's terms of use and privacy policy are being prepared with counsel.";
   draw(main, html`<header class="page-head"><h1 class="t-display-m">${doc.title}</h1>
-      <p class="section-sub">Effective ${EFFECTIVE}. ${route.view === 'privacy' ? html`See also the <a class="textlink" href="#/terms">Terms of use</a>.` : html`See also the <a class="textlink" href="#/privacy">Privacy policy</a>.`}</p></header>
+      <p class="legal-draft" data-v2-legal="placeholder" role="note"><b>${pending}</b> The version below was written before that review.</p>
+      <p class="section-sub">Effective ${EFFECTIVE}. ${other}</p></header>
     <article class="legal-doc">${doc.sections.map(([h, body]) => html`<h2>${h}</h2>${body}`)}</article>`);
 }
 export function dispose() { live = false; }

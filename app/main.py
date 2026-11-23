@@ -28,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import public_errors
 from . import health_extra, investor_routes, chart_routes, milo_routes
+from . import legal_text
 from . import (ai, brief as brief_mod, feeds as feeds_mod, legal,
                news as news_mod, paper, session as session_mod)
 from . import figures as figures_mod
@@ -9258,6 +9259,8 @@ app.include_router(auth_routes.router)
 app.include_router(investor_routes.router)
 app.include_router(chart_routes.router)
 app.include_router(milo_routes.router)
+app.include_router(legal_text.router)
+app.include_router(alerts_mod.router)
 app.include_router(account_mod.router)
 app.include_router(library_mod.router)
 from . import layouts as layouts_mod  # noqa: E402 - named layouts on the account (Pass 2)
