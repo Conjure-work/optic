@@ -22,7 +22,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _piece(head):
@@ -32,7 +33,7 @@ def _piece(head):
 
 
 def _run(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     prelude = """
@@ -51,7 +52,7 @@ def _run(script):
       function isIntradayRange(k) { return /^[0-9]+$/.test(k || chartRange); }
     """ + _piece("function chartTabPrice(d) {") + _piece("function chartTabTitle() {") \
         + _piece("function pageTabTitle() {") + _piece("function syncTabTitle() {")
-    out = subprocess.run([exe, "-e", prelude + script], capture_output=True, text=True,
+    out = run_e(exe, prelude + script, capture_output=True, text=True,
                          timeout=60, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])

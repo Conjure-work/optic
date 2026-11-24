@@ -27,14 +27,15 @@ ROOT = Path(__file__).resolve().parent.parent
 CHARTS = (ROOT / "static/charts.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
 NO_COMMENTS = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _drawn(live, ends_today=True):
     """A series of 40 daily bars ending today in New York, or yesterday. The
     pulse is drawn only on a series that runs to today: a page in market hours
     set the flag for every chart it drew, lagged daily data included."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = ((ROOT / "tests/support/recording_dom.js").read_text() + CHARTS + """
@@ -56,7 +57,7 @@ def _drawn(live, ends_today=True):
           opacity: n.attrs['fill-opacity'], stroke: n.attrs.stroke }; }),
         dots: dots.map(function (n) { return { r: n.attrs.r, color: n.attrs.color, fill: n.attrs.fill }; }) }));
     """ % ("true" if ends_today else "false", "true" if live else "false"))
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=120)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=120)
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

@@ -34,7 +34,8 @@ JS = (ROOT / "static/app.js").read_text()
 # Every script the page loads, for the question "does anything read this".
 SCRIPTS = "\n".join(p.read_text() for p in sorted((ROOT / "static").rglob("*.js"))
                     if "__" not in p.name)
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(name):
@@ -46,10 +47,10 @@ def _line(pattern):
 
 
 def _jsc(src):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
-    out = subprocess.run([exe, "-e", src + "\nprint('TEST_OK');"], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src + "\nprint('TEST_OK');", capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 
 

@@ -23,7 +23,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(head):
@@ -32,7 +33,7 @@ def _fn(head):
 
 
 def test_a_report_date_is_written_as_a_reader_says_it():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = _fn("function reportDate(iso) {") + """
@@ -40,7 +41,7 @@ def test_a_report_date_is_written_as_a_reader_says_it():
       print('RESULT:' + JSON.stringify([reportDate(y + '-11-02'), reportDate((y + 1) + '-01-29'),
         reportDate('not a date')]));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     got = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert got[0].endswith("Nov 2") and "," in got[0], got
     assert got[1].endswith(str(__import__("datetime").date.today().year + 1)), "another year says so"

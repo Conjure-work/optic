@@ -22,11 +22,12 @@ from tests.test_visual_primitives import DOM
 
 ROOT = Path(__file__).resolve().parent.parent
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _app(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -42,7 +43,7 @@ def _app(script):
       });
       function build(id) { var b = BUILT[id]; return b ? b.build(500) : 'not mounted'; }
     """ + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])
@@ -80,7 +81,7 @@ def test_a_row_and_a_strip_cell_carry_their_line():
 
 
 def test_a_line_is_drawn_at_the_width_its_track_has():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = DOM + """
@@ -98,7 +99,7 @@ def test_a_line_is_drawn_at_the_width_its_track_has():
       fillSparks({ querySelectorAll: function () { return slots; } });
       print('RESULT:' + JSON.stringify({ widths: widths, drawn: slots.map(function (s) { return s.dataset.drawn; }) }));
     """ % json.dumps(_fill_sparks_source())
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     r = json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])
     assert r["widths"] == [[58, 18], [160, 18], [64, 16]]
@@ -247,7 +248,7 @@ def test_the_expected_move_and_curve_are_drawn_from_the_payload():
 
 
 def test_the_curve_primitive():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = DOM + """
@@ -258,7 +259,7 @@ def test_the_curve_primitive():
                 none: curveChart({ categories: ['x'], series: [{ values: [1] }] }) };
       print('RESULT:' + JSON.stringify(R));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     r = json.loads((out.stdout + out.stderr).split("RESULT:", 1)[1].split("\n")[0])
     assert "5.30%" in r["labels"] and "3 month" in r["labels"]
     assert r["marks"] == 6 and r["none"] is None

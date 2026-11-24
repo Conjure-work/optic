@@ -32,7 +32,8 @@ from app.analytics import stage
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
 CHARTS = (ROOT / "static/charts.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 class _Feed:
@@ -55,7 +56,7 @@ class _Feed:
 
 
 def _js(script, prelude=None):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     head = prelude if prelude is not None else """
@@ -65,7 +66,7 @@ def _js(script, prelude=None):
       document.documentElement.style.removeProperty = function () {};
       try { load('static/charts.js'); load('static/app.js'); } catch (e) {}
     """
-    out = subprocess.run([exe, "-e", head + script], capture_output=True, text=True,
+    out = run_e(exe, head + script, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])

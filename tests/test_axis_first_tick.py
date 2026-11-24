@@ -16,7 +16,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 CHARTS = (ROOT / "static/charts.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(head):
@@ -25,7 +26,7 @@ def _fn(head):
 
 
 def _labels(unit, dates):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     months = CHARTS[CHARTS.index("const MONTH_SHORT"):CHARTS.index("/** A bar's label")]
@@ -33,7 +34,7 @@ def _labels(unit, dates):
       var ds = %s.map(function (s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); });
       print('RESULT:' + JSON.stringify(ds.map(function (d, i) { return tickLabel(d, '%s', i ? ds[i - 1] : null); })));
     """ % (json.dumps(dates), unit)
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=60)
+    out = run_e(exe, script, capture_output=True, text=True, timeout=60)
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-1500:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 

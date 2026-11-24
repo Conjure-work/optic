@@ -30,7 +30,8 @@ from app import analysts
 from app.providers import yf as yf_provider
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 NOW = datetime(2026, 9, 30, 20, 0, tzinfo=timezone.utc).timestamp()
 
 
@@ -224,16 +225,16 @@ def test_the_page_is_registered_under_discover():
 
 
 def _jsc(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
-    out = subprocess.run([exe, "-e", """
+    out = run_e(exe, """
       load('tests/support/browser_stubs.js');
       document.documentElement.style = document.documentElement.style || {};
       document.documentElement.style.setProperty = function () {};
       document.documentElement.style.removeProperty = function () {};
       try { load('static/charts.js'); load('static/app.js'); } catch (e) {}
-    """ + script], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    """ + script, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 

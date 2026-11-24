@@ -18,7 +18,8 @@ import pytest
 from app import catalyst_live
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def test_the_age_carries_the_instant():
@@ -28,7 +29,7 @@ def test_the_age_carries_the_instant():
 
 
 def test_the_page_counts_from_the_instant_not_the_label():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     three_hours = (datetime.now(timezone.utc) - timedelta(hours=3, minutes=2)).isoformat()
@@ -43,7 +44,7 @@ def test_the_page_counts_from_the_instant_not_the_label():
         catalystAgeLabel({label: 'as built'}),
         catalystAgeLabel(null)]));
     """ % three_hours
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     got = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert got == ["3 hours ago", "as built", ""]
 

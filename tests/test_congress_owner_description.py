@@ -26,7 +26,8 @@ import pytest
 from app.analytics import congress
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 F = "F\x00\x00\x00\x00\x00 S\x00\x00\x00\x00\x00: New"
 D = "D\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00: "
@@ -95,7 +96,7 @@ def test_a_parse_from_before_owners_were_kept_is_read_again():
 
 
 def _row_html(trade):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -106,7 +107,7 @@ def _row_html(trade):
       try { load('static/charts.js'); load('static/app.js'); } catch (e) {}
       print('RESULT:' + JSON.stringify({ html: insCongressRow(%s) }));
     """ % json.dumps(trade)
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    out = run_e(exe, script, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])["html"]
@@ -146,7 +147,7 @@ def test_the_header_has_both_columns_in_the_rows_order():
 
 def test_a_symbols_own_page_shows_them_too():
     """The dossier's Congressional disclosures table is the same trades."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -158,7 +159,7 @@ def test_a_symbols_own_page_shows_them_too():
       print('RESULT:' + JSON.stringify({ html: renderCongress({ available: true, count: 1, buys: 1,
         sells: 0, amount_low: 1000001, amount_high: 5000000, trades: [%s] }) }));
     """ % json.dumps({**TRADE, "owner": "SP", "description": "Purchased 10,000 shares."})
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    out = run_e(exe, script, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     html = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])["html"]
     assert "<th>Owner</th>" in html and "<th>Description</th>" in html

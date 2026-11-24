@@ -25,8 +25,8 @@ import pytest
 
 from app import priority
 
-JSC = ("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-       "Helpers/jsc")
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 APP = open("static/app.js", encoding="utf-8").read()
 CSS = open("static/styles.css", encoding="utf-8").read()
 
@@ -203,7 +203,7 @@ PAYLOAD = {"available": True, "horizon_days": 5, "columns": [
 
 @pytest.fixture(scope="module")
 def page():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -222,7 +222,7 @@ def page():
       out.past = homeTodayRow(p.columns[1].rows[1]);
       print('RESULT:' + JSON.stringify(out));
     """ % json.dumps(PAYLOAD)
-    proc = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=180)
+    proc = run_e(exe, script, capture_output=True, text=True, timeout=180)
     blob = proc.stdout + proc.stderr
     assert "RESULT:" in blob, blob[-1500:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

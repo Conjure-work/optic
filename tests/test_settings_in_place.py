@@ -21,7 +21,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 RAW = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 HARNESS = """
 function assert(v, m) { if (!v) throw new Error(m); }
@@ -41,11 +42,11 @@ function withTransitions(on) {
 
 
 def _run(scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     fn = re.search(r"^function applySettingInPlace\([^\n]*\) \{.*?^\}", RAW, re.M | re.S).group()
-    out = subprocess.run([exe, "-e", HARNESS + fn + "\n" + scenario + "\nprint('TEST_OK');"],
+    out = run_e(exe, HARNESS + fn + "\n" + scenario + "\nprint('TEST_OK');",
                          capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 

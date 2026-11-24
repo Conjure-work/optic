@@ -27,7 +27,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 RAW = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _raw_fn(name):
@@ -36,13 +37,13 @@ def _raw_fn(name):
 
 
 def _js(prelude, names, scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = ("function assert(v, m) { if (!v) throw new Error(m); }\n" + prelude + "\n"
            + "\n".join(_raw_fn(n) for n in names)
            + "\n(function () {\n" + scenario + "\n})(); print('TEST_OK');")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 
 

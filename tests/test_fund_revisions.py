@@ -23,7 +23,8 @@ from app.analytics import earnings as earnings_mod
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 class _Provider:
@@ -61,7 +62,7 @@ def _widget():
 
 
 def _run(scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     prelude = r"""
@@ -74,7 +75,7 @@ function money(v, d) { return '$' + Number(v).toFixed(d); }
 var STATE = { chartSymbol: 'QQQ', chartData: null };
 """
     src = prelude + _widget() + "\n(function () {\n" + scenario + "\n})(); print('TEST_OK');"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 
 

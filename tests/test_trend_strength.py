@@ -24,7 +24,8 @@ from app.analytics import indicators
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(name: str) -> str:
@@ -41,7 +42,7 @@ def _bars(n: int = 400, seed: int = 7):
 
 
 def _js(high, low, close):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     consts = re.search(r"^const TSO_ADX = [^\n]*;", APP, re.M).group()
@@ -49,7 +50,7 @@ def _js(high, low, close):
                      "var h = %s, l = %s, c = %s;" % (json.dumps(high), json.dumps(low), json.dumps(close)),
                      "print(JSON.stringify({ adx: adxSeries(h, l, c, 14), tso: tsoSeries(h, l, c),"
                      " rsi: rsiSeries(c, 14) }));"])
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     return json.loads(out.stdout)
 
 

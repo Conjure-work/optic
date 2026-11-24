@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 JS = (ROOT / "static/app.js").read_text(encoding="utf-8")
 CSS = (ROOT / "static/styles.css").read_text(encoding="utf-8")
 HTML = (ROOT / "static/index.html").read_text(encoding="utf-8")
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 
 
 def _block(src: str, start: str, open_ch: str = "{", close_ch: str = "}") -> str:
@@ -103,7 +103,7 @@ def test_hidden_is_honoured_by_the_header():
     assert re.search(r"\.page-head \{[^}]*display: flex", CSS)
 
 
-@pytest.mark.skipif(not os.path.exists(JSC) or shutil.which("true") is None,
+@pytest.mark.skipif(not JSC or shutil.which("true") is None,
                     reason="JavaScriptCore not available")
 def test_the_header_splits_a_title_from_its_description(tmp_path):
     """Run paintPageHead itself over the real tables: Optic's Read is a title

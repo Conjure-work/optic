@@ -28,6 +28,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_SRC = (ROOT / "static/app.js").read_text()
@@ -303,12 +304,11 @@ def test_the_colour_picker_says_when_stages_have_the_price():
 # ------------------------------------------------------ the shared Monday
 
 
-JSC = ("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-       "Helpers/jsc")
+from tests.support.jsc import JSC
 
 
 def _jsc():
-    return JSC if os.path.exists(JSC) else shutil.which("jsc")
+    return JSC
 
 
 def test_the_browser_and_the_server_agree_on_every_days_monday():
@@ -328,7 +328,7 @@ def test_the_browser_and_the_server_agree_on_every_days_monday():
       print('MONDAYS:' + days.map(weekMonday).join(','));
       print('JUNK:' + weekMonday('not a date'));
     """ % repr([d.isoformat() for d in days]).replace("'", '"')
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    out = run_e(exe, script, capture_output=True, text=True,
                          timeout=120).stdout
     got = out.split("MONDAYS:")[1].split("\n")[0].split(",")
     want = [(d - dt.timedelta(days=d.weekday())).isoformat() for d in days]
@@ -339,8 +339,8 @@ def test_the_browser_and_the_server_agree_on_every_days_monday():
 
 def test_prior_week_monday_is_seven_days_back_on_the_same_key():
     import os, shutil, subprocess
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         import pytest
         pytest.skip("no JavaScriptCore")
@@ -351,5 +351,5 @@ def test_prior_week_monday_is_seven_days_back_on_the_same_key():
       eq(priorWeekMonday('2026-01-05'), '2025-12-29');
       eq(priorWeekMonday(null), null);
       print('OK');"""
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=20)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=20)
     assert out.stdout.strip().endswith("OK"), out.stdout + out.stderr

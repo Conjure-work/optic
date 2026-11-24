@@ -34,7 +34,8 @@ from tests.test_swing_setups import frame, after
 
 ROOT = Path(__file__).resolve().parent.parent
 ET = session_mod.ET
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 @pytest.fixture(autouse=True)
@@ -383,7 +384,7 @@ def test_nothing_to_compare_is_said(accounts):
 # ================================================================ the card
 
 def _jsc(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -394,7 +395,7 @@ def _jsc(script):
       try { load('static/charts.js'); load('static/app.js'); } catch (e) { print('LOADFAIL:' + e); }
       var R = {};
     """ + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

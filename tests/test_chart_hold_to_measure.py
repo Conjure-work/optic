@@ -25,7 +25,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 HARNESS = """
   // Listeners kept, on elements and on the window, and a clock turned by hand.
@@ -103,14 +104,14 @@ SCENE = """
 
 
 def _run(steps, pan=True, armed=True, gap=None):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = ((ROOT / "tests/support/recording_dom.js").read_text() + HARNESS
            + (ROOT / "static/charts.js").read_text()
            + SCENE % {"pan": json.dumps(pan), "armed": json.dumps(armed), "gap": json.dumps(gap)}
            + steps + "\nprint(JSON.stringify({ log: LOG, prevented: prevented }));")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     last = out.stdout.strip().splitlines()[-1] if out.stdout.strip() else ""
     assert last.startswith("{"), out.stdout + out.stderr
     got = json.loads(last)

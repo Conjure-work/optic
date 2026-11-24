@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from app import alerts
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_JS = (ROOT / "static" / "app.js").read_text()
@@ -279,8 +280,8 @@ def _note(admin, delivery):
     import os
     import shutil
     import subprocess
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -292,7 +293,7 @@ def _note(admin, delivery):
       window.OpticAuth = { state: function () { return { status: 'user', admin: %s }; } };
       print('RESULT:' + JSON.stringify({ html: alertDeliveryNote(%s) }));
     """ % (json.dumps(admin), json.dumps(delivery))
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    out = run_e(exe, script, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])["html"]

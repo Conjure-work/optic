@@ -32,12 +32,12 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = (ROOT / "static/app.js").read_text()
-JSC = ("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-       "Helpers/jsc")
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _exe():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     return exe
@@ -78,7 +78,7 @@ ROUTING = """
 
 
 def _routing(scenario):
-    proc = subprocess.run([_exe(), "-e", ROUTING + scenario + "\nprint('RESULT:' + JSON.stringify(R));"],
+    proc = run_e(_exe(), ROUTING + scenario + "\nprint('RESULT:' + JSON.stringify(R));",
                           capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     return _out(proc)
 
@@ -187,7 +187,7 @@ def _anchor(scenario):
                                           "flushChartWheel", "chartBarsPerPixel",
                                           "interactiveRedraw"))
     src = ANCHOR % (consts, fns) + "\nvar R = {};\n" + scenario + "\nprint('RESULT:' + JSON.stringify(R));"
-    proc = subprocess.run([_exe(), "-e", src], capture_output=True, text=True, timeout=60)
+    proc = run_e(_exe(), src, capture_output=True, text=True, timeout=60)
     return _out(proc)
 
 

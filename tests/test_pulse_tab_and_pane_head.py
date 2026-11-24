@@ -19,7 +19,8 @@ ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
 HTML = (ROOT / "static/index.html").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(name):
@@ -28,7 +29,7 @@ def _fn(name):
 
 
 def test_the_placeholder_example_becomes_the_draft():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     ph = re.search(r'id="chat-input" placeholder="([^"]*)"', HTML).group(1).replace("&quot;", '"')
@@ -36,7 +37,7 @@ def test_the_placeholder_example_becomes_the_draft():
         "print('RESULT:' + JSON.stringify([pulsePlaceholderAsk({placeholder: %s}),"
         " pulsePlaceholderAsk({placeholder: 'Pulse is unavailable'}), pulsePlaceholderAsk(null)]));"
         % json.dumps(ph))
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=60)
+    out = run_e(exe, script, capture_output=True, text=True, timeout=60)
     got = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert got == ["What is moving the market today?", "", ""]
 
@@ -67,7 +68,7 @@ def test_the_title_and_its_symbol_sit_a_word_space_apart():
 def test_enter_sends_and_shift_enter_is_a_new_line():
     """Asked for as "pressing enter on Milo should send the message, not create
     another line". Run the box's own key handler on simulated keys."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     start = APP.index("$('#chat-input').addEventListener('keydown'")
@@ -93,7 +94,7 @@ def test_enter_sends_and_shift_enter_is_a_new_line():
         composing: press({ isComposing: true }), ime: press({ keyCode: 229 }),
         letter: press({ key: 'a', keyCode: 65 }) }));
     """ % handler
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=60)
+    out = run_e(exe, script, capture_output=True, text=True, timeout=60)
     got = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert got["enter"] == [1, True], "Enter sends, and adds no line"
     assert got["meta"] == [1, True] and got["ctrl"] == [1, True], "Cmd/Ctrl+Enter still send"

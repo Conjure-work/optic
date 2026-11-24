@@ -29,7 +29,8 @@ APP = (ROOT / "static/app.js").read_text()
 # Code without its comments, for the searches that must not pass on their own
 # prose: the comments here quote the calls they replaced.
 CODE = re.sub(r"^\s*//.*$", " ", re.sub(r"/\*.*?\*/", " ", APP, flags=re.S), flags=re.M)
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(name):
@@ -58,13 +59,13 @@ function $(sel) { return sel === '#chat-input' ? box : null; }
 
 
 def _run(scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = (HARNESS + "\n".join(_fn(n) for n in ("pulseFocusBox", "syncChatViewport", "openPulseWithText",
                                                     "openPulse", "draftPulse"))
            + "\n" + scenario + "\nprint('TEST_OK');")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 
 

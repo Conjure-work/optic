@@ -24,7 +24,8 @@ from app import signal_history
 from app.auth import config, store
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 RECORD = {
     "signal_key": "X|trend_pullback|bull|2026-09-01", "symbol": "X", "strategy": "trend_pullback",
@@ -41,7 +42,7 @@ RECORD = {
 
 
 def _run(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -53,7 +54,7 @@ def _run(script):
       var R = {};
       var REC = %s;
     """ % json.dumps(RECORD) + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

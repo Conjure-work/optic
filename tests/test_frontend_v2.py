@@ -116,11 +116,11 @@ def test_no_browser_dialogs_in_v2():
         assert not re.search(r"\b(window\.)?(prompt|confirm|alert)\(", text), path.name
 
 
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 
 
 def _jsc():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("jsc not available")
     return exe

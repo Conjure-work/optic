@@ -25,6 +25,7 @@ import pytest
 
 from app.analytics import gex
 from app.analytics.greeks import greeks
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 S0 = 100.0
@@ -207,11 +208,11 @@ def test_the_contradiction_is_gone_from_every_explanation():
     assert "Positioning leans long" not in (ROOT / "app/analytics/greeks_panel.py").read_text()
 
 
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 
 
 def test_the_flip_sentence_follows_the_crossing():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -222,7 +223,7 @@ def test_the_flip_sentence_follows_the_crossing():
         down: gexFlipSentence({regime: {flip_direction: 'downward'}}),
         none: gexFlipSentence({regime: {}})}));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     body = json.loads((out.stdout + out.stderr).split("RESULT:", 1)[1].split("\n")[0])
     assert "above it hedging" in body["up"] and "dampens moves, below it adds" in body["up"]
     assert "below it hedging" in body["down"] and "above it adds" in body["down"]

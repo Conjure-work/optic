@@ -37,7 +37,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 A = "0b7c1f9e-0000-4000-8000-00000000000a"
 B = "0b7c1f9e-0000-4000-8000-00000000000b"
@@ -82,7 +83,7 @@ var document = { getElementById: function (id) { return FIELDS[id] || null; } };
 def _run(scenario, boot=True):
     """The section as a page runs it, with `newPage()` standing in for a reload:
     a fresh evaluation over the same storage, as the browser gives it."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     section = _section()
@@ -106,7 +107,7 @@ def _run(scenario, boot=True):
     """ % (json.dumps(section), json.dumps(A), json.dumps(B))
     if boot:
         src += "newPage();\n"
-    out = subprocess.run([exe, "-e", src + scenario + "\nprint('TEST_OK');"],
+    out = run_e(exe, src + scenario + "\nprint('TEST_OK');",
                          capture_output=True, text=True, timeout=60)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 

@@ -26,7 +26,8 @@ import pytest
 from app.analytics import compare
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _payload(start, n, step):
@@ -58,7 +59,7 @@ def test_too_little_shared_history_draws_nothing():
 
 
 def _app(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -75,7 +76,7 @@ def _app(script):
       var PERF = { start: '2025-10-06', end: '2026-10-05', sessions: 252, dates: ['2025-10-06', '2026-10-05'],
         series: [{ ticker: 'NVDA', values: [100, 164], change_pct: 64.2 }, { ticker: 'AMD', values: [100, 79], change_pct: -21.0 }] };
     """ + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

@@ -18,11 +18,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def test_the_stand_in_weeks_are_their_mondays():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -35,7 +36,7 @@ def test_the_stand_in_weeks_are_their_mondays():
       var w = aggregateWeekly(ps);
       print('RESULT:' + JSON.stringify({dates: w.dates, close: w.close, high: w.high, mondays: w.mondays}));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     got = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert got["dates"] == ["2026-09-07", "2026-09-14"]
     assert got["close"] == [4.5, 8] and got["high"] == [5, 9]

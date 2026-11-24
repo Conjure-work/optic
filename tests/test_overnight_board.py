@@ -29,6 +29,7 @@ import pytest
 
 from app import session as session_mod
 from app.analytics import sector_board as sb
+from tests.support.jsc import run_e
 
 ET = session_mod.ET
 XLK = [{"symbol": "XLK", "name": "Technology"}]
@@ -594,8 +595,8 @@ def test_no_em_dash_in_the_new_client_copy():
 
 
 def _jsc():
-    exe = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    return exe if os.path.exists(exe) else shutil.which("jsc")
+    from tests.support.jsc import JSC as exe
+    return exe
 
 
 def _const(name):
@@ -630,7 +631,7 @@ def test_a_card_renders_a_real_row_under_javascriptcore():
         " pre: trendCardHTML(pre, 'regular session'), line: trendBasisLine(basis),"
         " night: trendBasisLine(night)}));",
     ])
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     got = json.loads(out.stdout.strip().splitlines()[-1])
     card = got["card"]
     words = re.sub(r"<[^>]+>", "", card)

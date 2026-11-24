@@ -31,7 +31,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(head):
@@ -71,7 +72,7 @@ def test_the_drawing_rail_has_room_round_its_tools():
 # ------------------------------------------------------------- funds
 
 def _run(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     prelude = """
@@ -79,7 +80,7 @@ def _run(script):
       const SECURITY_VIEWS = ['overview', 'chart', 'swing', 'long', 'earnings', 'financials', 'news'];
       const FUND_TYPES = ['ETF', 'MUTUALFUND'];
     """ + _fn("function symbolIsFund(sym) {") + _fn("function securityViewsFor(sym) {")
-    out = subprocess.run([exe, "-e", prelude + script], capture_output=True, text=True,
+    out = run_e(exe, prelude + script, capture_output=True, text=True,
                          timeout=60, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-1500:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])

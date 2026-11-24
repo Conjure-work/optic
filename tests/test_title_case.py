@@ -21,7 +21,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(head):
@@ -30,12 +31,12 @@ def _fn(head):
 
 
 def _cased(titles):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     prelude = APP[APP.index("const TITLE_SMALL"):APP.index("function titleCase(")] + _fn("function titleCase(text) {")
     script = prelude + "print('RESULT:' + JSON.stringify(%s.map(titleCase)));" % json.dumps(titles)
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=60)
+    out = run_e(exe, script, capture_output=True, text=True, timeout=60)
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-1500:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 

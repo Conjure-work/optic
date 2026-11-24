@@ -29,7 +29,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 UP, DOWN = "#00aa00", "#aa0000"
 OHLC = {"open": [10, 10.2, 11, 10.6, 12.1], "high": [10.5, 11.2, 11.1, 12.2, 12.3],
         "low": [9.8, 10.1, 10.3, 10.5, 11.4], "close": [10.3, 11, 10.5, 12, 11.5]}
@@ -38,7 +39,7 @@ OHLC = {"open": [10, 10.2, 11, 10.6, 12.1], "high": [10.5, 11.2, 11.1, 12.2, 12.
 def _draw(opts, hover=None):
     """Draw `opts` and read back what was drawn. `hover` is a clientX to move
     the pointer to afterwards; the readout it produced comes back as `tip`."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = ((ROOT / "tests/support/recording_dom.js").read_text()
@@ -76,7 +77,7 @@ def _draw(opts, hover=None):
                              top: f.margin ? f.margin.t : 0, priceH: f.priceH || 0,
                              foot: (f.margin ? f.margin.t : 0) + (f.priceH || 0) }));
     """ % (json.dumps(opts), json.dumps(hover)))
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     last = out.stdout.strip().splitlines()[-1] if out.stdout.strip() else ""
     assert last.startswith("{"), out.stdout + out.stderr
     return json.loads(last)

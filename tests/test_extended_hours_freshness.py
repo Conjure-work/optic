@@ -27,14 +27,14 @@ import subprocess
 
 import pytest
 
-JSC = ("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-       "Helpers/jsc")
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 APP = open("static/app.js", encoding="utf-8").read()
 
 
 def _jsc():
-    return JSC if os.path.exists(JSC) else shutil.which("jsc")
+    return JSC
 
 
 # "Now" for every case below: Sunday 2026-10-04 21:19 ET, the moment reported.
@@ -108,7 +108,7 @@ def rendered():
         print('RESULT:' + JSON.stringify(out));
       }
     """ % (json.dumps(NOW), json.dumps(CASES))
-    proc = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    proc = run_e(exe, script, capture_output=True, text=True,
                           timeout=180)
     blob = proc.stdout + proc.stderr
     assert "RESULT:" in blob, blob[-1500:]
@@ -236,7 +236,7 @@ def night():
       // temporal dead zone -- a harness limit, not a production one.
       print('RESULT:' + JSON.stringify(out));
     """ % (json.dumps(NOW), json.dumps(OVERNIGHT_SESSION), json.dumps(SWING_QUOTE))
-    proc = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    proc = run_e(exe, script, capture_output=True, text=True,
                           timeout=180)
     blob = proc.stdout + proc.stderr
     assert "RESULT:" in blob, blob[-1500:]

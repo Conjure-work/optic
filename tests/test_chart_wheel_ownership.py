@@ -30,7 +30,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _raw_fn(name: str) -> str:
@@ -43,7 +44,7 @@ def _handler() -> str:
 
 
 def _run(scenario: str) -> str:
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     consts = "\n".join(re.search(r"^const %s = [^\n]*;" % n, RAW, re.M).group()
@@ -52,7 +53,7 @@ def _run(scenario: str) -> str:
            + _raw_fn("wheelPixels") + "\n" + _raw_fn("chartWheelHasRoom") + "\n"
            + _raw_fn("chartBarUnderCursor") + "\n" + _raw_fn("chartPointerFraction") + "\n"
            + scenario + "\nprint('OK');")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=20)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=20)
     assert out.stdout.strip().endswith("OK"), out.stdout + out.stderr
     return out.stdout
 

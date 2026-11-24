@@ -20,7 +20,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(head):
@@ -34,7 +35,7 @@ def _rule(selector):
 
 
 def _run(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     prelude = """
@@ -43,7 +44,7 @@ def _run(script):
       function cap(s) { return s; }
       const DAILY_LINK_LABEL = { swing: 'Swing setups', chart: 'Chart' };
     """ + _fn("function dailyChangeRow(it, repeatWhy) {") + _fn("function dailyChangeRows(items) {")
-    out = subprocess.run([exe, "-e", prelude + script], capture_output=True, text=True,
+    out = run_e(exe, prelude + script, capture_output=True, text=True,
                          timeout=60, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
@@ -123,7 +124,7 @@ def test_the_pe_bands_quote_cheap_with_quote_marks():
 def test_a_yield_moves_in_basis_points():
     """The 10-year read "-0.79%", a percent of the rate, for a move of about
     four hundredths of a point."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -136,7 +137,7 @@ def test_a_yield_moves_in_basis_points():
         moveLabel({ group: 'equity', last: 7878, chg_1d: 0.66 }),
         moveLabel({ group: 'rates', last: 4.1, chg_1d: null })]));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     got = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert got == ["−4 bp", "+5 bp", "0 bp", "+0.66%", None]
 
@@ -199,7 +200,7 @@ def test_the_today_band_goes_stale_and_says_when_it_is_from():
 def test_the_pulse_inputs_fill_out_from_a_middle_line():
     """(score + 100) / 2 drew a score of 0 as a half-full bar, and -7 for
     Macro as "about half good"."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = _fn("function pulseBar(score, direction) {") + """
@@ -211,7 +212,7 @@ def test_the_pulse_inputs_fill_out_from_a_middle_line():
       print('RESULT:' + JSON.stringify([cells(pulseBar(0, 'flat')), cells(pulseBar(50, 'up')),
         cells(pulseBar(-75, 'down')), cells(pulseBar(100, 'up')), pulseBar(null).indexOf('is-none') >= 0]));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     got = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert got == [[0, 0], [0, 3], [4, 0], [0, 5], True]
     hero = _fn("function renderOpticPulse(d) {")

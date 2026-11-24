@@ -32,7 +32,8 @@ from app.analytics import extras, fundamentals
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 CO = {
     "short_interest": {"available": True, "squeeze_potential": "low", "settlement_date": "2026-09-15",
@@ -88,7 +89,7 @@ EXTRAS_LABELS = [
 
 
 def _jsc(script, before=""):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -101,7 +102,7 @@ def _jsc(script, before=""):
       var CO = %s, X = %s, R = {};
       STATE.swing = {};
     """ % (json.dumps(CO), json.dumps(X)) + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-1500:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])
@@ -318,7 +319,7 @@ def test_the_tab_renders_whatever_shape_the_holders_come_in():
 # ------------------------------------------------- the panel that went missing
 
 def _lifted(names, decls, scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     fn = lambda n: re.search(r"^(?:async )?function " + n + r"\([^\n]*\) \{.*?^\}", APP, re.M | re.S).group()
@@ -330,7 +331,7 @@ def _lifted(names, decls, scenario):
            + "\n".join(decl(d) for d in decls) + "\n" + "\n".join(fn(n) for n in names)
            + "\n(async function () {\n" + scenario + "\n})().then(function () { print('TEST_OK'); },"
            " function (e) { print('FAIL ' + e + '\\n' + e.stack); });")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 
 

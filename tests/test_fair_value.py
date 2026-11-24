@@ -30,7 +30,8 @@ from app.analytics import sec_facts
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 TODAY = datetime(2026, 10, 3, tzinfo=timezone.utc)
 
 
@@ -176,7 +177,7 @@ def test_each_block_fails_on_its_own(monkeypatch):
 # ------------------------------------------------------------------ the page
 
 def _run(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
 
@@ -203,7 +204,7 @@ def _run(script):
       function facetQuote() { return {}; }
       function vizBlock(id, title, sub) { return '<div id="' + id + '">' + title + '|' + sub + '</div>'; }
     """ + pieces
-    out = subprocess.run([exe, "-e", prelude + script], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, prelude + script, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 
@@ -319,7 +320,7 @@ def test_the_quote_carries_it_and_the_page_shows_stars_only_when_there_are_some(
 
 
 def _run_ms(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     fn = ""
@@ -331,7 +332,7 @@ def _run_ms(script):
       function hg(v) { return v; }
       function tile(label, value, note) { return label + '|' + value + '|' + (note || ''); }
     """
-    out = subprocess.run([exe, "-e", prelude + fn + script], capture_output=True, text=True,
+    out = run_e(exe, prelude + fn + script, capture_output=True, text=True,
                          timeout=60, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-1500:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
@@ -391,7 +392,7 @@ def test_the_star_panel_sits_above_the_range_and_is_optics():
 # no Financials card, as its strip has no Financials tab.
 
 def _overview(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     fns = ""
@@ -404,7 +405,7 @@ def _overview(script):
       function esc(v) { return String(v); }
       function fmt(v, d) { return Number(v).toFixed(d); }
     """
-    out = subprocess.run([exe, "-e", prelude + fns + script], capture_output=True, text=True,
+    out = run_e(exe, prelude + fns + script, capture_output=True, text=True,
                          timeout=60, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-1500:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])

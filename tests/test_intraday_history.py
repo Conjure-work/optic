@@ -28,7 +28,8 @@ import app.main as main
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _sessions(days, per_day=78, spike_before=None):
@@ -170,7 +171,7 @@ def test_vwap_starts_at_the_views_first_bar(monkeypatch):
 
 
 def _run(scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     frame = _sessions(10)
@@ -197,7 +198,7 @@ def _run(scenario):
       }
       %s
     """ % (json.dumps(bars), scenario)
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    out = run_e(exe, script, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])

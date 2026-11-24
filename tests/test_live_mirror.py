@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 
 import app.main as main
 from app import ai, catalysts, live_mirror
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 # Taken before conftest's fixture swaps it out, which happens per test.
@@ -360,18 +361,18 @@ def _raw_fn(name):
                      APP_RAW, re.M | re.S).group()
 
 
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 
 
 def _js(scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = ("function assert(v, m) { if (!v) throw new Error(m); }\n"
            + "\n".join(_raw_fn(n) for n in ("esc", "httpUrl", "catalystMirrorNote",
                                              "weeklyMirrorNote"))
            + "\n" + scenario + "\nprint('TEST_OK');")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 
 

@@ -36,6 +36,7 @@ import pytest
 from app.analytics import entry
 from app.analytics import swing
 from app.analytics.greeks import bs_price
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text(encoding="utf-8")
@@ -414,11 +415,11 @@ def test_the_snapshot_hands_the_limit_to_every_builder():
 
 # ------------------------------------------------------------- the page
 
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 
 
 def _run(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -426,7 +427,7 @@ def _run(script):
       try { load('static/charts.js'); load('static/app.js'); } catch (e) {}
       var R = {};
     """ + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True,
+    out = run_e(exe, src, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]

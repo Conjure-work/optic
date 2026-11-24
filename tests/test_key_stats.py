@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.providers import yf
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
@@ -61,7 +62,7 @@ import subprocess
 
 import pytest
 
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 QUOTE = {"price": 155.0, "market_cap": 54.11e9, "trailing_pe": 24.46, "forward_pe": 20.1,
          "trailing_eps": 6.33, "forward_eps": 7.7, "dividend_yield": 0.0063, "open": 151.44,
          "day_high": 161.61, "day_low": 146.0, "volume": 10.86e6, "avg_volume": 6.34e6,
@@ -72,7 +73,7 @@ SHORT = {"available": True, "percent_of_float": 0.034, "days_to_cover": 1.8,
 
 
 def _jsc(script, before=""):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -84,7 +85,7 @@ def _jsc(script, before=""):
       try { load('static/charts.js'); load('static/app.js'); } catch (e) {}
       var Q = %s, SH = %s, R = {};
     """ % (json.dumps(QUOTE), json.dumps(SHORT)) + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-1500:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

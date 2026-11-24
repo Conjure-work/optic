@@ -23,7 +23,8 @@ from app import news as news_mod
 from app.main import YF_PROVIDER as P
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 STORY = {"id": "1", "title": "Example Co beats estimates", "summary": "", "publisher": "Wire",
          "published": "2026-10-06T12:00:00Z", "link": "https://example.com/1"}
 
@@ -68,7 +69,7 @@ def test_the_payload_says_when_its_headlines_were_fetched():
 
 
 def test_the_news_tab_says_it():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -79,7 +80,7 @@ def test_the_news_tab_says_it():
         held: newsHeldNote({held: {fetched_at: at, note: 'The headline feed came back empty just now, so these are the stories it returned earlier.'}}),
         fresh: newsHeldNote({held: null})}));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     got = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert "came back empty" in got["held"] and "3h ago" in got["held"]
     assert got["fresh"] == ""

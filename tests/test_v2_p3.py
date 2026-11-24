@@ -19,7 +19,7 @@ CSS = (V2 / "css/components.css").read_text() + (V2 / "css/pages.css").read_text
 
 
 def _run(tmp_path, body):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("jsc not available")
     script = tmp_path / "check.mjs"
