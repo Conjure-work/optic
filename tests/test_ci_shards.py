@@ -53,13 +53,23 @@ def test_the_shard_floors_add_up_to_the_suite_floor():
     assert sum(shards.SHARD_FLOORS.values()) == floor
 
 
+def _junit(tmp_path, name, tests, failures=0, skipped=(), unnamed_skips=0):
+    """A JUnit file in pytest's shape; `skipped` names the skipped tests as (classname, name) pairs."""
+    cases = "".join('<testcase classname="{}" name="{}"><skipped message="x"/></testcase>'.format(c, n)
+                    for c, n in skipped)
+    (tmp_path / "junit-{}.xml".format(name)).write_text(
+        '<testsuites><testsuite tests="{}" failures="{}" errors="0" skipped="{}">{}</testsuite></testsuites>'.format(
+            tests, failures, len(skipped) + unnamed_skips, cases))
+
+
+KNOWN = ("tests.test_brokerage_exposure", "test_live_qqq")
+
+
 def test_the_count_fails_a_missing_shard_a_failure_or_a_total_under_the_floor(tmp_path, monkeypatch):
-    def junit(name, tests, failures=0, skipped=0):
-        (tmp_path / "junit-{}.xml".format(name)).write_text(
-            '<testsuites><testsuite tests="{}" failures="{}" errors="0" skipped="{}"/></testsuites>'.format(
-                tests, failures, skipped))
+    def junit(name, tests, failures=0, skipped=()):
+        _junit(tmp_path, name, tests, failures, skipped)
     for name in shards.names():
-        junit(name, shards.SHARD_FLOORS[name] + (1 if name == "py" else 0), skipped=1 if name == "py" else 0)
+        junit(name, shards.SHARD_FLOORS[name] + (1 if name == "py" else 0), skipped=(KNOWN,) if name == "py" else ())
     monkeypatch.setenv("SUITE_FLOOR", str(sum(shards.SHARD_FLOORS.values())))
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     assert ci_count.total(str(tmp_path)) == 0
@@ -68,3 +78,23 @@ def test_the_count_fails_a_missing_shard_a_failure_or_a_total_under_the_floor(tm
     junit("e2e-3", shards.SHARD_FLOORS["e2e-3"])
     (tmp_path / "junit-e2e-6.xml").unlink()
     assert ci_count.total(str(tmp_path)) == 1
+
+
+def test_the_count_fails_any_skip_but_the_known_one(tmp_path, monkeypatch):
+    """Zero skips is the rule (2026-11-24): a test skipped for want of JavaScriptCore used to pass the run."""
+    monkeypatch.setenv("SUITE_FLOOR", str(sum(shards.SHARD_FLOORS.values())))
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    for name in shards.names():
+        _junit(tmp_path, name, shards.SHARD_FLOORS[name] + (1 if name == "py" else 0),
+               skipped=(KNOWN,) if name == "py" else ())
+    assert ci_count.total(str(tmp_path)) == 0
+    assert ci_count.shard("py", str(tmp_path / "junit-py.xml")) == 0
+    assert ci_count.skipped_ids(tmp_path / "junit-py.xml") == ["tests/test_brokerage_exposure.py::test_live_qqq"]
+    # one more skip, in a journey slice, with the floor still met
+    _junit(tmp_path, "e2e-2", shards.SHARD_FLOORS["e2e-2"] + 1, skipped=(("tests.e2e.test_x", "test_y"),))
+    assert ci_count.total(str(tmp_path)) == 1
+    assert ci_count.shard("e2e-2", str(tmp_path / "junit-e2e-2.xml")) == 1
+    # a skip the file counts but does not name
+    _junit(tmp_path, "e2e-2", shards.SHARD_FLOORS["e2e-2"] + 1, unnamed_skips=1)
+    assert ci_count.total(str(tmp_path)) == 1
+    assert ci_count.shard("e2e-2", str(tmp_path / "junit-e2e-2.xml")) == 1
