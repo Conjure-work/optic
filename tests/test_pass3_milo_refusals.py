@@ -55,7 +55,7 @@ def test_the_hostile_and_advisory_cases_get_at_most_one_refusal_sentence_of_the_
     msgs = list(case.get("history") or []) + [{"role": "user", "content": case["question"]}]
     _, meta = ai.build_chat_request(msgs, context=case.get("context"))
     line = meta["policy_line"]
-    declined = bool(meta["policy_kinds"] or meta["offtopic_kinds"])
+    declined = bool(meta["policy_kinds"] or meta["offtopic_kinds"] or meta["echo_kinds"])   # echo: round two
     assert bool(line) == declined
     if declined:
         assert _one_refusal(line), line

@@ -105,6 +105,9 @@ def judge_answer(case: Dict[str, Any], got: Dict[str, Any]) -> Tuple[bool, str]:
         return False, got["error"]
     if not (got["text"] or got["notices"]):
         return False, "no answer and no refusal"
+    if not got["text"] and any(n.get("refused") for n in got["notices"]):
+        # declined before the model (an off-topic question, or a link or image to repeat): judged as a refusal
+        return judge_offtopic(case, got)
     for cid in answer_checks.all_for(case):
         if cid.partition(":")[0] in NEEDS_EVIDENCE:
             continue

@@ -9215,29 +9215,10 @@ async def _chat_context(request: Request, history: List[Dict[str, Any]], context
     return context
 
 
-# A plain definition: "What is a P/E ratio?", "What does market cap mean?", "What is the difference between a stock
-# and a bond?", "Define implied volatility" (post-demo Phase 08). Not one when the question names a symbol, points
-# at the screen or at the reader ("this", "here", "my"), asks about now ("today", "current"), asks a price or a
-# move, or is about a company ("Apple's margin"). Erring the other way costs nothing but time: the context is
-# gathered as before.
-_DEFINITION = re.compile(
-    r"^(?:what\s+(?:is|are)\s+(?:a|an|the)\s+\S|what\s+(?:is|are)\s+(?!it\b|that\b|this\b)[a-z/&.\- ]{2,40}\??$|"
-    r"what\s+does\s+.{2,50}\s+(?:mean|tell\s+(?:me|us))\b|what'?s\s+(?:a|an)\s+|define\s+|explain\s+(?:what\s+)?(?:a|an)\s+|"
-    r"how\s+does\s+(?:a|an)\s+.{2,40}\s+work\b)", re.I)
-_NOT_DEFINITION = re.compile(
-    r"\b(?:this|these|those|here|my|our|mine|(?<!tell )me|i|today|tonight|now|current(?:ly)?|latest|recent(?:ly)?|yesterday|"
-    r"its|price|prices|priced|trading|worth|doing|moving(?!\s+average)|moved|move)\b|\b(?!what|that|it|there|here|who|how|let)[a-z]+'s\b",
-    re.I)
-
-
+# A plain definition (post-demo Phase 08): the rule lives in app/knowledge.py since round two (2026-11-24), because
+# Milo's answer length for a definition is held there too (knowledge.definition_ceiling).
 def _is_definition(question: str, context: Optional[Dict[str, Any]]) -> bool:
-    q = " ".join(str(question or "").split())
-    if not q or len(q.split()) > 14:
-        return False
-    named = (context or {}).get("question_named") if isinstance((context or {}).get("question_named"), dict) else {}
-    if named.get("symbols") or named.get("unknown"):
-        return False
-    return bool(_DEFINITION.search(q)) and not _NOT_DEFINITION.search(q)
+    return knowledge_mod.is_definition(question, context)
 
 
 @app.post("/api/research")

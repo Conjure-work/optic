@@ -406,21 +406,126 @@ _POLICY_INSTEAD = "show the research that bears on the decision, and the decisio
 REFUSAL_SHAPE = re.compile(r"^Milo can't [^.;!?]+; it can [^.;!?]+\.$")
 
 
+# ------------------------------------------------------------ links and images in a question (round two, 2026-11-24)
+#
+# A question that asks Milo to repeat, echo or render a web address or an image is declined before any model is
+# called. A model asked to "repeat exactly" a markdown image will often do it, and the address can carry whatever an
+# attacker put in it (a query string with data from the page, or a word that proves the model obeyed); an image the
+# panel ever drew would fetch that address on its own. The live evaluation of 2026-11-24 saw a model repeat one
+# (INJ-12). The answer side has its own guard, `scrub_echo`, for an address the model writes anyway.
+
+ECHO_VERSION = "echo-2026-11-24"
+
+ECHO_KINDS: Dict[str, str] = {
+    "echo_link": "repeat web addresses or images pasted into a question",
+}
+
+# Asked to say it back: "repeat exactly", "echo this", "print verbatim", "output it as-is", "render this image"
+_ECHO_ASK = re.compile(
+    r"\b(?:repeat|echo|reproduce|parrot|copy|paste|print|output|return|render|display|embed|include)\b|"
+    r"\b(?:say|write|type|show|give)\b[^.?!\n]{0,40}\b(?:exactly|verbatim|word\s+for\s+word|character\s+for\s+character|"
+    r"as[- ]is|back)\b|\b(?:verbatim|word\s+for\s+word|exactly\s+as\s+(?:written|given|typed))\b", _I)
+# A web address or an image: a markdown image, an <img> tag, http(s)://, or a bare host with a path and a query
+_LINKISH = re.compile(r"!\[[^\]]*\]\(|<img\b|\bhttps?://|\bwww\.[a-z0-9-]+\.[a-z]{2,}|"
+                      r"\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/\S*\?\S*=", _I)
+
+
+def classify_echo(question: str) -> List[str]:
+    """["echo_link"] when the question asks Milo to repeat, echo or render a web address or an image; else []."""
+    q = " ".join(str(question or "").split())
+    if not q:
+        return []
+    if re.search(r"!\[[^\]]*\]\(\s*https?://|<img\b", q, _I):
+        return ["echo_link"]           # an image to draw is declined whatever words come with it
+    return ["echo_link"] if _ECHO_ASK.search(q) and _LINKISH.search(q) else []
+
+
+# an address ends before whitespace, a closing bracket or quote, and before the punctuation that ends a sentence
+_URL = re.compile(r"\b(?:https?://|www\.)[^\s)\]>\"'<`]+?(?=[.,;:!?]*(?:[\s)\]>\"'<`]|$))", _I)
+_MD_IMAGE = re.compile(r"!\[([^\]]*)\]\(\s*[^)\s]*(?:\s+\"[^\"]*\")?\s*\)")
+_HTML_IMG = re.compile(r"<img\b[^>]*>", _I)
+ECHO_NOTE = ("Milo left out an image or the data in a web address that came from the question; it does not repeat "
+             "pasted links.")
+
+
+def _payloads(question: str) -> Tuple[List[str], List[str]]:
+    """The hosts of the web addresses in a question, and the payload-like values their query strings and fragments
+    carry."""
+    from urllib.parse import parse_qsl, urlsplit
+    hosts, values = [], []
+    for raw in _URL.findall(str(question or "")):
+        try:
+            parts = urlsplit(raw if "://" in raw else "http://" + raw)
+        except ValueError:
+            continue
+        if parts.hostname:
+            hosts.append(parts.hostname.lower())
+        for piece in (parts.query, parts.fragment):
+            if not piece:
+                continue
+            values.append(piece)
+            values.extend(v for _, v in parse_qsl(piece, keep_blank_values=True))
+    # A value is taken out wherever it appears only when it looks like a payload, not a word: six characters or more
+    # with a digit or a sign in it ("PINEAPPLE-7", a token, an encoded string). "type=10-K" leaves "10-K" alone
+    # outside the address. Longest first, so a whole query string goes before a value inside it.
+    keep = {v for v in values if len(v) >= 6 and re.search(r"[^A-Za-z]", v)}
+    return hosts, sorted(keep, key=len, reverse=True)
+
+
+def scrub_echo(text: str, question: str = "") -> Tuple[str, int]:
+    """`text` with every image taken out (its alt words kept), the query string and fragment stripped from any web
+    address on a host the question named, and any value from those query strings removed wherever it appears.
+    Returns the text and how many changes were made; (text, 0) when there was nothing to take out."""
+    from urllib.parse import urlsplit, urlunsplit
+    out, n = str(text or ""), 0
+    hosts, values = _payloads(question)
+
+    def image(m: "re.Match") -> str:
+        nonlocal n
+        n += 1
+        return m.group(1).strip() if m.groups() and m.group(1) else ""
+    out = _MD_IMAGE.sub(image, out)
+    out = _HTML_IMG.sub(image, out)
+
+    def link(m: "re.Match") -> str:
+        nonlocal n
+        raw = m.group(0)
+        try:
+            parts = urlsplit(raw if "://" in raw else "http://" + raw)
+        except ValueError:
+            return raw
+        if not (parts.query or parts.fragment) or (parts.hostname or "").lower() not in hosts:
+            return raw
+        n += 1
+        bare = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+        return bare if "://" in raw else bare.split("://", 1)[1]
+    if hosts:
+        out = _URL.sub(link, out)
+    for v in values:
+        if v in out:
+            n += out.count(v)
+            out = out.replace(v, "[removed]")
+    return out, n
+
+
 def refusal_line(policy_kinds: Iterable[str] = (), offtopic_kinds: Iterable[str] = (),
-                 screen: Optional[str] = None) -> str:
-    """One refusal sentence: the policy's reason first, the off-topic reason second, then what Optic can do instead.
+                 screen: Optional[str] = None, echo_kinds: Iterable[str] = ()) -> str:
+    """One refusal sentence: the policy's reason first, the off-topic reason second, the echo reason third, then what
+    Optic can do instead.
 
     Empty when nothing was declined. One composer, so a question that is both off-policy and off-topic reads as one
     product, never two refusals in two voices."""
     pk = [k for k in policy_kinds if k in REQUEST_KINDS]
     ok = [k for k in offtopic_kinds if k in OFFTOPIC_KINDS]
-    if not pk and not ok:
+    ek = [k for k in echo_kinds if k in ECHO_KINDS]
+    if not pk and not ok and not ek:
         return ""
     reasons: List[str] = []
     if pk:
         reasons.append(_OVERRIDE_REASON if pk == ["override_policy"] else _POLICY_REASON)
     reasons += [OFFTOPIC_KINDS[k] for k in ok]
-    if ok:
+    reasons += [ECHO_KINDS[k] for k in ek]
+    if ok or ek:
         instead = INSTEAD.get(str(screen or ""), INSTEAD_DEFAULT)
     else:
         instead = _POLICY_INSTEAD
@@ -1176,14 +1281,33 @@ _STREAM_END = re.compile(r"(?<!\b[A-Z])(?<!\be\.g)(?<!\bi\.e)(?<!\bvs)[.!?][\"�
 _LIST_LEAD = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
 
 
-class StreamGate:
-    """Feed it the model's text as it streams; it returns what may be sent now."""
+FOLLOW_UP = "→"
 
-    def __init__(self) -> None:
+
+class StreamGate:
+    """Feed it the model's text as it streams; it returns what may be sent now.
+
+    Round two (2026-11-24) gave it two more duties, both optional, both applied sentence by sentence before anything
+    is sent: `scrub`, a function that returns (text, changes), takes out an image or a pasted web address's data
+    (`scrub_echo`); `word_cap` stops the answer's body at the last sentence that fits under that many words, while
+    the follow-up questions (lines starting with an arrow) still pass. `policy=False` leaves the advice policy's
+    sentence check out, for `trim_to_words`."""
+
+    def __init__(self, word_cap: Optional[int] = None, scrub: Optional[Any] = None, policy: bool = True) -> None:
         self._held = ""
         self._line_start = True
         self._sent_any = False
         self.findings: List[Dict[str, Any]] = []
+        self.word_cap = int(word_cap) if word_cap else None
+        self.scrub = scrub
+        self.policy = policy
+        self.scrubbed = 0          # changes `scrub` made
+        self.trimmed = 0           # body sentences held back by the word cap
+        self.body_words = 0        # body words sent
+        self._follow_up = False    # the current line is a follow-up question
+        self._cutting = False
+        self._pending_newlines = 0
+        self._sent_tail = ""
 
     def feed(self, text: str) -> str:
         """Every finished sentence of the text so far that passes, and nothing unfinished."""
@@ -1202,16 +1326,88 @@ class StreamGate:
 
     def _check(self, piece: str) -> str:
         at_line_start, self._line_start = self._line_start, piece.endswith("\n")
-        found = check_output(piece)
+        if at_line_start:
+            self._follow_up = piece.lstrip().startswith(FOLLOW_UP)
+        if self.scrub is not None:
+            piece, changes = self.scrub(piece)
+            self.scrubbed += changes
+        found = check_output(piece) if self.policy else []
         if not found:
-            self._sent_any = self._sent_any or bool(piece.strip())
-            return piece
+            return self._capped(piece)
         self.findings.extend(found)
         newlines = "\n" * (len(piece) - len(piece.rstrip("\n")))
         lead = _LIST_LEAD.match(piece) if at_line_start else None
         if lead and not newlines:
-            return lead.group(0)       # the list item goes on with its next sentence
-        return newlines if self._sent_any else ""
+            return self._sent(lead.group(0))       # the list item goes on with its next sentence
+        return self._sent(newlines if self._sent_any else "")
+
+    def _sent(self, text: str) -> str:
+        if text:
+            self._sent_tail = (self._sent_tail + text)[-2:]
+        return text
+
+    def _capped(self, piece: str) -> str:
+        """The piece, or only its line breaks once the body has reached the word cap."""
+        if self.word_cap and piece.strip() and not self._follow_up:
+            words = len(piece.split())
+            if self._cutting or (self.body_words and self.body_words + words > self.word_cap):
+                self._cutting = True
+                self.trimmed += 1
+                newlines = len(piece) - len(piece.rstrip("\n"))
+                self._pending_newlines = max(self._pending_newlines, newlines)
+                return ""
+            self.body_words += words
+        if self._pending_newlines and piece.strip():
+            # the follow-ups after a cut body start on their own paragraph, as they would have
+            have = len(self._sent_tail) - len(self._sent_tail.rstrip("\n"))
+            piece = "\n" * max(0, self._pending_newlines - have) + piece
+            self._pending_newlines = 0
+        self._sent_any = self._sent_any or bool(piece.strip())
+        return self._sent(piece)
+
+
+def trim_to_words(text: str, cap: int) -> Tuple[str, int]:
+    """`text` with its body cut at the last sentence end under `cap` words, the follow-up questions kept; and how
+    many sentences were cut. The first sentence always stays. The same rule the stream applies (StreamGate)."""
+    gate = StreamGate(word_cap=cap, policy=False)
+    out = gate.feed(text) + gate.flush()
+    return out, gate.trimmed
+
+
+# ------------------------------------------------------------ the labelled read (round two, 2026-11-24)
+#
+# At the expert level an answer keeps what was measured apart from Milo's own reading of it, and the reading carries
+# a label the reader can find: "My read". The prompt asks for it; `label_read` makes sure of it after the answer,
+# because the live evaluation of 2026-11-24 saw an expert answer without one (ADV-01).
+READ_LABEL = re.compile(r"\bmy read\b|\bmy reading\b|\binterpretation\b", _I)
+READ_PREFIX = "**My read:** "
+READ_NOTE = "Milo labelled its own reading so it stays apart from the measured figures."
+_INTERPRETIVE = re.compile(r"\b(?:suggests?|implies|imply|likely|unlikely|probably|reads?\s+as|points?\s+to|consistent\s+with|"
+                           r"in\s+my\s+view|i\s+think|appears?|looks?\s+like|seems?|the\s+read|the\s+takeaway|net(?:\s+net)?|"
+                           r"bottom\s+line|on\s+balance|leans?|tilts?|argues?)\b", _I)
+
+
+def _prose(paragraph: str) -> bool:
+    p = paragraph.lstrip()
+    return bool(p) and not p.startswith(("|", "#", "[[", FOLLOW_UP, ">", "```")) and not _LIST_LEAD.match(p)
+
+
+def label_read(text: str) -> Tuple[str, str]:
+    """The answer with its reading labelled, and what was done: "present" (already labelled), "inserted", or "flagged" (no prose paragraph to label; the text is returned unchanged and the caller logs it). The label goes
+    before the first prose paragraph that interprets ("suggests", "likely", "on balance"), else the last prose
+    paragraph of the body, which the base prompt keeps for what would change the view."""
+    text = str(text or "")
+    if READ_LABEL.search(text):
+        return text, "present"
+    parts = re.split(r"(\n\s*\n)", text)
+    idx = [i for i in range(0, len(parts), 2) if _prose(parts[i])]
+    if not idx:
+        return text, "flagged"
+    pick = next((i for i in idx if _INTERPRETIVE.search(parts[i])), idx[-1])
+    para = parts[pick]
+    lead = len(para) - len(para.lstrip())
+    parts[pick] = para[:lead] + READ_PREFIX + para[lead:]
+    return "".join(parts), "inserted"
 
 
 def with_policy(system: Any) -> Any:

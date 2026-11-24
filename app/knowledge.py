@@ -36,6 +36,7 @@ are Classic's panel ladder only, kept so Classic's layouts do not move.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Optional
 
 # Classic's panel ladder (static/components/knowledge.js reads these through the
@@ -185,7 +186,10 @@ MODES: Dict[str, Dict[str, Any]] = {
             "Where a figure is a proxy or an assumption, label it in a word rather "
             "than a sentence, and keep it labelled: density is not a reason to drop "
             "the distinction between what was measured and what was inferred, "
-            "which is the one thing this register could quietly lose."
+            "which is the one thing this register could quietly lose. In any answer "
+            "longer than a definition, start the sentence or paragraph that gives "
+            "your own reading of the figures with the words \"My read:\", so the "
+            "reader can tell the data from the interpretation at a glance."
         ),
     },
 }
@@ -286,3 +290,51 @@ def resolve_for_answer(mode: Optional[str], question: str = "") -> str:
     one of the five positions (D-027), so the reader's chosen level is the one
     used, and `question` is no longer read. The name is kept for its callers."""
     return normalise(mode)
+
+
+# ---------------------------------------------------------------- a definition's length (round two, 2026-11-24)
+#
+# A plain definition: "What is a P/E ratio?", "What does market cap mean?", "What is the difference between a stock
+# and a bond?", "Define implied volatility" (post-demo Phase 08). Not one when the question names a symbol, points
+# at the screen or at the reader ("this", "here", "my"), asks about now ("today", "current"), asks a price or a
+# move, or is about a company ("Apple's margin"). Erring the other way costs nothing but time: the context is
+# gathered as before, and the answer is not held to a definition's length.
+_DEFINITION = re.compile(
+    r"^(?:what\s+(?:is|are)\s+(?:a|an|the)\s+\S|what\s+(?:is|are)\s+(?!it\b|that\b|this\b)[a-z/&.\- ]{2,40}\??$|"
+    r"what\s+does\s+.{2,50}\s+(?:mean|tell\s+(?:me|us))\b|what'?s\s+(?:a|an)\s+|define\s+|explain\s+(?:what\s+)?(?:a|an)\s+|"
+    r"how\s+does\s+(?:a|an)\s+.{2,40}\s+work\b)", re.I)
+_NOT_DEFINITION = re.compile(
+    r"\b(?:this|these|those|here|my|our|mine|(?<!tell )me|i|today|tonight|now|current(?:ly)?|latest|recent(?:ly)?|yesterday|"
+    r"its|price|prices|priced|trading|worth|doing|moving(?!\s+average)|moved|move)\b|\b(?!what|that|it|there|here|who|how|let)[a-z]+'s\b",
+    re.I)
+
+
+def is_definition(question: str, context: Optional[Dict[str, Any]] = None) -> bool:
+    q = " ".join(str(question or "").split())
+    if not q or len(q.split()) > 14:
+        return False
+    named = (context or {}).get("question_named") if isinstance((context or {}).get("question_named"), dict) else {}
+    if named.get("symbols") or named.get("unknown"):
+        return False
+    return bool(_DEFINITION.search(q)) and not _NOT_DEFINITION.search(q)
+
+
+# The most words a definition's body may run to at each level, the follow-up questions not counted. Milo's base
+# prompt gives a narrow question "roughly 60 to 150 words" and says that length holds at every level (a level that
+# explains more does it in plainer words, not more of them), so every level's ceiling is the prompt's 150;
+# tests/test_round_two_milo.py holds the two together. The prompt alone did not hold it: on 2026-11-24 a live answer
+# at New to Markets ran to 205 words. The answer is now cut at the last sentence end under the ceiling as it streams
+# (app/ai_policy.py StreamGate), and the model is told the ceiling in a block of its own.
+DEFINITION_WORDS: Dict[str, int] = {"new": 150, "beginner": 150, "intermediate": 150, "advanced": 150, "expert": 150}
+
+
+def definition_ceiling(mode: Optional[str]) -> int:
+    return DEFINITION_WORDS[normalise(mode)]
+
+
+def definition_instruction(mode: Optional[str]) -> str:
+    """The system block for a definition: the ceiling as a hard limit the model can see."""
+    return ("## This question asks what a term means\n"
+            "Answer in at most {} words before the follow-up questions, counting every word of the answer's body. "
+            "Anything past that is cut at a sentence end before the reader sees it, so put the whole definition "
+            "and its one example inside the limit.".format(definition_ceiling(mode)))

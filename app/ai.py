@@ -3804,10 +3804,17 @@ def build_chat_request(
     # one refusal composer (ai_policy.refusal_line) says why in one sentence, the policy's reason first, then the
     # off-topic one, then what Optic can do on this screen
     offtopic = ai_policy.classify_offtopic(last_user)
+    # Round two (2026-11-24): a question that asks Milo to repeat or render a web address or an image is declined
+    # before the model too, in the same sentence (ai_policy.classify_echo); a definition is held to its level's
+    # length (knowledge.definition_ceiling), told to the model here and enforced as the answer streams
+    echo = ai_policy.classify_echo(last_user)
     screen = screen_of(context)
-    meta.update({"policy_kinds": declined, "offtopic_kinds": offtopic, "screen": screen,
-                 "policy_line": ai_policy.refusal_line(declined, offtopic, screen),
-                 "stance": stance_of(persona)})
+    definition = knowledge.is_definition(last_user, context)
+    word_cap = knowledge.definition_ceiling(level) if definition else None
+    meta.update({"policy_kinds": declined, "offtopic_kinds": offtopic, "echo_kinds": echo, "screen": screen,
+                 "policy_line": ai_policy.refusal_line(declined, offtopic, screen, echo),
+                 "stance": stance_of(persona), "question": last_user, "definition": definition, "word_cap": word_cap})
+    definition_prompt = knowledge.definition_instruction(level) if definition else ""
 
     kwargs: Dict[str, Any] = {
         "model": PULSE_MODEL,
@@ -3828,6 +3835,7 @@ def build_chat_request(
           + ([{"type": "text", "text": framework_prompt}] if framework_prompt else [])
           + ([{"type": "text", "text": persona_prompt}] if persona_prompt else [])
           + ([{"type": "text", "text": flavour_prompt}] if flavour_prompt else [])
+          + ([{"type": "text", "text": definition_prompt}] if definition_prompt else [])
           + ([{"type": "text", "text": policy_turn}] if policy_turn else []),
         "messages": messages,
         "thinking": {"type": "adaptive"},
@@ -3923,6 +3931,42 @@ def sources_read(kwargs: Optional[Dict[str, Any]], limit: int = 12) -> List[Dict
     return out
 
 
+def _round_two_checks(amend: Optional[Dict[str, Any]], streamed: str, gate: Any,
+                      meta: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The end-of-answer checks added in round two (2026-11-24), merged into the one `amend` event.
+
+    * An image or a pasted web address's data: the gate took it out before it was sent; the reader is told, and the
+      whole answer is scrubbed once more as the backstop (an address split across two pieces).
+    * The expert level's labelled read: an answer longer than a definition at Expert carries "My read" (or
+      "interpretation"); when the model left it out the label is put in (ai_policy.label_read) and the reader is
+      told; when there is no prose paragraph to put it on, it is logged as flagged.
+    The word cap needs nothing here: the gate never sent what it cut, and `done.length` says so."""
+    text = amend["text"] if amend else streamed
+    rules, notes, removed = [], [], 0
+    question = meta.get("question") or ""
+    scrubbed, changes = ai_policy.scrub_echo(text, question)
+    if gate.scrubbed or changes:
+        text, removed = scrubbed, gate.scrubbed + changes
+        rules.append("echoed_link")
+        notes.append(ai_policy.ECHO_NOTE)
+        log.warning("ai policy: pulse: took out %s image(s) or pasted link payload(s)", removed)
+    if meta.get("level") == "expert" and not meta.get("word_cap") and text.strip():
+        labelled, how = ai_policy.label_read(text)
+        if how == "inserted":
+            text = labelled
+            rules.append("read_labelled")
+            notes.append(ai_policy.READ_NOTE)
+        elif how == "flagged":
+            log.warning("ai policy: pulse: an expert answer with no labelled read and no paragraph to label")
+    if not rules:
+        return amend
+    if amend:
+        return dict(amend, text=text, removed=amend["removed"] + removed,
+                    rules=sorted(set(amend["rules"]) | set(rules)), note=" ".join([amend["note"]] + notes))
+    return {"text": text, "removed": removed, "rules": sorted(rules), "note": " ".join(notes),
+            "policy": ai_policy.POLICY_VERSION}
+
+
 async def stream_chat(
     history: List[Dict[str, str]],
     context: Optional[Dict[str, Any]] = None,
@@ -3942,12 +3986,14 @@ async def stream_chat(
     # deployment with Milo switched off still says what Milo is for.
     pre_kwargs, pre_meta = build_chat_request(history, context=context, use_web=use_web, attachments=attachments,
                                               persona=persona, mode=mode, horizon=horizon)
-    if pre_kwargs is not None and pre_meta.get("offtopic_kinds"):
+    if pre_kwargs is not None and (pre_meta.get("offtopic_kinds") or pre_meta.get("echo_kinds")):
         yield _sse("stance", pre_meta["stance"])
         yield _sse("notice", {"kind": "policy", "text": pre_meta["policy_line"], "refused": True,
                               "categories": (pre_meta.get("policy_kinds") or [])
-                              + ["offtopic:" + k for k in pre_meta["offtopic_kinds"]],
-                              "policy": ai_policy.POLICY_VERSION, "offtopic": ai_policy.OFFTOPIC_VERSION})
+                              + ["offtopic:" + k for k in pre_meta.get("offtopic_kinds") or []]
+                              + ["echo:" + k for k in pre_meta.get("echo_kinds") or []],
+                              "policy": ai_policy.POLICY_VERSION, "offtopic": ai_policy.OFFTOPIC_VERSION,
+                              "echo": ai_policy.ECHO_VERSION})
         yield _sse("done", {"refused": True, "stance": pre_meta["stance"], "citations": [], "read": [],
                             "retrieved": [], "loaded": [], "named": {}, "cited": [],
                             "usage": {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0}})
@@ -3997,8 +4043,12 @@ async def stream_chat(
     tool_texts: List[Tuple[Dict[str, Any], str]] = []
     answer_parts: List[str] = []
     # Held back by at most one sentence, so a sentence that breaks the advice policy is never sent
-    # (app/ai_policy.py StreamGate); the end-of-stream amend below still reads the whole answer.
-    gate = ai_policy.StreamGate()
+    # (app/ai_policy.py StreamGate); the end-of-stream amend below still reads the whole answer. Round two: the
+    # gate also takes out an image or a pasted web address's data before it is sent, and stops a definition's body
+    # at its level's ceiling, the follow-up questions kept.
+    question = meta.get("question") or ""
+    gate = ai_policy.StreamGate(word_cap=meta.get("word_cap"),
+                                scrub=lambda piece: ai_policy.scrub_echo(piece, question))
 
     # Milo's tools (app/milo_tools.py), when the route supplies them: Optic's own data for whatever the
     # question needs, not only what the page sent. Web search stays the reader's switch; the tools do not
@@ -4165,6 +4215,7 @@ async def stream_chat(
             else:
                 amend = {"text": grounded["text"], "removed": grounded["removed"], "rules": ["unsupported_figure"],
                          "note": grounded["note"], "policy": ai_policy.POLICY_VERSION}
+        amend = _round_two_checks(amend, "".join(answer_parts), gate, meta)
         if amend:
             log.warning("ai policy: pulse: removed %s sentence(s) (%s)", amend["removed"], ", ".join(amend["rules"]))
             yield _sse("amend", amend)
@@ -4189,6 +4240,10 @@ async def stream_chat(
                 # round three: the stance the answer was written in, and the lookup behind each figure it gives
                 "stance": meta["stance"],
                 "cited": grounded["cited"],
+                # round two of the build (2026-11-24): a definition's ceiling and how many body sentences were
+                # held back under it
+                "length": {"cap": meta.get("word_cap"), "words": gate.body_words, "trimmed": gate.trimmed}
+                if meta.get("word_cap") else None,
             },
         )
     except Exception as exc:  # surfaced to the UI rather than swallowed
