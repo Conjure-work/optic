@@ -443,6 +443,57 @@ def fresh_account(run: Run, browser) -> None:
     run.item("RP", "forgot-password walk", "end to end", reset_walk)
 
 
+# ==================================================================== A3 by passkey sign-up, if the copy has one
+
+def passkey_signup(run: Run, browser) -> None:
+    """The level-questions band is drawn only for an account made without the sign-up form (pages/levelquiz.js offer()).
+    A passkey account would be one such account. This asks the copy, with a WebAuthn virtual authenticator attached
+    through CDP, whether a passkey can make an account; it makes one and walks A3 on it if so."""
+    def go():
+        ctx, page = run.context(browser)
+        cdp = ctx.new_cdp_session(page)
+        cdp.send("WebAuthn.enable")
+        auth = cdp.send("WebAuthn.addVirtualAuthenticator", {"options": {"protocol": "ctap2", "transport": "internal", "hasResidentKey": True,
+                                                                          "hasUserVerification": True, "isUserVerified": True, "automaticPresenceSimulation": True}})
+        seen = {}
+        for mode in ("up", "in"):
+            page.goto("about:blank")   # a hash change alone keeps the page's last mode (pages/signin.js), so each is a fresh load
+            page.goto(BASE + "/#/signin" + ("?mode=up" if mode == "up" else ""), wait_until="domcontentloaded")
+            page.wait_for_selector("form[data-v2-auth='{}']".format(mode), timeout=30000)
+            page.wait_for_timeout(1000)
+            seen[mode] = page.eval_on_selector_all("main button, main a.btn", "els => els.map(e => e.textContent.replace(/\\s+/g, ' ').trim()).filter(Boolean)")
+        run.shot(page, "A3p-sign-up-page")
+        # the one passkey control offered signed out: sign in with a passkey, from a browser whose authenticator holds none
+        tried = ""
+        page.goto("about:blank")
+        page.goto(BASE + "/#/signin?mode=up", wait_until="domcontentloaded")
+        page.wait_for_selector("form[data-v2-auth='up']")
+        pk = page.locator("[data-v2-pk-signin]")
+        if pk.count():
+            pk.first.click()
+            page.wait_for_timeout(6000)
+            tried = page.evaluate("() => ((document.querySelector('#si-err') || {}).textContent || '').trim()")
+        me = run.me(page)
+        creds = cdp.send("WebAuthn.getCredentials", {"authenticatorId": auth["authenticatorId"]}).get("credentials", [])
+        reg = page.evaluate("async () => { const r = await fetch('/api/auth/passkeys/register/options', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); return r.status; }")
+        ctx.close()
+        made = bool((me.get("body") or {}).get("user"))
+        up_pk = [b for b in seen["up"] if "passkey" in b.lower()]
+        reachable = made or any("create" in b.lower() for b in up_pk)
+        run.notes["passkey_signup"] = {"signup_page_buttons": seen["up"], "signin_page_buttons": seen["in"], "register_options_signed_out": reg,
+                                       "virtual_credentials_after": len(creds), "account_made": made}
+        run.record("A3p", "A3 on a fresh account made through the product's passkey sign-up (WebAuthn virtual authenticator over CDP)",
+                   "the band once, Answer them and Not now the same size, not offered again on reload",
+                   "no passkey sign-up path on the copy: the Create account page's passkey control is {} (a sign-in, not a sign-up); pressed from a "
+                   "virtual authenticator holding no credential it made no account (/api/auth/me {} with {}; error line '{}'; credentials on the "
+                   "authenticator after: {}); POST /api/auth/passkeys/register/options signed out answers {} (routes.py requires a signed-in "
+                   "account; the only place to add a passkey is Settings, Add a passkey, on an account that already exists, and an account "
+                   "made through the form has spent its questions offer on #/welcome)".format(
+                       up_pk or "absent", me["status"], "a user" if made else "no user", tried, len(creds), reg),
+                   "pass" if reachable else "not reached")
+    run.item("A3p", "passkey sign-up", "band", go)
+
+
 # ==================================================================== the evaluator: B, refusals, F, C, E, X, K
 
 def evaluator(run: Run, browser) -> None:
@@ -1068,7 +1119,7 @@ def level_back(run: Run, browser) -> None:
     run.item("Z1", "level back", "", go)
 
 
-GROUPS = ["identity", "gate", "fresh", "evaluator", "owner", "level"]
+GROUPS = ["identity", "gate", "fresh", "passkey", "evaluator", "owner", "level"]
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -1099,6 +1150,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 gate_and_first_visit(run, browser)
             if "fresh" in groups:
                 fresh_account(run, browser)
+            if "passkey" in groups:
+                passkey_signup(run, browser)
             if "evaluator" in groups:
                 evaluator(run, browser)
             if "owner" in groups:
