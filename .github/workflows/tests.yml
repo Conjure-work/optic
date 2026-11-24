@@ -1,10 +1,13 @@
 # The whole suite on every pull request and every push to main (added 2026-11-09).
 #
-# - suite: the Python tests and the browser journeys (tests/e2e) on macOS, because about a thousand of the tests run
-#   the front end's modules in JavaScriptCore, which macOS has and Linux does not (they skip without it). Outbound
-#   HTTP is pinned to a closed local port, so no test can reach a real provider; Anthropic is a recording stub.
-#   Since 2026-11-23 it runs as seven parallel shards (tests/support/shards.py), each with its own floor.
-# - count: adds the shards' counts together, writes them to the run's summary, and fails below SUITE_FLOOR.
+# - suite: the Python tests and the browser journeys (tests/e2e) on Ubuntu (since 2026-11-24). About a thousand of
+#   the tests run the front end's modules in JavaScriptCore; Ubuntu's libjavascriptcoregtk-bin installs it as
+#   /usr/bin/jsc and tests/support/jsc.py finds it. They ran on macOS before, and GitHub's macOS arm64 capacity kept
+#   cancelling jobs before a runner took them, so no run on the deployed build had completed. Outbound HTTP is pinned
+#   to a closed local port, so no test can reach a real provider; Anthropic is a recording stub. It runs as eleven
+#   parallel shards (tests/support/shards.py), each with its own floor.
+# - count: adds the shards' counts together, writes them to the run's summary, and fails below SUITE_FLOOR or on any
+#   skip other than the known one (tests/support/ci_count.py KNOWN_SKIPS).
 # - image: builds the Dockerfile, as a deploy does.
 # - secrets: gitleaks over the full history, with .gitleaks.toml's allowlist (storage key names, test fixtures).
 name: tests
@@ -30,10 +33,10 @@ env:
 
 jobs:
   # The suite in parallel shards (2026-11-23): as one job it took about 33 minutes on a fast Mac and timed out at 40
-  # on GitHub's shared macOS runner. `py` is every Python file (about five minutes); the browser journeys are dealt
+  # on GitHub's shared macOS runner (Ubuntu since 2026-11-24). `py` is every Python file (about five minutes); the browser journeys are dealt
   # round-robin into six slices so the slowest file is shared out. Which test runs where: tests/support/shards.py.
   suite:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     # a journey slice measured 15 to 21 minutes on the runner with ten slices' worth of work in six; 45 leaves room
     timeout-minutes: 45
     strategy:
@@ -44,6 +47,12 @@ jobs:
       # Optic's dates are market dates in New York; the suite was written and is run there (a UTC runner after 7 pm
       # New York time put "in 12 days" a day out in tests/test_v2_parity_b6a.py)
       TZ: America/New_York
+      # and in US English. JavaScriptCore's default number format follows the process locale: under C.UTF-8 (the
+      # Ubuntu runner's default, and what Python coerces a bare C locale to) it is en-US-u-va-posix, which drops the
+      # thousands separator, so toLocaleString() gave "7160248" where the Mac and every en-US browser give
+      # "7,160,248" (tests/test_chart_first_layout.py, 2026-11-24)
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
       SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v5
@@ -55,9 +64,16 @@ jobs:
             requirements.txt
             requirements-dev.txt
       - name: Install
+        # libjavascriptcoregtk-bin is the JavaScriptCore shell (/usr/bin/jsc); the step fails if the tests cannot
+        # find it, rather than letting a thousand tests skip. --with-deps installs Chromium's system libraries.
         run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libjavascriptcoregtk-bin
           python -m pip install -r requirements-dev.txt
-          python -m playwright install chromium
+          python -m playwright install --with-deps chromium
+          jsc_path="$(python -m tests.support.jsc)"
+          echo "JavaScriptCore: $jsc_path"
+          test -x "$jsc_path"
       - name: Tests
         # outbound HTTP pinned to a closed port, both spellings (curl reads the lowercase ones), set in the shell
         # because the workflow's env section treats the two spellings as one key
@@ -74,8 +90,8 @@ jobs:
           name: junit-${{ matrix.shard }}
           path: junit-${{ matrix.shard }}.xml
 
-  # The shards added together: the run fails unless every shard ran, nothing failed, and the total passed is at least
-  # SUITE_FLOOR. The summary shows each shard's line and the total.
+  # The shards added together: the run fails unless every shard ran, nothing failed, nothing skipped but the known
+  # skip, and the total passed is at least SUITE_FLOOR. The summary shows each shard's line, the total and every skip.
   count:
     needs: suite
     if: always()

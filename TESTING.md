@@ -14,9 +14,11 @@ Everything a run needs, and nowhere else:
 
 - Python 3.12, and `python -m pip install -r requirements-dev.txt` (the app's own requirements plus the test tools)
 - Chromium for Playwright: `python -m playwright install chromium`
-- macOS for the full count: about a thousand tests run v2's modules in JavaScriptCore
-  (`/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc`); without it they skip,
-  which is why CI runs on a macOS runner
+- A JavaScriptCore shell for the full count: about a thousand tests run v2's modules in it. macOS has one in the
+  JavaScriptCore framework; on Ubuntu or Debian, `apt-get install libjavascriptcoregtk-bin` gives `/usr/bin/jsc`
+  (CI runs on Ubuntu since 2026-11-24). `tests/support/jsc.py` finds it (the `JSC` environment variable overrides);
+  `python -m tests.support.jsc` prints what it found. Without one those tests skip, and CI fails on any skip but
+  `tests/test_brokerage_exposure.py::test_live_qqq`
 - `git` on the path (one test asks git what `.gitignore` covers)
 - No network: pin outbound HTTP to a closed port so nothing can reach a real provider
 
