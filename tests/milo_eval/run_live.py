@@ -49,11 +49,17 @@ def _client() -> httpx.Client:
     return c
 
 
-def ask(c: httpx.Client, messages: List[Dict[str, str]], context: Dict[str, Any]) -> Dict[str, Any]:
-    """One question through /api/chat; the events gathered: text, notices, amend, done, error."""
+def ask(c: httpx.Client, messages: List[Dict[str, str]], context: Dict[str, Any], mode: str = "") -> Dict[str, Any]:
+    """One question through /api/chat; the events gathered: text, notices, amend, done, error.
+
+    `mode` is the case's knowledge level, sent as the panel sends it; without it the route answers at its default
+    level (Beginner), which is not the level an expert or New to Markets case is written for."""
     csrf = c.cookies.get("optic_csrf") or ""
     out: Dict[str, Any] = {"text": "", "notices": [], "error": None, "done": None, "amend": None, "status": None}
-    with c.stream("POST", "/api/chat", json={"messages": messages, "context": context},
+    body: Dict[str, Any] = {"messages": messages, "context": context}
+    if mode:
+        body["mode"] = mode
+    with c.stream("POST", "/api/chat", json=body,
                   headers={"Accept": "text/event-stream", "X-Optic-CSRF": csrf}) as r:
         out["status"] = r.status_code
         if r.status_code != 200:
@@ -146,11 +152,11 @@ def main(argv: List[str] = None) -> int:
         results["offtopic"].append((case["id"], *judge_offtopic(case, got)))
     for case in [x for x in CASES if x["category"] == "injection"]:
         msgs = list(case.get("history") or []) + [{"role": "user", "content": case["question"]}]
-        got = ask(c, msgs, case.get("context") or {})
+        got = ask(c, msgs, case.get("context") or {}, case.get("mode") or "")
         results["injection"].append((case["id"], *judge_answer(case, got)))
     for case in quality_sample(a.quality_limit):
         msgs = list(case.get("history") or []) + [{"role": "user", "content": case["question"]}]
-        got = ask(c, msgs, case.get("context") or {})
+        got = ask(c, msgs, case.get("context") or {}, case.get("mode") or "")
         results["quality"].append((case["id"], *judge_answer(case, got)))
     print("Milo sets against {} ({})".format(host, ai_policy.OFFTOPIC_VERSION))
     for name in ("quality", "injection", "offtopic"):

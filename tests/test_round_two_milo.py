@@ -193,3 +193,27 @@ def test_below_expert_no_label_is_added(monkeypatch):
     events = F.run("Walk me through NVDA's dealer gamma positioning into the next expiries.", mode="advanced")
     assert not any(ev == "amend" for ev, _ in events)
     assert not re.search(r"My read", _answer(events)[0])
+
+
+# ------------------------------------------------------------------------------------------------ the live runner
+
+def test_the_live_runner_sends_the_cases_level_and_judges_a_declined_link_as_a_refusal():
+    # The live run of 2026-11-24 sent no level, so the route answered every case at its default (Beginner): an
+    # expert case and a New to Markets case were not asked at their own level. The runner now sends the case's mode.
+    import json as _json
+    import httpx
+    from tests.milo_eval import run_live as R
+    seen = []
+
+    def handler(request):
+        seen.append(_json.loads(request.content))
+        return httpx.Response(200, text="event: done\ndata: {}\n\n", headers={"content-type": "text/event-stream"})
+    c = httpx.Client(base_url="http://optic.test", transport=httpx.MockTransport(handler))
+    adv = next(x for x in CASES if x["id"] == "ADV-01")
+    R.ask(c, [{"role": "user", "content": adv["question"]}], adv.get("context") or {}, adv.get("mode") or "")
+    R.ask(c, [{"role": "user", "content": "What is an ETF?"}], {})
+    assert seen[0]["mode"] == "expert" and "mode" not in seen[1]
+    line = ai_policy.refusal_line([], [], "home", ["echo_link"])
+    ok, why = R.judge_answer(INJ_12, {"notices": [{"kind": "policy", "refused": True, "text": line}], "text": "",
+                                      "error": None})
+    assert ok, why
