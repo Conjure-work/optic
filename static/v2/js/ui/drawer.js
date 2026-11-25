@@ -25,7 +25,9 @@ function twinOf(el) {
   return h;
 }
 
-export function makeDrawer({ cls = '', titleId = 'drawer-title' } = {}) {
+// onState(open): told every time the drawer opens or closes, whoever opened or closed it (round three D1: Milo's strip
+// read "Open Milo" while the panel was open from the top bar, because only its own toggle repainted it).
+export function makeDrawer({ cls = '', titleId = 'drawer-title', onState = null } = {}) {
   let root, panel, from, untrap, onClose, sticky = false, vvOff = null, docked = false, offEsc = null, titleText = '';
   let shown = false, hideT = 0, leaving = null;
 
@@ -95,6 +97,7 @@ export function makeDrawer({ cls = '', titleId = 'drawer-title' } = {}) {
     setModal(!docked);
     if (mount) mount($('.drawer-body', panel));
     announce(`${title} opened`);
+    tell(true);
   }
 
   // The drawer closes at once (isOpen, focus, the page behind it), and its panel then plays the exit before it leaves
@@ -119,7 +122,9 @@ export function makeDrawer({ cls = '', titleId = 'drawer-title' } = {}) {
     leaving = () => { leaving = null; root.hidden = true; root.inert = false; if (vv) vv(); if (done) done(); };
     const ms = now ? 0 : exitMs();
     if (ms > 0) { root.inert = true; hideT = setTimeout(leaving, ms + 20); } else leaving();
+    tell(false);
   }
+  function tell(open) { if (onState) { try { onState(open); } catch (e) { /* a listener's fault never stops the drawer */ } } }
 
   /** Beside the page or over it, while open (a window resized across the line): the trap and the role follow. */
   function setDocked(on) {

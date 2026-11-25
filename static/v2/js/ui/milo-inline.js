@@ -9,7 +9,7 @@
 // aria-expanded, and under reduced motion nothing animates (the panel's own transitions are already 0 there).
 import { html, render, $ } from '../core/dom.js';
 import { icon } from './icons.js';
-import { openMilo, isOpen, closeMilo } from './milo.js';
+import { openMilo, isOpen, closeMilo, MILO_STATE_EVENT } from './milo.js';
 import { press } from './miloprompt.js';
 
 // One offer per screen, naming what is on it. {S} is the company's ticker when the route has one.
@@ -85,6 +85,18 @@ export function paint(route) {
   </aside>`);
 }
 
+/** Bring the strip's control in line with the panel's real state, in place, so focus on it is kept (round three D1:
+ *  opened from the top bar's Ask Milo, the strip still read "Open Milo" with aria-expanded false). */
+export function sync() {
+  const host = strip(); if (!host) return;
+  const open = isOpen();
+  const aside = $('[data-v2-milo-strip]', host), tog = $('[data-v2-milo-strip-toggle]', host);
+  if (!aside || !tog) { paint(); return; }
+  aside.setAttribute('data-state', open ? 'open' : 'strip');
+  tog.setAttribute('aria-expanded', open ? 'true' : 'false');
+  tog.textContent = open ? 'Collapse Milo' : 'Open Milo';
+}
+
 /** Wire the strip once (app.js, at boot). */
 export function wire() {
   const host = strip(); if (!host) return;
@@ -93,16 +105,15 @@ export function wire() {
     if (off) {
       const question = offerFor(current);
       press(() => ({ question, screen: current.view || 'page', symbol: current.symbol || '', about: null }), off);
-      setTimeout(() => paint(), 60);
       return;
     }
     const tog = e.target.closest('[data-v2-milo-strip-toggle]');
     if (tog) {
-      if (isOpen()) { closeMilo(); setTimeout(() => { paint(); const t = $('[data-v2-milo-strip-toggle]', host); if (t) t.focus(); }, 0); }
-      else { openMilo({ opener: tog }); setTimeout(() => paint(), 60); }
+      // the panel's real state decides, never the label: the label follows it through MILO_STATE_EVENT
+      if (isOpen()) { closeMilo(); sync(); tog.focus(); }
+      else openMilo({ opener: tog });
     }
   });
-  // the panel closed by its own button or Escape: the strip says so
-  document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('[data-v2-close]')) setTimeout(() => paint(), 0); }, true);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setTimeout(() => paint(), 0); }, true);
+  // every opener and every way of closing (the top bar, a page's Ask Milo, the palette, the panel's close, Escape)
+  document.addEventListener(MILO_STATE_EVENT, () => sync());
 }

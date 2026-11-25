@@ -1452,7 +1452,11 @@ async function runAction(a, card, i) {
 /* ---------------- the panel ---------------- */
 // A drawer of its own (ui/drawer.js makeDrawer), so another one (an answer's evidence, the account sheet) opens over
 // it rather than in its place.
-const drawer = makeDrawer({ cls: 'drawer-milo', titleId: 'milo-title' });
+// Every opening and closing, from any opener (the top bar, the strip, a page's Ask Milo, the palette, Escape, the
+// panel's own close), is announced as one event, `optic:milo-state` with { open }, so the strip's control follows
+// the panel's real state (round three D1).
+export const MILO_STATE_EVENT = 'optic:milo-state';
+const drawer = makeDrawer({ cls: 'drawer-milo', titleId: 'milo-title', onState: (open) => document.dispatchEvent(new CustomEvent(MILO_STATE_EVENT, { detail: { open } })) });
 export const isOpen = () => drawer.isOpen();
 /** Collapse Milo to the strip (ui/milo-inline.js): the panel closes, the conversation is kept. */
 export function closeMilo() { drawer.close({ force: true }); }
