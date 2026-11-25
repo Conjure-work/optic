@@ -18,11 +18,12 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def test_a_save_keeps_what_another_tab_saved_since():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -41,7 +42,7 @@ def test_a_save_keeps_what_another_tab_saved_since():
       var saved = JSON.parse(MEM['optic.chart.drawings.v2']);
       print('RESULT:' + JSON.stringify({saved: saved, mine: wsDrawings().map(function (d) { return d.id; })}));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     body = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert body["saved"]["MSFT"] == [{"id": "m1"}], "the other tab's drawing survived"
     assert [d["id"] for d in body["saved"]["AAPL"]] == ["a1", "a2"]

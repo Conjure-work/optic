@@ -12,7 +12,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(name):
@@ -21,10 +22,10 @@ def _fn(name):
 
 
 def _js(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore")
-    out = subprocess.run([exe, "-e", _fn("glCdf") + _fn("glBS") + script], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, _fn("glCdf") + _fn("glBS") + script, capture_output=True, text=True, timeout=30)
     return json.loads(out.stdout.strip().splitlines()[-1])
 
 

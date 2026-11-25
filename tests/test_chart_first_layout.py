@@ -34,7 +34,8 @@ APP = (ROOT / "static/app.js").read_text()
 CHARTS = (ROOT / "static/charts.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
 NO_COMMENTS = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(name, src=APP):
@@ -44,10 +45,10 @@ def _fn(name, src=APP):
 
 
 def _run(prelude, script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
-    out = subprocess.run([exe, "-e", prelude + script], capture_output=True, text=True,
+    out = run_e(exe, prelude + script, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]

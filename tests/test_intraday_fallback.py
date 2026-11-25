@@ -30,8 +30,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = Path("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-           "Helpers/jsc")
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def function(name):
@@ -57,7 +57,7 @@ function assert(v, m) { if (!v) throw new Error(m); }
 
 
 def run_js(scenario):
-    exe = str(JSC) if JSC.exists() else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("JavaScriptCore is unavailable")
     src = (HARNESS
@@ -71,7 +71,7 @@ def run_js(scenario):
                "swingWindowKey", "wsClampWindow", "wsSliceWindow",
                "intradaySeries", "swingSeries", "swingBarCountText"])
            + "\n(function() {\n" + scenario + "\n})();\nprint('TEST_OK');")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True,
+    out = run_e(exe, src, capture_output=True, text=True,
                          timeout=15, cwd=ROOT)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 

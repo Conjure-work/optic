@@ -17,6 +17,7 @@ and the PEG six hours, so a repeat load reads only the quote.
 from __future__ import annotations
 
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import time
 
 import pytest
@@ -29,6 +30,15 @@ def clean(monkeypatch):
     monkeypatch.setattr(Y, "_CACHE", {})
     monkeypatch.setattr(Y, "_BUCKET", {"tokens": 100.0, "rate": 100.0, "last": time.time()})
     monkeypatch.setattr(Y, "_THROTTLE", {"until": 0.0, "hits": 0, "last_seen": None})
+    # Each test's reads on a pool of its own, waited out before the next test swaps the cache. A refused summary
+    # raises out of _info_documents without waiting for the quote and PEG reads it started; on the module's shared
+    # pool the quote finished after the next test's fresh _CACHE was in place and wrote "q7:ZZZ" into it, so
+    # test_the_prior_close_is_the_quote_documents found the quote already read (calls == []). Seen once on the
+    # Ubuntu runner, 2026-11-24; reproduced on the Mac by slowing the stray read by 0.2s.
+    pool = ThreadPoolExecutor(max_workers=24, thread_name_prefix="yf-doc-test")
+    monkeypatch.setattr(Y, "_DOC_POOL", pool)
+    yield
+    pool.shutdown(wait=True)
 
 
 SUMMARY = {"quoteSummary": {"result": [{

@@ -19,11 +19,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _render(result):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -41,7 +42,7 @@ def _render(result):
       var cat = { considered: 484, universe_size: 2975, scans: [] };
       print('RESULT:' + JSON.stringify({ html: renderScan(cat, %s) }));
     """ % json.dumps(result)
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    out = run_e(exe, script, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])["html"]

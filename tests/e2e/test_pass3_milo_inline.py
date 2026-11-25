@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
 
 import pytest
+from playwright.sync_api import TimeoutError as PWTimeout
 
 from tests.e2e.conftest import make_account
 from tests.e2e.test_pass1_journeys import DESKTOP, PHONE, open_page
@@ -239,11 +241,43 @@ def test_a_stance_is_picked_for_one_answer_from_the_keyboard_and_kept_on_the_acc
         r = page.evaluate("async (t) => (await fetch('/api/milo/stance', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Optic-CSRF': t }, body: JSON.stringify({ stance: 'stoic' }) })).status", csrf)
         assert r == 200
         ctx2, page2 = open_page(chrome, server, level="advanced", viewport=DESKTOP, cookies=jar)
+        # Diagnostic (2026-11-25): this wait timed out on every Ubuntu CI run and passed on the Mac and in an Ubuntu
+        # container. On a timeout it prints what the second browser shows, the stance the account holds, and the
+        # order of the API calls, then raises the same error; the assertion is unchanged.
+        net, t0 = [], time.monotonic()
+
+        def _log(kind, r):
+            path = r.url.split(server["base"], 1)[-1]
+            if path.startswith("/api/"):
+                net.append([round(time.monotonic() - t0, 3), kind, getattr(r, "method", None) or r.request.method,
+                            path, getattr(r, "status", None)])
+        page2.on("request", lambda r: _log("request", r))
+        page2.on("response", lambda r: _log("response", r))
+        page2.on("requestfailed", lambda r: _log("failed", r))
+        # the first page is still open on Home with Milo; what it asks the server while the second page waits
+        page.on("request", lambda r: _log("page1 request", r))
+        page.on("response", lambda r: _log("page1 response", r))
+        page.on("requestfailed", lambda r: _log("page1 failed", r))
         try:
             page2.goto(server["base"] + "/#/", wait_until="domcontentloaded")
             page2.wait_for_selector("[data-v2-account].avatar")
+            net.append([round(time.monotonic() - t0, 3), "avatar shown"])
             page2.click(".topbar-milo")
-            page2.wait_for_function("() => (document.querySelector('#milo-stance-once option') || {}).textContent === \"As kept: a conservative investor's reading\"", timeout=20000)
+            net.append([round(time.monotonic() - t0, 3), "Milo clicked"])
+            try:
+                page2.wait_for_function("() => (document.querySelector('#milo-stance-once option') || {}).textContent === \"As kept: a conservative investor's reading\"", timeout=20000)
+            except PWTimeout:
+                shown = page2.evaluate("""async () => ({
+                  options: [...document.querySelectorAll('#milo-stance-once option')].map(o => o.textContent),
+                  slot: !!document.querySelector('[data-v2-milo-stance-slot]'),
+                  persona_in_browser: localStorage.getItem('optic.pulse.persona.v1'),
+                  account_stance: await fetch('/api/milo/stance', { credentials: 'same-origin' })
+                    .then(r => r.text().then(t => r.status + ' ' + t)).catch(e => 'fetch failed: ' + e),
+                })""")
+                log_tail = (server["data"] / "server.log").read_text(errors="replace").splitlines()[-120:]
+                print("STANCE_DIAGNOSTIC " + json.dumps({"shown": shown, "net": net, "errors": page2.errors[:5],
+                                                         "server_log_tail": log_tail}))
+                raise
         finally:
             ctx2.close()
         assert not page.errors, page.errors[:3]

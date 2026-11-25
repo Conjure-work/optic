@@ -27,7 +27,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 # 5:05 pm ET on Thursday 1 October 2026, after hours, with overnight at 8 pm.
 SESSION = {
@@ -42,10 +43,10 @@ AT_519 = "Date.parse('2026-10-01T17:19:30-04:00')"
 
 
 def _run(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
-    out = subprocess.run([exe, "-e", """
+    out = run_e(exe, """
       load('tests/support/browser_stubs.js');
       document.documentElement.style = document.documentElement.style || {};
       document.documentElement.style.setProperty = function () {};
@@ -58,7 +59,7 @@ def _run(script):
       var asked = [];
       loadSession = function (force) { asked.push('ticker'); };
       loadCalendarSession = function (force) { asked.push('calendar'); };
-    """ + script], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    """ + script, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 

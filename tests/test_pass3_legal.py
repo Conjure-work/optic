@@ -89,9 +89,9 @@ def test_the_page_renders_the_file_or_the_notice_above_the_published_draft():
 
 
 def test_counsels_markdown_is_escaped_and_only_https_or_mailto_links_survive():
-    jsc = Path("/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc")
-    if not jsc.exists():
-        pytest.skip("JavaScriptCore is macOS only")
+    from tests.support.jsc import JSC as jsc
+    if not jsc:
+        pytest.skip("no JavaScriptCore on this machine")
     src = PAGE.read_text()
     m = re.search(r"const LINK = .*?\nexport function fromMarkdown\(md\) \{.*?\n\}\n", src, re.S)
     assert m

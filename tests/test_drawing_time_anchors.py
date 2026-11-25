@@ -25,12 +25,12 @@ import subprocess
 
 import pytest
 
-JSC = ("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-       "Helpers/jsc")
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _run(scenario: str, seed: dict | None = None) -> dict:
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -74,7 +74,7 @@ def _run(scenario: str, seed: dict | None = None) -> dict:
       %s
       print('RESULT:' + JSON.stringify(R));
     """ % (json.dumps({k: json.dumps(v) for k, v in (seed or {}).items()}), scenario)
-    proc = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    proc = run_e(exe, script, capture_output=True, text=True,
                           timeout=120)
     blob = proc.stdout + proc.stderr
     assert "RESULT:" in blob, blob[-2000:]

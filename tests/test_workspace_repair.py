@@ -30,8 +30,8 @@ ROOT = Path(__file__).resolve().parent.parent
 JS = (ROOT / "static/app.js").read_text(encoding="utf-8")
 CSS = (ROOT / "static/styles.css").read_text(encoding="utf-8")
 CSS_NC = re.sub(r"/\*.*?\*/", " ", CSS, flags=re.S)
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-needs_jsc = pytest.mark.skipif(not os.path.exists(JSC), reason="JavaScriptCore not available")
+from tests.support.jsc import JSC
+needs_jsc = pytest.mark.skipif(not JSC, reason="JavaScriptCore not available")
 
 
 def _block(src: str, start: str, open_ch: str = "{", close_ch: str = "}") -> str:

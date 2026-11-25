@@ -18,8 +18,8 @@ import subprocess
 
 import pytest
 
-JSC = ("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-       "Helpers/jsc")
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 CSS = open("static/styles.css", encoding="utf-8").read()
 APP_JS = open("static/app.js", encoding="utf-8").read()
@@ -89,7 +89,7 @@ def ran():
     which is how the first version of the next test passed a mutation. These
     call the function against a fake root and report which of setProperty and
     removeProperty it reached."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = r"""
@@ -112,7 +112,7 @@ def ran():
       print('COMPACT:' + run('compact'));
       print('JUNK:' + run('enormous'));
     """
-    proc = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=120)
+    proc = run_e(exe, script, capture_output=True, text=True, timeout=120)
     return proc.stdout + proc.stderr
 
 

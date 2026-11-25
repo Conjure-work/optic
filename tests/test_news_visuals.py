@@ -22,7 +22,8 @@ import pytest
 from tests.test_visual_primitives import _jsc as _prim
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 NEWS = {"tiers": [{"id": "breaking", "label": "Breaking"}, {"id": "notable", "label": "Notable"}],
         "articles": [
@@ -36,7 +37,7 @@ NEWS = {"tiers": [{"id": "breaking", "label": "Breaking"}, {"id": "notable", "la
 
 
 def _app(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -52,7 +53,7 @@ def _app(script):
       eventTimeline = function (o) { (CAPT.t = CAPT.t || []).push(o); return { chart: 'timeline' }; };
       function build(id) { var b = BUILT[id]; return b ? b.build(600) : 'not mounted'; }
     """ % json.dumps(NEWS) + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

@@ -10,6 +10,7 @@ that cut across routes.
 from __future__ import annotations
 
 from tests.test_visual_primitives import _jsc as _prim
+from tests.support.jsc import run_e
 
 SHIMS = """
   El.prototype.querySelectorAll = function (sel) { var self = this, out = []; walk(this, function (n) { if (n !== self && n.tag === sel) out.push(n); }); return out; };
@@ -99,8 +100,8 @@ def _app(script):
     import pytest
 
     root = Path(__file__).resolve().parent.parent
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -111,7 +112,7 @@ def _app(script):
       try { load('static/charts.js'); load('static/app.js'); } catch (e) {}
       var R = {};
     """ + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(root))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(root))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

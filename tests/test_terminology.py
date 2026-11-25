@@ -26,7 +26,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _keys(name):
@@ -66,7 +67,7 @@ def test_no_generic_label_has_a_terminal_wide_definition():
 
 
 def test_every_heading_definition_reaches_its_heading():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -82,7 +83,7 @@ def test_every_heading_definition_reaches_its_heading():
       R.missing = Object.keys(HEADER_DEFS).filter(function (k) { return hg(k) === esc(k); });
       print('RESULT:' + JSON.stringify(R));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-1500:]
     r = json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

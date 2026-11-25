@@ -11,7 +11,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 APP = (ROOT / "static/app.js").read_text(encoding="utf-8")
 RJS = (ROOT / "static/research.js").read_text(encoding="utf-8")
 HTML = (ROOT / "static/index.html").read_text(encoding="utf-8")
@@ -20,7 +21,7 @@ POST = json.loads((ROOT / "tests/fixtures/framework_jpm_post.json").read_text())
 
 
 def _render(payload):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -33,7 +34,7 @@ def _render(payload):
       var html = window.OpticFramework.render(%s);
       print('RESULT:' + JSON.stringify({html: html, keys: Object.keys(window.OpticFramework).sort()}));
     """ % json.dumps(payload)
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "LOADFAIL" not in blob, blob[-2000:]
     assert "RESULT:" in blob, blob[-2000:]

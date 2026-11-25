@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 V2 = Path(__file__).resolve().parent.parent / "static" / "v2"
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 STUBS = """
   globalThis.window = { addEventListener() {}, matchMedia() { return { matches: false, addEventListener() {} }; } };
   globalThis.location = { hash: '', pathname: '/v2/', search: '' };
@@ -24,7 +24,7 @@ STUBS = """
 
 
 def _run(tmp_path, body):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("jsc not available")
     script = tmp_path / "check.mjs"

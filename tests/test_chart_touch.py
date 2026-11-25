@@ -32,11 +32,12 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
 CHARTS = (ROOT / "static/charts.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _jsc():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     return exe
@@ -53,7 +54,7 @@ def _span(start, end):
 
 
 def _run(src):
-    out = subprocess.run([_jsc(), "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(_jsc(), src, capture_output=True, text=True, timeout=30)
     last = out.stdout.strip().splitlines()[-1] if out.stdout.strip() else ""
     assert last.startswith("{"), out.stdout + out.stderr
     return json.loads(last)

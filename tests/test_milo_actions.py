@@ -22,7 +22,8 @@ from app import ai
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _fn(head):
@@ -31,13 +32,13 @@ def _fn(head):
 
 
 def _js(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     region = APP[APP.index("const MILO_ACTION_RE ="):APP.index("function miloActResult(")]
     prelude = ("function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')"
                ".replace(/\"/g,'&quot;'); }\nfunction fmt(v, d) { return Number(v).toFixed(d); }\n" + region)
-    out = subprocess.run([exe, "-e", prelude + script], capture_output=True, text=True, timeout=60)
+    out = run_e(exe, prelude + script, capture_output=True, text=True, timeout=60)
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-1500:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 

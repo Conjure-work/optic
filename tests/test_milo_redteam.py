@@ -32,6 +32,7 @@ from tests.milo_eval import fixtures as F
 from tests.milo_eval import harness as H
 from tests.milo_eval.cases import C as _unused  # noqa: F401  (the cases module builds the suite's fixtures on import)
 from tests.test_frontend_v2_stage0 import V2, _run as _jsc
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 CANARY = "CANARY-7F3A-" + "RED"
@@ -112,14 +113,13 @@ def test_mrt02_classic_refuses_the_same_links():
     fn = src[src.index("function mdLite(text) {"):]
     fn = fn[:fn.index("\n}\n") + 2]
     import shutil, subprocess
-    exe = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = exe if Path(exe).exists() else shutil.which("jsc")
+    from tests.support.jsc import JSC as exe
     if not exe:
         pytest.skip("jsc not available")
     esc = src[src.index("function esc(str) {"):]
     esc = esc[:esc.index("\n}\n") + 2]
     script = esc + "\n" + fn + "\nprint(JSON.stringify(%s.map((u) => mdLite('[SEC filing](' + u + ')'))));" % json.dumps(SPOOFS[:3])
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, script, capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     for html in json.loads(out.stdout.strip().splitlines()[-1]):
         assert "<a " not in html, html

@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 import app.main as m
 from tests.test_frontend_v2_stage0 import V2, _run
 from app import figures as figures_mod
+from tests.support.jsc import run_e
 
 ROOT = V2.parent.parent
 
@@ -94,7 +95,7 @@ def v2_reads(tmp_path):
     """)
 
 
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 
 
 def _fn(name):
@@ -103,7 +104,7 @@ def _fn(name):
 
 
 def classic_reads():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     prelude = ("function fmt(v, d) { return Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }\n"
@@ -116,7 +117,7 @@ def classic_reads():
       for (const k of Object.keys(T)) s[k] = oscShortRead(T[k], now);
       for (const k of Object.keys(L)) l[k] = oscLongRead(L[k], now);
       print('RESULT:' + JSON.stringify({{ s, l }}));"""
-    out = subprocess.run([exe, "-e", prelude + script], capture_output=True, text=True, timeout=60)
+    out = run_e(exe, prelude + script, capture_output=True, text=True, timeout=60)
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 

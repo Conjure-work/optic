@@ -8,6 +8,7 @@ chart, drawn in the same colour as the axis line.
 """
 
 import re
+from tests.support.jsc import run_e
 
 CHARTS = open("static/charts.js", encoding="utf-8").read()
 CSS = open("static/styles.css", encoding="utf-8").read()
@@ -124,8 +125,8 @@ def _drawn(script):
     import shutil
     import subprocess
     import pytest
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = (open("tests/support/recording_dom.js", encoding="utf-8").read() + CHARTS + """
@@ -143,7 +144,7 @@ def _drawn(script):
         });
       };
     """ + script)
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].strip().splitlines()[0])
 

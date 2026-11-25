@@ -28,15 +28,15 @@ import subprocess
 
 import pytest
 
-JSC = ("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-       "Helpers/jsc")
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 APP_JS = open("static/app.js", encoding="utf-8").read()
 CSS = open("static/styles.css", encoding="utf-8").read()
 
 
 def _jsc():
-    return JSC if os.path.exists(JSC) else shutil.which("jsc")
+    return JSC
 
 
 def strip_comments(js):
@@ -134,7 +134,7 @@ def ran():
       try { closeNavMenus(); } catch (e) { threw = String(e); }
       print('BUTTONLESS:' + (threw || 'ok') + ':' + lone.isOpen());
     """
-    proc = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    proc = run_e(exe, script, capture_output=True, text=True,
                           timeout=120)
     return proc.stdout + proc.stderr
 

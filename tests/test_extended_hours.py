@@ -30,7 +30,8 @@ from app.providers import yf as yf_mod
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _extended_day(day="2026-09-29", has_prepost=True):
@@ -161,7 +162,7 @@ def test_the_two_sessions_are_cached_apart(monkeypatch):
 
 
 def _app(scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -172,7 +173,7 @@ def _app(scenario):
       try { load('static/charts.js'); load('static/app.js'); } catch (e) {}
       %s
     """ % scenario
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    out = run_e(exe, script, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
@@ -248,7 +249,7 @@ def test_the_chart_is_given_the_flags_only_when_there_are_any():
 def _shade(off_hours, bars=None):
     """Draw `bars` bars (as many as there are flags, by default) with the
     flags given, and read back the bands."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     n = bars or len(off_hours or [0, 0])
@@ -264,7 +265,7 @@ def _shade(off_hours, bars=None):
         return [Number(r.attrs.x), Number(r.attrs.x) + Number(r.attrs.width)]; }) : [],
         left: f.margin.l, plotW: f.plotW }));
     """ % (json.dumps(off_hours), n))
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     last = out.stdout.strip().splitlines()[-1] if out.stdout.strip() else ""
     assert last.startswith("{"), out.stdout + out.stderr
     return json.loads(last)

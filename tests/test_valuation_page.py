@@ -15,7 +15,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 APP = (ROOT / "static/app.js").read_text(encoding="utf-8")
 VJS = (ROOT / "static/valuation.js").read_text(encoding="utf-8")
 
@@ -47,7 +48,7 @@ SAMPLE = {
 
 
 def _run(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -62,7 +63,7 @@ def _run(script):
       STATE.ticker = 'SYN';
       V._state.data.SYN = %s;
     """ % json.dumps(SAMPLE) + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "LOADFAIL" not in blob, blob[-2000:]
     assert "RESULT:" in blob, blob[-2000:]

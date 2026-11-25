@@ -37,7 +37,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def strip_comments(js):
@@ -147,10 +148,10 @@ def test_the_shape_is_drawn_once_it_has_the_points_it_needs():
 
 
 def _jsc(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, script, capture_output=True, text=True, timeout=30)
     last = out.stdout.strip().splitlines()[-1] if out.stdout.strip() else ""
     assert last.startswith("{"), out.stdout + out.stderr
     return json.loads(last)

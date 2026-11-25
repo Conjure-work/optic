@@ -35,7 +35,8 @@ from app.analytics import indicators
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 NY = "America/New_York"
 
 
@@ -137,7 +138,7 @@ def _fn(name):
 
 
 def _anchor(range_, interval, dates, ids="['vwap']"):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -155,7 +156,7 @@ def _anchor(range_, interval, dates, ids="['vwap']"):
       print('RESULT:' + JSON.stringify({ anchor: vwapAnchorFor(d),
         query: vwapAnchorQuery(%s, d), none: vwapAnchorFor(null) }));
     """ % (json.dumps(range_), json.dumps(interval), json.dumps(dates), ids)
-    proc = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    proc = run_e(exe, script, capture_output=True, text=True,
                           timeout=180, cwd=str(ROOT))
     blob = proc.stdout + proc.stderr
     assert "RESULT:" in blob, blob[-1500:]

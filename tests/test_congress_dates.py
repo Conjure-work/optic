@@ -21,6 +21,7 @@ from __future__ import annotations
 import pytest
 
 from app.analytics import congress
+from tests.support.jsc import run_e
 
 
 class _Resp:
@@ -123,8 +124,8 @@ def test_a_slice_with_nothing_to_chart_says_so_rather_than_drawing_a_key():
     import subprocess
     from pathlib import Path
 
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     app = (Path(__file__).resolve().parent.parent / "static/app.js").read_text()
@@ -140,7 +141,7 @@ def test_a_slice_with_nothing_to_chart_says_so_rather_than_drawing_a_key():
             fn("congressActivityChart"), fn("congressChartBlock"),
             "print(congressChartBlock(%s, {days: 30}));" % json.dumps(c),
         ])
-        return subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30).stdout
+        return run_e(exe, src, capture_output=True, text=True, timeout=30).stdout
 
     empty = run({"count": 1, "activity": [], "dates_suspect": 1, "lag_median": None,
                  "lag_max": None, "other": 0, "activity_days": 30})

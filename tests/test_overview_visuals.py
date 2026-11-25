@@ -24,7 +24,8 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 DATES = [d.strftime("%Y-%m-%d") for d in pd.bdate_range("2025-01-02", periods=300)]
 CLOSE = [50 + i * 0.1 for i in range(300)]
@@ -40,7 +41,7 @@ X = {"ticker": "KO", "actions": {"dividends": [{"date": DATES[-60], "amount": 0.
 
 
 def _app(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -59,7 +60,7 @@ def _app(script):
       document.getElementById = function (id) { return HOSTS[id] || (HOSTS[id] = { innerHTML: '' }); };
       function build(id) { var b = BUILT[id]; return b ? b.build(600) : 'not mounted'; }
     """ % (json.dumps(D), json.dumps(X)) + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

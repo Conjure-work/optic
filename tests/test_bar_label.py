@@ -22,8 +22,8 @@ from __future__ import annotations
 import re
 import subprocess
 
-JSC = ("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-       "Helpers/jsc")
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 SRC = open("static/charts.js", encoding="utf-8").read()
 
 
@@ -38,7 +38,7 @@ def _run(label):
     Source-level assertions cannot tell a correct formatter from one that
     returns the string unchanged, which is the failure being fixed."""
     script = _fn("barLabelText") + "\nprint(barLabelText(%s));" % _js(label)
-    out = subprocess.run([JSC, "-e", script], capture_output=True, text=True)
+    out = run_e(JSC, script, capture_output=True, text=True)
     return out.stdout.strip()
 
 
@@ -49,7 +49,7 @@ def _js(value):
 import pytest  # noqa: E402
 
 jsc = pytest.mark.skipif(
-    subprocess.run(["test", "-x", JSC]).returncode != 0,
+    not JSC,
     reason="JavaScriptCore not available",
 )
 

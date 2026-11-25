@@ -22,7 +22,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 RAW = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _raw_fn(name):
@@ -30,7 +31,7 @@ def _raw_fn(name):
 
 
 def _run(width, stored):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     consts = "\n".join(re.search(r"^const %s = [^\n]*;" % n, RAW, re.M).group()
@@ -41,7 +42,7 @@ def _run(width, stored):
            + "var localStorage = { getItem: function (k) { return k in STORE ? STORE[k] : null; } };\n"
            + consts + "\n" + _raw_fn("defaultChatWidth") + "\n" + _raw_fn("storedChatWidth")
            + "\nprint('RESULT:' + JSON.stringify({ d: defaultChatWidth(), s: storedChatWidth() }));")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "RESULT:" in out.stdout, out.stdout + out.stderr
     return json.loads(out.stdout.split("RESULT:", 1)[1].strip())
 

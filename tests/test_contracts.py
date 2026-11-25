@@ -20,6 +20,7 @@ import re
 from pathlib import Path
 
 from app import contracts
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = (ROOT / "app/contracts.py").read_text()
@@ -281,8 +282,8 @@ def _jsc(script):
     import shutil
     import subprocess
     import pytest
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
 
@@ -291,7 +292,7 @@ def _jsc(script):
         return APP[at:APP.index("\n}\n", at) + 3]
     src = ("function esc(s) { return String(s); }\n"
            + fn("function contractDate(iso) {") + fn("function contractWhen(a) {") + script)
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 

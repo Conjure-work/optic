@@ -18,11 +18,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def test_each_row_carries_its_title():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -32,7 +33,7 @@ def test_each_row_carries_its_title():
                   {id: 2, kind: 'risk', ticker: null, title: 'The book reached its position cap', body: ''}];
       print('RESULT:' + JSON.stringify(homeAlerts({alerts: rows})));
     """
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     html = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert '<span class="hm-alert-text">Bull flag confirmed on NVDA</span>' in html
     assert '<span class="hm-alert-text">The book reached its position cap</span>' in html

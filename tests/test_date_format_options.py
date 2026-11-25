@@ -42,8 +42,8 @@ def test_no_format_in_the_front_end_mixes_a_style_with_parts():
 
 
 def test_the_sheets_footer_format_runs_in_javascriptcore(tmp_path):
-    jsc = Path("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc")
-    if not jsc.exists():
+    from tests.support.jsc import JSC as jsc
+    if not jsc:
         pytest.skip("jsc not available")
     sheet = (ROOT / "static/v2/js/pages/sheet.js").read_text()
     m = re.search(r"Generated \$\{(new Date\(\)\.toLocaleString\([^`]*?\))\}", sheet)

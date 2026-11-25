@@ -14,6 +14,7 @@ adds is the map.
 from __future__ import annotations
 
 import re
+from tests.support.jsc import run_e
 
 APP_JS = open("static/app.js").read()
 CSS = open("static/styles.css").read()
@@ -238,8 +239,8 @@ def test_every_reading_draws_from_the_rows_the_server_actually_builds():
 
     from app.analytics import sector_board
 
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
 
@@ -268,7 +269,7 @@ def test_every_reading_draws_from_the_rows_the_server_actually_builds():
         "[], %s, %s);" % (json.dumps(rows), json.dumps(board["benchmark"])),
         "print(JSON.stringify(rows));",
     ])
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     readings = {r["label"]: r for r in json.loads(out.stdout.strip().splitlines()[-1])}
     assert "Sector breadth" in readings, out.stdout + out.stderr
     assert readings["Sector breadth"]["verdict"] == "%d of 11 ahead of SPY" % ahead
@@ -287,8 +288,8 @@ def test_a_quiet_tape_is_not_headlined_as_a_move():
 
     import pytest
 
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
 
@@ -300,7 +301,7 @@ def test_a_quiet_tape_is_not_headlined_as_a_move():
             _fn("exploreReadings"),
             "print(JSON.stringify(exploreReadings(null, %s, [])));" % json.dumps(moves),
         ])
-        out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+        out = run_e(exe, src, capture_output=True, text=True, timeout=30)
         return json.loads(out.stdout.strip().splitlines()[-1])[0]
 
     quiet = run(0.9)

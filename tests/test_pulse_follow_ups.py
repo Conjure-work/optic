@@ -30,7 +30,8 @@ from app import ai
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 FORMAT = " ".join(ai.FORMAT_PROMPT.lower().split())
 
 
@@ -40,11 +41,11 @@ def _fn(name):
 
 
 def _split(text):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
-    out = subprocess.run([exe, "-e", _fn("splitFollowUps") + "print('RESULT:' + JSON.stringify(splitFollowUps(%s)));"
-                          % json.dumps(text)], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, _fn("splitFollowUps") + "print('RESULT:' + JSON.stringify(splitFollowUps(%s)));"
+                          % json.dumps(text), capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-1500:]
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 

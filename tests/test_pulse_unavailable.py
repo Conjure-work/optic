@@ -19,6 +19,7 @@ visitor to the public site, who has no environment to set it in.
 from __future__ import annotations
 
 from app import ai
+from tests.support.jsc import run_e
 
 APP = open("static/app.js", encoding="utf-8").read()
 CSS = open("static/styles.css", encoding="utf-8").read()
@@ -177,8 +178,8 @@ def _run_blocked(scenario):
 
     import pytest
 
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     dom = r"""
@@ -216,7 +217,7 @@ def _run_blocked(scenario):
         _js_fn("openPulseWithText"),
         "try {", scenario, "print('TEST_OK'); } catch (e) { print('FAIL ' + e); }",
     ])
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 
 

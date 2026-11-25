@@ -33,7 +33,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
 CSS = (ROOT / "static/styles.css").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def strip_comments(js):
@@ -52,7 +53,7 @@ def fn(name, src=CODE):
 @pytest.fixture(scope="module")
 def toolbar():
     """The toolbar as it renders, shut and with the interval menu open."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -80,7 +81,7 @@ def toolbar():
       print('RESULT:' + JSON.stringify({ shut: shut, open: open,
         shutButtons: buttons(shut), openButtons: buttons(open) }));
     """
-    proc = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    proc = run_e(exe, script, capture_output=True, text=True,
                           timeout=180, cwd=str(ROOT))
     blob = proc.stdout + proc.stderr
     assert "RESULT:" in blob, blob[-1500:]
@@ -283,7 +284,7 @@ def test_the_grid_rule_outweighs_the_menu_rule_it_would_have_lost_to():
 def _place(pop, host, width, bar=None):
     """`bar` is the toolbar's box and whether it clips (the compact one-row bar
     scrolls sideways, so it does); without it, a bar that clips nothing."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = re.search(r"^function wsPlaceMenu\(\) \{.*?^\}", APP, re.M | re.S).group()
@@ -307,7 +308,7 @@ def _place(pop, host, width, bar=None):
       wsPlaceMenu();
       print('RESULT:' + JSON.stringify(pop.style));
     """ % (json.dumps(host), json.dumps(pop), json.dumps(bar), width, width, src)
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, script, capture_output=True, text=True, timeout=30)
     assert "RESULT:" in out.stdout, out.stdout + out.stderr
     return json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])
 

@@ -30,7 +30,8 @@ from app import insiders
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 # ------------------------------------------------------------------ the server
@@ -105,7 +106,7 @@ def test_the_endpoint_passes_the_view_through(monkeypatch):
 
 
 def _app(scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -130,7 +131,7 @@ def _app(scenario):
         try { %s } catch (e) { print('RESULT:' + JSON.stringify({ error: String(e) })); }
       })();
     """ % scenario
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    out = run_e(exe, script, capture_output=True, text=True,
                          timeout=120, cwd=str(ROOT))
     assert "RESULT:" in out.stdout, (out.stdout + out.stderr)[-2000:]
     got = json.loads(out.stdout.split("RESULT:", 1)[1].split("\n")[0])

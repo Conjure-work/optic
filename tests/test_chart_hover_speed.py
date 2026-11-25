@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = (ROOT / "static/app.js").read_text()
@@ -73,8 +74,8 @@ def test_every_readout_of_the_header_is_sized_to_the_series():
 def test_the_widths_cover_every_bar(tmp_path):
     import json, os, shutil, subprocess
     import pytest
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     script = """
@@ -92,7 +93,7 @@ def test_the_widths_cover_every_bar(tmp_path):
       });
       print('RESULT:' + JSON.stringify({ fit: fit, widths: widths, bare: wsOhlcRow(wsLastBar(ps)) }));
     """
-    out = subprocess.run([exe, "-e", script], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    out = run_e(exe, script, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     res = json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])

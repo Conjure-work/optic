@@ -30,7 +30,8 @@ from app.analytics import screener
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_JS = (ROOT / "static" / "app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 
 def _ranking(rows):
@@ -61,7 +62,7 @@ def test_a_limit_that_is_not_a_number_is_the_callers_mistake():
 
 
 def _jsc(script):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = """
@@ -77,7 +78,7 @@ def _jsc(script):
                 setAttribute: function (k, v) { this.attrs[k] = v; }, closest: function () { return null; }};
       }
     """ + script + "\nprint('RESULT:' + JSON.stringify(R));"
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+    out = run_e(exe, src, capture_output=True, text=True, timeout=120, cwd=str(ROOT))
     blob = out.stdout + out.stderr
     assert "RESULT:" in blob, blob[-2000:]
     return json.loads(blob.split("RESULT:", 1)[1].split("\n")[0])
@@ -163,7 +164,7 @@ def test_a_ratio_it_cannot_read_is_listed_as_unread():
 
 def test_the_screen_being_built_survives_a_reload():
     """A reload, or a tab closed by accident, emptied the builder."""
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     page = """
@@ -184,19 +185,19 @@ def test_the_screen_being_built_survives_a_reload():
                           setAttribute: function () {}, closest: function () { return null; }});
       print('MEM:' + JSON.stringify(MEM));
     """
-    out = subprocess.run([exe, "-e", first], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out = run_e(exe, first, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     mem = out.stdout.split("MEM:", 1)[1].split("\n")[0]
     second = "var MEM = " + mem + ";" + page + """
       print('RESULT:' + JSON.stringify(screenerSpec()));
     """
-    out2 = subprocess.run([exe, "-e", second], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out2 = run_e(exe, second, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     spec = json.loads(out2.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert spec["filters"] == [{"field": "price", "min": 100, "max": None}], "typing alone saved it"
     assert spec["sort"] == "score" and spec["direction"] == "desc"
     garbage = "var MEM = {'optic.screener.v1': '{not json'};" + page + """
       print('RESULT:' + JSON.stringify(screenerSpec()));
     """
-    out3 = subprocess.run([exe, "-e", garbage], capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+    out3 = run_e(exe, garbage, capture_output=True, text=True, timeout=60, cwd=str(ROOT))
     blank = json.loads(out3.stdout.split("RESULT:", 1)[1].split("\n")[0])
     assert blank["filters"] == [] and blank["sort"] == "score"
 

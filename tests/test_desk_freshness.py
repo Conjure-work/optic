@@ -25,6 +25,7 @@ from pathlib import Path
 import pytest
 
 import app.main as main
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -144,7 +145,7 @@ def test_the_written_desk_records_what_it_was_written_against(monkeypatch):
 # ------------------------------------------------------------------ the page
 
 APP_RAW = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 
 
 def _raw_fn(name):
@@ -152,7 +153,7 @@ def _raw_fn(name):
 
 
 def test_the_line_under_the_desk_says_why_it_is_the_assembled_one():
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = ("function assert(v, m) { if (!v) throw new Error(m); }\n"
@@ -167,7 +168,7 @@ def test_the_line_under_the_desk_says_why_it_is_the_assembled_one():
       assert(deskVoiceReason({voice_reason: 'unconfigured'}).indexOf('not configured') > 0, 'unconfigured');
       assert(deskVoiceReason({}).indexOf('not configured') > 0, 'an old payload');
       print('TEST_OK');""")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 
 

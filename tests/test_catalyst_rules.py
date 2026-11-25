@@ -26,6 +26,7 @@ from fastapi.testclient import TestClient
 
 import app.main as main
 from app import ai, catalyst_rules as rules, catalysts, feeds, live_mirror
+from tests.support.jsc import run_e
 
 ROOT = Path(__file__).resolve().parent.parent
 NOW = datetime.now(timezone.utc)
@@ -511,7 +512,7 @@ def test_yahoo_headlines_come_from_search_when_the_ticker_feed_is_empty(monkeypa
 # ------------------------------------------------------------------ the page
 
 APP_RAW = (ROOT / "static/app.js").read_text()
-JSC = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
+from tests.support.jsc import JSC
 
 
 def _raw_fn(name):
@@ -525,7 +526,7 @@ def _const(name):
 
 
 def _js(scenario):
-    exe = JSC if os.path.exists(JSC) else shutil.which("jsc")
+    exe = JSC
     if not exe:
         pytest.skip("no JavaScriptCore on this machine")
     src = ("function assert(v, m) { if (!v) throw new Error(m); }\n"
@@ -536,7 +537,7 @@ def _js(scenario):
                                                     "catalystTickerHTML", "catalystCountLine",
                                                     "catalystScanLine", "catalystEmptyText"))
            + "\n" + scenario + "\nprint('TEST_OK');")
-    out = subprocess.run([exe, "-e", src], capture_output=True, text=True, timeout=30)
+    out = run_e(exe, src, capture_output=True, text=True, timeout=30)
     assert "TEST_OK" in out.stdout, out.stdout + out.stderr
 
 

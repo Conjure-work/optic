@@ -29,8 +29,8 @@ import subprocess
 
 import pytest
 
-JSC = ("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/"
-       "Helpers/jsc")
+from tests.support.jsc import JSC
+from tests.support.jsc import run_e
 
 # Functions the app calls across file and panel boundaries. Not an exhaustive
 # list of everything defined: these are the ones whose absence is silent,
@@ -56,12 +56,12 @@ REQUIRED = [
 
 
 def _jsc():
-    return JSC if os.path.exists(JSC) else shutil.which("jsc")
+    return JSC
 
 
 def _run(script: str) -> str:
     exe = _jsc()
-    proc = subprocess.run([exe, "-e", script], capture_output=True, text=True,
+    proc = run_e(exe, script, capture_output=True, text=True,
                           timeout=120)
     return proc.stdout + proc.stderr
 

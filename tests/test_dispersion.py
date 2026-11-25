@@ -6,6 +6,7 @@ import pytest
 
 from app.analytics import dispersion as dp
 from app.desk import evidence as ev
+from tests.support.jsc import run_e
 
 
 class FakeProvider:
@@ -101,11 +102,11 @@ def test_ordinals_read_as_english():
     app = (root / "static/app.js").read_text()
     fn = app[app.index("function ordinal("):]
     fn = fn[:fn.index("\n}\n") + 3]
-    jsc = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc"
-    exe = jsc if os.path.exists(jsc) else shutil.which("jsc")
+    from tests.support.jsc import JSC as jsc
+    exe = jsc
     if not exe:
         pytest.skip("no JavaScriptCore")
-    out = subprocess.run([exe, "-e", fn + "print(JSON.stringify([1,2,3,4,11,12,13,21,22,98,101,111].map(ordinal)))"],
+    out = run_e(exe, fn + "print(JSON.stringify([1,2,3,4,11,12,13,21,22,98,101,111].map(ordinal)))",
                          capture_output=True, text=True, timeout=30).stdout
     assert json.loads(out) == ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "98th", "101st", "111th"]
     assert "th percentile`" not in app.replace("${ordinal(", "")
