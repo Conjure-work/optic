@@ -121,18 +121,28 @@ def test_home_at_advanced_is_everything_home_has(chrome, server):
 
 # ------------------------------------------------------------------ the level matrix, the stock page
 
+# Each read is one evaluate in the page (round three, 2026-11-25). page.eval_on_selector_all queries in one call to
+# the browser and runs the function in a second; the Overview redraws itself as each piece of data arrives, and a
+# redraw between the two calls hands the function elements already taken out of the page, whose offsetParent is
+# null. That is how test_stock_page_at_advanced read no primary button in a fresh-clone run on 7550291 while the Milo
+# bar was on screen throughout (tests/e2e/test_round_three.py, the redraw journey, measures it).
 def actions(page):
     # the header's own buttons, not the ⋯ menu's items
-    return page.eval_on_selector_all(".dhead .acts a, .dhead .acts button", "els => els.filter(e => !e.closest('details')).map(e => (e.textContent || '').trim()).filter(Boolean)")
+    return page.evaluate("() => [...document.querySelectorAll('.dhead .acts a, .dhead .acts button')]"
+                         ".filter(e => !e.closest('details')).map(e => (e.textContent || '').trim()).filter(Boolean)")
 
 
 def menu_items(page):
     # what the header's More offers (hierarchy review change 2: Alert, Compare, Save and Export moved there)
-    return page.eval_on_selector_all(".dhead .acts details .menu-body a, .dhead .acts details .menu-body button", "els => els.map(e => (e.textContent || '').trim()).filter(Boolean)")
+    return page.evaluate("() => [...document.querySelectorAll('.dhead .acts details .menu-body a, .dhead .acts details .menu-body button')]"
+                         ".map(e => (e.textContent || '').trim()).filter(Boolean)")
 
 
-def primaries(page):
-    return page.eval_on_selector_all("#main .btn-primary", "els => els.filter(e => e.offsetParent !== null).map(e => e.matches('[data-v2-mp-ask]') ? 'milo bar' : (e.textContent || '').trim())")
+def primaries(page, bar_timeout=10000):
+    # the Milo bar's own visibility first, bounded: a page that never draws it still fails here
+    page.wait_for_selector("#main [data-v2-mp-ask]", state="visible", timeout=bar_timeout)
+    return page.evaluate("() => [...document.querySelectorAll('#main .btn-primary')].filter(e => e.offsetParent !== null)"
+                         ".map(e => e.matches('[data-v2-mp-ask]') ? 'milo bar' : (e.textContent || '').trim())")
 
 
 def test_stock_page_at_beginner(chrome, server):

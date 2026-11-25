@@ -247,3 +247,32 @@ def test_the_phone_bar_marks_research_not_home_on_a_trading_layout(chrome, serve
         assert on == ["security"], on
     finally:
         ctx.close()
+
+
+# ------------------------------------------------------------------ the stock page's reads while it redraws
+
+def test_the_stock_pages_primary_is_read_whole_while_the_overview_redraws(chrome, server):
+    """test_stock_page_at_advanced read no primary button once in a fresh-clone run on 7550291 (1 in 36 repeats on the
+    Mac). The Milo bar is drawn by the same render as the header and was on screen throughout; the read was the
+    fault: page.eval_on_selector_all queries in one call and evaluates in a second, and the Overview redraws itself as
+    each piece of data arrives. Here the Overview is made to repaint every few milliseconds (the level, from another
+    tab, as a storage event) and the read is taken 300 times: the two-step read is wrong some of the time and the
+    suite's helper, one evaluate after the bar's own visibility, never."""
+    from tests.e2e.test_pass1_journeys import primaries, stock
+    ctx, page = open_page(chrome, server, level="advanced", viewport=DESKTOP)
+    try:
+        page.add_init_script("""window.__draws = 0; new MutationObserver((ms) => { if (ms.some(m => m.target.classList && m.target.classList.contains('page-view'))) window.__draws++; }).observe(document, { subtree: true, childList: true });""")
+        stock(page, server)
+        page.evaluate("""() => { window.__stop = false; const tick = () => { if (window.__stop) return;
+          window.dispatchEvent(new StorageEvent('storage', { key: 'optic.knowledge.v1', newValue: 'advanced' })); setTimeout(tick, 2); }; tick(); }""")
+        two_step = "els => els.filter(e => e.offsetParent !== null).map(e => e.matches('[data-v2-mp-ask]') ? 'milo bar' : (e.textContent || '').trim())"
+        d0 = page.evaluate("() => window.__draws")
+        helper_wrong = sum(1 for _ in range(300) if primaries(page) != ["milo bar"])
+        two_wrong = sum(1 for _ in range(300) if page.eval_on_selector_all("#main .btn-primary", two_step) != ["milo bar"])
+        redraws = page.evaluate("() => window.__draws") - d0
+        page.evaluate("() => { window.__stop = true; }")
+        assert redraws > 50, "the Overview did not repaint during the reads ({})".format(redraws)
+        assert helper_wrong == 0, "the suite's read was wrong {} of 300 times".format(helper_wrong)
+        print("two-step read wrong {} of 300 during {} redraws".format(two_wrong, redraws))
+    finally:
+        ctx.close()
