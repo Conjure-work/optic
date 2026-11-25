@@ -1465,8 +1465,13 @@ class YFinanceProvider(MarketDataProvider):
                 return _failed({**out, **held_back}, refused)
 
             if not answered:
-                filled = self._fill_missing(out, tickers, period, interval)
-                return _empty_answer(key, filled) if not filled else _Failed(filled)
+                # Nothing came back for any name: each name was already asked inside the download (yfinance reads
+                # them one by one), so asking each again here only queues requests certain to fail at the limiter,
+                # ahead of every reader. With the feeds refused one empty macro basket became thirty gated history
+                # reads and the options page waited over 30 s on "Loading contracts" (round three, 2026-11-25).
+                # Only what each name last had, as after a refusal; a partial answer is still filled in below.
+                held_back = {sym: v for sym in tickers if (v := _stand_in(_hist_key(sym, period, interval), None)) is not None}
+                return _empty_answer(key, held_back) if not held_back else _Failed(held_back)
 
             for sym, frame in out.items():
                 _keep_good(_hist_key(sym, period, interval), frame)   # each name's own stand-in, should a later answer leave it out
