@@ -66,9 +66,13 @@ jobs:
       - name: Install
         # libjavascriptcoregtk-bin is the JavaScriptCore shell (/usr/bin/jsc); the step fails if the tests cannot
         # find it, rather than letting a thousand tests skip. --with-deps installs Chromium's system libraries.
+        # fonts-inter-variable and fonts-space-grotesk-ttf are the app's two faces (--sans and --label-face). The
+        # pages load them from cdn.jsdelivr.net; Chromium on Linux obeys the closed-port proxy, so that load fails and
+        # without them installed the phone bar drew in DejaVu Sans and crowded at 320 and 390 (run 45489503872).
+        # Chromium on macOS ignores the proxy variables and loaded them from the CDN, which is why the Mac passed.
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q libjavascriptcoregtk-bin
+          sudo apt-get install -y -q libjavascriptcoregtk-bin fonts-inter-variable fonts-space-grotesk-ttf
           python -m pip install -r requirements-dev.txt
           python -m playwright install --with-deps chromium
           jsc_path="$(python -m tests.support.jsc)"
