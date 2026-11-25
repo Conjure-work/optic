@@ -839,7 +839,7 @@ def milo(run: Run, page) -> None:
         run.record("E20b", "Keep a stance on the account, then open Milo in another browser",
                    "the new panel shows the kept stance ('{}')".format(label),
                    "PUT {} -> {}; second browser's Milo shows '{}' {:.1f} s after the click; put back to {} ({})".format(
-                       want, st, shown, (was or {}).get("id") or "neutral (none was kept)", back),
+                       want, st, shown, took, (was or {}).get("id") or "neutral (none was kept)", back),
                    "pass" if st == 200 and shown == label and back == 200 else "fail")
     run.item("E20b", "kept stance", "", e20b)
 
