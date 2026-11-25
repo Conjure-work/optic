@@ -254,6 +254,10 @@ def test_a_stance_is_picked_for_one_answer_from_the_keyboard_and_kept_on_the_acc
         page2.on("request", lambda r: _log("request", r))
         page2.on("response", lambda r: _log("response", r))
         page2.on("requestfailed", lambda r: _log("failed", r))
+        # the first page is still open on Home with Milo; what it asks the server while the second page waits
+        page.on("request", lambda r: _log("page1 request", r))
+        page.on("response", lambda r: _log("page1 response", r))
+        page.on("requestfailed", lambda r: _log("page1 failed", r))
         try:
             page2.goto(server["base"] + "/#/", wait_until="domcontentloaded")
             page2.wait_for_selector("[data-v2-account].avatar")
@@ -270,7 +274,9 @@ def test_a_stance_is_picked_for_one_answer_from_the_keyboard_and_kept_on_the_acc
                   account_stance: await fetch('/api/milo/stance', { credentials: 'same-origin' })
                     .then(r => r.text().then(t => r.status + ' ' + t)).catch(e => 'fetch failed: ' + e),
                 })""")
-                print("STANCE_DIAGNOSTIC " + json.dumps({"shown": shown, "net": net, "errors": page2.errors[:5]}))
+                log_tail = (server["data"] / "server.log").read_text(errors="replace").splitlines()[-120:]
+                print("STANCE_DIAGNOSTIC " + json.dumps({"shown": shown, "net": net, "errors": page2.errors[:5],
+                                                         "server_log_tail": log_tail}))
                 raise
         finally:
             ctx2.close()

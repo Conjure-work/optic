@@ -282,7 +282,7 @@ def _register(server, email):
 
 
 @pytest.mark.parametrize("server", [{"ADMIN_EMAILS": OWNER}], indirect=True)
-def test_the_owner_report_reads_counts_by_week_and_names_the_group_it_read(chrome, server):
+def test_the_owner_report_reads_counts_by_week_and_names_the_group_it_read(chrome, server, record_property):
     jar = _register(server, OWNER)
     _quiz_done(server, OWNER)
     now = time.time()
@@ -312,6 +312,7 @@ def test_the_owner_report_reads_counts_by_week_and_names_the_group_it_read(chrom
         }""")
         phases["took_s"] = round(took, 3)
         print("OWNER_REPORT_PHASES " + json.dumps(phases))
+        record_property("owner_report_phases", json.dumps(phases))   # in the JUnit file, so a passing run keeps it
         assert got.value.status == 200 and took < 2.0, took
         cells = page.eval_on_selector_all("[data-v2-or-signals] tbody tr", "els => els.map(e => e.textContent.replace(/\\s+/g, ' ').trim())")
         assert any(c.startswith("Opened a stock from Home") for c in cells), cells
