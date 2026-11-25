@@ -300,6 +300,18 @@ def test_the_owner_report_reads_counts_by_week_and_names_the_group_it_read(chrom
             page.goto(server["base"] + "/#/owner-report", wait_until="domcontentloaded")
         page.wait_for_selector("[data-v2-or-signals]", timeout=20000)
         took = time.perf_counter() - t
+        # Diagnostic (2026-11-25): the page took 2.04 s and 2.13 s on the Ubuntu runner and 0.85 s on the Mac. The
+        # browser's own timings say where the time goes; printed, they show with the failure. The bound is unchanged.
+        phases = page.evaluate("""() => {
+          const n = performance.getEntriesByType('navigation')[0] || {};
+          const r = performance.getEntriesByType('resource').map(e => [e.name.replace(location.origin, ''), Math.round(e.startTime), Math.round(e.duration)]);
+          return { took_s: null, responseEnd: Math.round(n.responseEnd || 0), domContentLoaded: Math.round(n.domContentLoadedEventEnd || 0),
+                   load: Math.round(n.loadEventEnd || 0), now: Math.round(performance.now()),
+                   slowest: r.sort((a, b) => b[2] - a[2]).slice(0, 15),
+                   report: r.filter(e => e[0].includes('owner-report')) };
+        }""")
+        phases["took_s"] = round(took, 3)
+        print("OWNER_REPORT_PHASES " + json.dumps(phases))
         assert got.value.status == 200 and took < 2.0, took
         cells = page.eval_on_selector_all("[data-v2-or-signals] tbody tr", "els => els.map(e => e.textContent.replace(/\\s+/g, ' ').trim())")
         assert any(c.startswith("Opened a stock from Home") for c in cells), cells
