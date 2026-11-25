@@ -115,15 +115,20 @@ export function paint(route) {
   const cur = (on) => (on ? html`aria-current="page"` : '');
   const row = (href, ic, label, on, cls = 'rail-row') => html`<a class="${cls}" href="${href}" ${cur(on)}>${icon(ic)}<span>${label}</span></a>`;
   const gid = g ? g.id : null, view = route.view;
+  // Charts & Technicals and Options & Derivatives open as Home's trading layouts (#/?preset=technicals): opened from
+  // the rail, the entry is the current one and Home is not (round three D3; Home stayed highlighted)
+  const railPreset = view === 'home' && route.params && RESEARCH.some((e) => e.preset && e.preset === route.params.preset) ? route.params.preset : null;
   // The owner's rail of 2026-11-09 (nav.js RESEARCH and LISTS), item for item, over today's routes
-  const inResearch = gid === 'security' || view === 'dossierstart' || view === 'insiders';
+  const inResearch = gid === 'security' || view === 'dossierstart' || view === 'insiders' || !!railPreset;
   const research = RESEARCH.map((e) => row(researchHref(e, sym), e.icon, e.label,
-    e.filter ? view === 'insiders' : (gid === 'security' && (view === e.view || (e.view === 'overview' && !['financials', 'chart', 'swing'].includes(view)))), 'rail-row rail-sub'));
+    e.filter ? view === 'insiders'
+      : railPreset ? e.preset === railPreset
+        : (gid === 'security' && (view === e.view || (e.view === 'overview' && !['financials', 'chart', 'swing'].includes(view)))), 'rail-row rail-sub'));
   const more = RAIL_MORE.filter((m) => (m.group ? has(m.group) : true)).map((m) => row(m.group ? groupHref(byId(m.group), sym) : hrefFor(m.view), m.icon, m.label,
     m.group ? gid === m.group : view === m.view, 'rail-row rail-sub'));
   render($('.rail'), html`<a class="brand" href="#/" aria-label="Optic Terminal, Home">${brandMark()}<span class="brand-word" aria-hidden="true">OPTIC <span>TERMINAL</span></span></a>
     <nav class="rail-nav" aria-label="Sections">
-      ${row('#/', 'home', 'Home', view === 'home')}
+      ${row('#/', 'home', 'Home', view === 'home' && !railPreset)}
       <div class="rail-group ${inResearch ? 'is-in' : ''}" role="group" aria-labelledby="rail-research">
         <p class="rail-row rail-head" id="rail-research">${icon('research')}<span>Research</span></p>
         ${research}
@@ -141,7 +146,7 @@ export function paint(route) {
 
   // The phone bar: the rail's sections by the rail's names, each to the address the rail's entry opens (nav.js MOBILE_TABS)
   const tabOn = {
-    home: view === 'home', security: inResearch && view !== 'insiders', market: gid === 'market',
+    home: view === 'home' && !railPreset, security: inResearch && view !== 'insiders', market: gid === 'market',
     discover: gid === 'discover' && view !== 'scan', portfolio: gid === 'portfolio', lists: LISTS.some((l) => l.views.includes(view)),
   };
   const tabHref = { home: '#/', security: researchHref(RESEARCH[0], sym), market: groupHref(byId('market'), sym), discover: groupHref(byId('discover'), sym), portfolio: groupHref(byId('portfolio'), sym), lists: LISTS[0].href };
