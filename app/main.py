@@ -439,15 +439,36 @@ _BACKGROUND_JOB = contextvars.ContextVar("optic_background_job", default=False)
 _DAILY_PERIODS = frozenset({"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"})
 
 
+# Two pools, sized here and not by the machine (round three D2, 2026-11-25). The loop's default executor is
+# min(32, CPUs + 4) threads: six on a two-CPU runner or a small Railway machine. On CI one job-lane batch download
+# held the provider lock for about 26 s, the readers' legs queued on it filled all six threads, and every route that
+# runs through _run waited, so a browser's six connections to the host were all held by them and even the routes
+# that need no thread (/api/milo/stance, /api/personas) could not be reached. A thread dump during the reproduction
+# (two CPUs, a slow batch) showed the loop itself never blocked for a second; the threads were all waiting on locks.
+# So the jobs' lane runs in a bounded pool of its own and can never take a reader's thread, and the readers' pool
+# is installed at startup at a size that does not depend on the machine.
+READER_THREADS = 32
+JOB_THREADS = 8
+_READER_POOL = ThreadPoolExecutor(max_workers=READER_THREADS, thread_name_prefix="reader")
+_JOB_POOL = ThreadPoolExecutor(max_workers=JOB_THREADS, thread_name_prefix="job")
+
+
+def _install_reader_pool() -> None:
+    """The readers' pool as the loop's default executor, whatever the machine's CPU count (see READER_THREADS);
+    asyncio.to_thread uses it too. Called first thing at startup."""
+    asyncio.get_running_loop().set_default_executor(_READER_POOL)
+
+
 def _run(fn, *args, **kwargs):
-    """Push blocking provider/analytics work off the event loop."""
+    """Push blocking provider/analytics work off the event loop: a scheduled job's into the jobs' pool, a reader's
+    into the readers' pool (the loop's default executor, set at startup)."""
     if _BACKGROUND_JOB.get():
         def call():
             with yf_provider_mod.background():
                 return fn(*args, **kwargs)
-    else:
-        def call():
-            return fn(*args, **kwargs)
+        return asyncio.get_running_loop().run_in_executor(_JOB_POOL, call)
+    def call():
+        return fn(*args, **kwargs)
     return asyncio.get_running_loop().run_in_executor(None, call)
 
 
@@ -4618,6 +4639,7 @@ async def research_book_state() -> Dict[str, Any]:
 
 @app.on_event("startup")
 async def _start_tracker() -> None:
+    _install_reader_pool()
     paper.init_db()
     # Held on the app so the reference isn't garbage-collected mid-flight --
     # asyncio keeps only a weak reference to a bare create_task.

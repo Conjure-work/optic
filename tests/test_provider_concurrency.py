@@ -103,7 +103,8 @@ def test_a_rate_limit_inside_the_quote_pool_does_not_freeze_the_process(monkeypa
 def test_downloads_still_take_the_lock_that_keeps_them_apart():
     import inspect
     src = inspect.getsource(Y.YFinanceProvider.batch_history)
-    assert "with _NET_LOCK:\n                    raw = yf.download(" in src
+    # each part of a job's batch takes the lock for its own download (round three D2), a reader's batch once
+    assert "with _NET_LOCK:\n                return yf.download(" in src
     path = inspect.getsource(Y._cached) + inspect.getsource(Y._fill)
     assert "with _key_lock(key):" in path
     assert "with _NET_LOCK" not in path

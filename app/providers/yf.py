@@ -185,6 +185,11 @@ class _ReaderFirstLock:
 
 _NET_LOCK = _ReaderFirstLock()
 
+# How many names a scheduled job downloads per turn at _NET_LOCK (round three D2). On a two-CPU runner the ranking's
+# hundred-name download held the lock for about 26 s while every reader's batch waited behind it; in parts of twenty a
+# reader waits for one part at most.
+JOB_DOWNLOAD_PART = 20
+
 # The limiter's state, the token bucket and the throttle window. Held only to
 # take a token or record a refusal, never across a network call or a wait
 # (see _wait_turn). Its own lock
@@ -1407,38 +1412,62 @@ class YFinanceProvider(MarketDataProvider):
         macro panel."""
         key = "batch:{}:{}:{}".format(",".join(sorted(tickers)), period, interval)
 
-        def build() -> Dict[str, pd.DataFrame]:
-            try:
-                # The one call that must not overlap another of itself.
-                with _NET_LOCK:
-                    raw = yf.download(
-                        tickers,
-                        period=period,
-                        interval=interval,
-                        group_by="ticker",
-                        auto_adjust=False,
-                        progress=False,
-                        threads=True,
-                    )
-            except Exception as exc:
-                # refused: no more requests on top of it, only what each name last had
-                return _failed({sym: v for sym in tickers if (v := _stand_in(_hist_key(sym, period, interval), None)) is not None}, exc)
+        def download(names: List[str]):
+            # The one call that must not overlap another of itself.
+            with _NET_LOCK:
+                return yf.download(
+                    names,
+                    period=period,
+                    interval=interval,
+                    group_by="ticker",
+                    auto_adjust=False,
+                    progress=False,
+                    threads=True,
+                )
 
-            out: Dict[str, pd.DataFrame] = {}
+        def frames_of(raw, names: List[str], out: Dict[str, pd.DataFrame]) -> None:
             if raw is None or len(raw) == 0:
-                filled = self._fill_missing(out, tickers, period, interval)
-                return _empty_answer(key, filled) if not filled else _Failed(filled)
-
+                return
             if isinstance(raw.columns, pd.MultiIndex):
-                for sym in tickers:
+                for sym in names:
                     if sym in raw.columns.get_level_values(0):
                         frame = raw[sym].dropna(subset=["Close"])
                         if not frame.empty:
                             out[sym] = frame
-            elif len(tickers) == 1:
+            elif len(names) == 1:
                 frame = raw.dropna(subset=["Close"])
                 if not frame.empty:
-                    out[tickers[0]] = frame
+                    out[names[0]] = frame
+
+        def build() -> Dict[str, pd.DataFrame]:
+            # A job's batch goes in parts of JOB_DOWNLOAD_PART names, each its own turn at _NET_LOCK, so a reader
+            # waiting on the lock is let in between parts (the lock is reader-first) instead of after the whole batch.
+            # A reader's batch is one download, as before.
+            parts = ([tickers[i:i + JOB_DOWNLOAD_PART] for i in range(0, len(tickers), JOB_DOWNLOAD_PART)]
+                     if in_background() and len(tickers) > JOB_DOWNLOAD_PART else [list(tickers)])
+            out: Dict[str, pd.DataFrame] = {}
+            refused: Optional[BaseException] = None
+            answered = False
+            for part in parts:
+                try:
+                    raw = download(part)
+                except Exception as exc:
+                    refused = refused or exc
+                    break                                       # refused: no more requests on top of it
+                answered = answered or (raw is not None and len(raw) > 0)
+                frames_of(raw, part, out)
+            if refused is not None:
+                # refused: no more requests on top of it, only what each name last had (and what the parts before the
+                # refusal brought)
+                for sym, frame in out.items():
+                    _keep_good(_hist_key(sym, period, interval), frame)
+                held_back = {sym: v for sym in tickers if sym not in out and (v := _stand_in(_hist_key(sym, period, interval), None)) is not None}
+                return _failed({**out, **held_back}, refused)
+
+            if not answered:
+                filled = self._fill_missing(out, tickers, period, interval)
+                return _empty_answer(key, filled) if not filled else _Failed(filled)
+
             for sym, frame in out.items():
                 _keep_good(_hist_key(sym, period, interval), frame)   # each name's own stand-in, should a later answer leave it out
             if len(out) == len(tickers):

@@ -477,13 +477,34 @@ async function loadAllowance() {
 // (the next question only), or kept from Response settings; signed in, the kept one is on the account
 // (/api/milo/stance), and the account's wins over this browser's on the first open, as the level does.
 export const STANCES = [['neutral', "A neutral analyst's reading"], ['longterm', "A long-term investor's reading"], ['stoic', "A conservative investor's reading"], ['quant', "A statistician's reading"], ['skeptic', "A skeptic's reading"]];
-let stanceSynced = false;
-async function syncStance() {
-  if (stanceSynced || !store.signedIn()) return;
-  stanceSynced = true;
-  try { const r = await api.get('/api/milo/stance', { force: true, timeout: 8000 }); if (r && r.kept && r.kept.id && r.kept.id !== persona()) { setPref(PERSONA_KEY, r.kept.id); paintChrome(); const slot = host() && $('[data-v2-milo-stance-slot]', host()); if (slot) render(slot, stanceOnceHTML()); } } catch (e) { stanceSynced = false; }
+// The account's stance is asked once per page, and asked again after a failure (round three D2: a server held up behind a
+// market-data batch timed the first ask out, and the panel kept the default stance for good because nothing asked
+// again). The retries back off (STANCE_RETRY_MS) and stop once an answer arrives; the answer then corrects the panel,
+// unless the reader kept a stance in this browser after the ask began (that pick was sent to the account and wins).
+export const STANCE_RETRY_MS = [1000, 2000, 4000, 8000, 15000, 30000];
+let stanceSynced = false, stanceTry = 0, stanceTimer = 0, stanceEpoch = 0;
+function applyKeptStance(r) {
+  if (!(r && r.kept && r.kept.id) || r.kept.id === persona()) return;
+  setPref(PERSONA_KEY, r.kept.id); paintChrome();
+  const slot = host() && $('[data-v2-milo-stance-slot]', host()); if (slot) render(slot, stanceOnceHTML());
 }
-function keepStance(id) { if (store.signedIn()) api.put('/api/milo/stance', { stance: id }).catch(() => { /* kept in this browser; the account catches up at the next pick */ }); }
+async function syncStance() {
+  if (stanceSynced || stanceTimer || !store.signedIn()) return;
+  stanceSynced = true;
+  const epoch = stanceEpoch;
+  try {
+    const r = await api.get('/api/milo/stance', { force: true, timeout: 8000 });
+    stanceTry = 0;
+    if (epoch === stanceEpoch) applyKeptStance(r);
+  } catch (e) {
+    stanceSynced = false;
+    if (e && e.kind === 'auth') return;                     // signed out meanwhile: nothing on an account to ask for
+    const wait = STANCE_RETRY_MS[Math.min(stanceTry, STANCE_RETRY_MS.length - 1)];
+    stanceTry += 1;
+    stanceTimer = setTimeout(() => { stanceTimer = 0; syncStance(); }, wait);
+  }
+}
+function keepStance(id) { stanceEpoch += 1; if (store.signedIn()) api.put('/api/milo/stance', { stance: id }).catch(() => { /* kept in this browser; the account catches up at the next pick */ }); }
 function stanceOnceHTML() {
   const cur = STANCES.find(([id]) => id === persona()) || STANCES[0];
   return html`<div class="milo-stance-once"><label class="t-label" for="milo-stance-once">Stance for this answer</label>
