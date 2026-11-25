@@ -192,7 +192,8 @@ def identity(run: Run) -> None:
         h = json.loads(body)
         files = ["static/v2/js/app.js", "static/v2/js/pages/signin.js", "static/v2/js/pages/levelquiz.js",
                  "static/v2/js/ui/milo.js", "static/v2/js/pages/settings.js", "static/v2/js/pages/chart.js",
-                 "static/v2/js/ui/pricechart.js", "static/v2/css/base.css", "static/v2/css/pages.css"]
+                 "static/v2/js/ui/pricechart.js", "static/v2/css/base.css", "static/v2/css/pages.css",
+                 "static/v2/js/ui/shell.js", "static/v2/js/ui/milo-inline.js", "static/v2/js/ui/drawer.js"]
         same, differ = 0, []
         for f in files:
             want = subprocess.run(["git", "-C", str(ROOT), "show", "{}:{}".format(DEPLOYED, f)], capture_output=True).stdout
@@ -204,11 +205,11 @@ def identity(run: Run) -> None:
                 differ.append("{} ({})".format(f, s2))
         ok = st == 200 and str(h.get("booted_at", "")).startswith(BOOTED) and not differ
         run.notes["health"] = {"booted_at": h.get("booted_at"), "uptime_seconds": h.get("uptime_seconds"), "commit": h.get("commit")}
-        run.record("V0", "The copy is still the 3ff7100 deployment", "booted 2026-11-24 16:00:35 UTC; served scripts equal 3ff7100",
+        run.record("V0", "The copy is still the {} deployment".format(DEPLOYED), "booted {} UTC; served scripts equal {}".format(BOOTED, DEPLOYED),
                    "/api/health {}: booted_at {}, uptime {} s; {} of {} served files equal by sha256 to {}{}".format(
                        st, h.get("booted_at"), h.get("uptime_seconds"), same, len(files), DEPLOYED,
                        "; differ: " + ", ".join(differ) if differ else ""), "pass" if ok else "fail")
-    run.item("V0", "deployment identity", "3ff7100", go)
+    run.item("V0", "deployment identity", DEPLOYED, go)
 
 
 # ==================================================================== A1 and A2
@@ -768,6 +769,31 @@ def charts(run: Run, browser, page) -> None:
                    "; ".join("{}: tab {} selected, {} panels".format(*x) for x in got), "pass" if ok else "fail")
     run.item("C14", "trading layouts", "", c14)
 
+    def c14b():
+        # round three D3: the rail entry that opened a trading layout is the current one, and Home is not
+        cur = "() => [...document.querySelectorAll('.rail [aria-current=\"page\"]')].map(a => a.textContent.trim())"
+        got, ok = [], True
+        for label, preset in (("Charts & Technicals", "technicals"), ("Options & Derivatives", "derivatives")):
+            page.goto(BASE + "/#/AAPL", wait_until="domcontentloaded")
+            page.locator(".rail-nav a.rail-row", has_text=label).first.click()
+            page.wait_for_selector("[data-ws-preset='{}'][aria-selected='true']".format(preset), timeout=45000)
+            page.wait_for_function("l => [...document.querySelectorAll('.rail [aria-current=\"page\"]')].map(a => a.textContent.trim()).includes(l)",
+                                   arg=label, timeout=15000)
+            on = page.evaluate(cur)
+            run.shot(page, "C14b-" + preset)
+            got.append("{}: current {}".format(label, on))
+            ok = ok and on == [label]
+        page.locator(".rail-nav a.rail-row", has_text="Home").first.click()
+        page.wait_for_function("() => location.hash === '#/'", timeout=15000)
+        page.wait_for_timeout(800)
+        on = page.evaluate(cur)
+        got.append("Home pressed: current {}".format(on))
+        ok = ok and on == ["Home"]
+        run.record("C14b", "Open Charts & Technicals and Options & Derivatives from the rail, then Home",
+                   "the entry opened is the rail's current item (aria-current) and Home is not; Home pressed is current again",
+                   "; ".join(got), "pass" if ok else "fail")
+    run.item("C14b", "rail current item", "", c14b)
+
 
 def milo(run: Run, page) -> None:
     def e20():
@@ -786,6 +812,36 @@ def milo(run: Run, page) -> None:
         run.record("E20", "The Milo strip on AAPL Financials, Home, Chart, Portfolio, Calendar, Settings", "each names its own screen ('Explain the chart in view on AAPL's Financials' on Financials)",
                    "; ".join("{} -> '{}'".format(h, o) for h, _, o in seen), "pass" if ok else "fail")
     run.item("E20", "strip", "", e20)
+
+    def e20b():
+        # round three D2(b): the stance kept on the account is what a newly opened Milo shows, in another browser.
+        # The evaluator's kept stance is read first and put back after (a kept 'neutral' stays if none was kept,
+        # since an account's stance cannot be unset; neutral is the default reading).
+        csrf = next(c["value"] for c in page.context.cookies() if c["name"].lower().endswith("csrf"))
+        put = "async ([t, s]) => (await fetch('/api/milo/stance', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Optic-CSRF': t }, body: JSON.stringify({ stance: s }) })).status"
+        was = page.evaluate("async () => (await (await fetch('/api/milo/stance')).json()).kept")
+        want = "quant" if (was or {}).get("id") != "quant" else "stoic"
+        label = {"quant": "As kept: a statistician's reading", "stoic": "As kept: a conservative investor's reading"}[want]
+        st = page.evaluate(put, [csrf, want])
+        ctx2, page2 = run.context(page.context.browser)
+        try:
+            run.sign_in(page2, EVALUATOR, run.key["evaluator"])
+            t0 = time.monotonic()
+            page2.click(".topbar-milo")
+            page2.wait_for_selector("#milo-stance-once")
+            page2.wait_for_function("k => (document.querySelector('#milo-stance-once option') || {}).textContent === k", arg=label, timeout=30000)
+            took = time.monotonic() - t0
+            shown = page2.eval_on_selector("#milo-stance-once option", "o => o.textContent")
+            run.shot(page2, "E20b-kept-stance")
+        finally:
+            ctx2.close()
+        back = page.evaluate(put, [csrf, (was or {}).get("id") or "neutral"])
+        run.record("E20b", "Keep a stance on the account, then open Milo in another browser",
+                   "the new panel shows the kept stance ('{}')".format(label),
+                   "PUT {} -> {}; second browser's Milo shows '{}' {:.1f} s after the click; put back to {} ({})".format(
+                       want, st, shown, (was or {}).get("id") or "neutral (none was kept)", back),
+                   "pass" if st == 200 and shown == label and back == 200 else "fail")
+    run.item("E20b", "kept stance", "", e20b)
 
     def e21():
         page.goto(BASE + "/#/AAPL/financials", wait_until="domcontentloaded")
@@ -1128,7 +1184,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--key", default=str(Path.home() / ".conjure" / "optic-eval.key"))
     ap.add_argument("--only", default=",".join(GROUPS), help="comma list of groups: " + ",".join(GROUPS))
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--deployed", default=DEPLOYED, help="the commit the copy runs (V0 compares served files to it)")
+    ap.add_argument("--booted", default=BOOTED, help="the boot time /api/health reports, as its ISO prefix")
     a = ap.parse_args(argv)
+    globals().update(DEPLOYED=a.deployed, BOOTED=a.booted)
     print(KIND, flush=True)
     out = Path(a.out).resolve()
     probe = subprocess.run(["git", "-C", str(out.parent if not out.exists() else out), "rev-parse", "--show-toplevel"], capture_output=True, text=True)
