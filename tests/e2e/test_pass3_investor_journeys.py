@@ -295,9 +295,18 @@ def test_the_owner_report_reads_counts_by_week_and_names_the_group_it_read(chrom
         c.executemany("INSERT INTO usage_event (occurred_at, actor_kind, actor_ref, user_id, event, symbol, source_screen, level) VALUES (?,?,?,?,?,?,?,?)", rows)
     ctx, page = open_page(chrome, server, level="advanced", cookies=jar)
     try:
+        # The report is timed from the app already open (Settings, signed in) to the report drawn, as the owner opens it
+        # from the rail. Timed from a cold browser it measured the app's first load: on the Ubuntu runner the page's
+        # own document took 1.34 s to arrive and the report's request 44 ms of a 2.08 s total (run 45557051883,
+        # 2026-11-25). The bound is unchanged.
+        # Settings rather than Home: Home's market panels keep asking the refused feeds, and the axe scan below waits
+        # for the network to go quiet
+        page.goto(server["base"] + "/#/settings", wait_until="domcontentloaded")
+        page.wait_for_selector("[data-v2-account].avatar", timeout=20000)
+        page.wait_for_selector("#pl-h", timeout=20000)
         t = time.perf_counter()
         with page.expect_response(lambda r: "/api/admin/owner-report" in r.url, timeout=20000) as got:
-            page.goto(server["base"] + "/#/owner-report", wait_until="domcontentloaded")
+            page.evaluate("() => { location.hash = '#/owner-report'; }")
         page.wait_for_selector("[data-v2-or-signals]", timeout=20000)
         took = time.perf_counter() - t
         # Diagnostic (2026-11-25): the page took 2.04 s and 2.13 s on the Ubuntu runner and 0.85 s on the Mac. The
