@@ -50,7 +50,8 @@ def test_docked_milo_is_not_a_dialog_and_stays_across_pages():
     assert "export function makeDrawer(" in DRAWER and "const main = makeDrawer();" in DRAWER
     assert "panel.setAttribute('role', 'complementary'); panel.removeAttribute('aria-modal');" in DRAWER, "no trap, no aria-modal"
     assert "if ((sticky || docked) && route && !force) return;" in DRAWER
-    assert "const drawer = makeDrawer({ cls: 'drawer-milo', titleId: 'milo-title' });" in MILO, "its own drawer and title id"
+    # its own drawer and title id; it announces its state to the strip since round three (D1)
+    assert "const drawer = makeDrawer({ cls: 'drawer-milo', titleId: 'milo-title', onState:" in MILO, "its own drawer and title id"
     assert "if (drawer.isOpen() && !drawer.isDocked()) drawer.close({ silent: true });" in MILO, "over the page, it closes with the page"
     assert ".drawer.drawer-milo { z-index: 59; }" in CSS and "html.milo-docked .stage { margin-right: var(--milo-dock-w, 0px); }" in CSS
     assert ".drawer.is-docked .drawer-scrim { display: none; }" in CSS

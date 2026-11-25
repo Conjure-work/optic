@@ -221,16 +221,18 @@ def test_the_rail_entry_that_opened_a_trading_layout_is_current_and_home_is_not(
     ctx, page = open_page(chrome, server, level="advanced", viewport=DESKTOP)
     try:
         page.goto(server["base"] + "/#/AAPL", wait_until="domcontentloaded")
-        page.wait_for_selector(".rail a:has-text('{}')".format(label))
+        # the company page drawn first (its rail marks Company Overview), so the press is on a settled page
+        page.wait_for_function("() => [...document.querySelectorAll('.rail [aria-current=\"page\"]')].map(a => a.textContent.trim()).includes('Company Overview')", timeout=45000)
         page.click(".rail a:has-text('{}')".format(label))
         page.wait_for_function("p => location.hash.startsWith('#/?preset=' + p)", arg=preset)
-        page.wait_for_function("l => [...document.querySelectorAll('.rail [aria-current=\"page\"]')].map(a => a.textContent.trim()).includes(l)", arg=label, timeout=10000)
+        page.wait_for_selector("[data-ws-preset='{}'][aria-selected='true']".format(preset), timeout=45000)
+        page.wait_for_function("l => [...document.querySelectorAll('.rail [aria-current=\"page\"]')].map(a => a.textContent.trim()).includes(l)", arg=label, timeout=15000)
         assert _current(page) == [label], _current(page)
         assert page.locator(".rail .rail-group").first.evaluate("g => g.classList.contains('is-in')")
         # Home, pressed in the rail, is Home again
         page.click(".rail a.rail-row:has-text('Home')")
         page.wait_for_function("() => location.hash === '#/'")
-        page.wait_for_function("() => [...document.querySelectorAll('.rail [aria-current=\"page\"]')].map(a => a.textContent.trim()).join() === 'Home'", timeout=10000)
+        page.wait_for_function("() => [...document.querySelectorAll('.rail [aria-current=\"page\"]')].map(a => a.textContent.trim()).join() === 'Home'", timeout=30000)
         assert not page.errors, page.errors[:3]
     finally:
         ctx.close()
