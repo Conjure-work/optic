@@ -103,7 +103,7 @@ def world(user: Optional[str] = None, extra: Optional[Dict[str, Any]] = None):
         mock.patch.object(m, "_market_context", _market_context),
         mock.patch.object(m, "_screen_candidates", lambda: {"source": "screener (fixture)", "rows": [{"symbol": "NVDA"}, {"symbol": "AMD"}]}),
         mock.patch.object(m, "_spend_guard", lambda request: None),
-        mock.patch.object(m, "_count_question", lambda request, kind: None),
+        mock.patch.object(m, "_count_question", lambda request, kind, payload=None: None),
         mock.patch.object(m.auth_deps, "current_user", current_user),
         mock.patch.object(m.brokerage_service, "open_to", lambda user: bool(user)),
         mock.patch.object(m.brokerage_store, "link", link),

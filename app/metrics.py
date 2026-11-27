@@ -38,7 +38,13 @@ RETENTION_DAYS = 28
 KINDS = {"chat": "Milo chat", "research": "Deep research", "scan": "Scan requests",
          "portfolio": "Portfolio briefings (Brokerage)",
          # counted since the earnings brief went through the allowance; it showed as its raw id (Phase 10 analytics review)
-         "earnings_brief": "Earnings briefs"}
+         "earnings_brief": "Earnings briefs",
+         "investigation": "Investigation steps"}
+
+# One definition of a question to Milo, printed above both figures on the owner's page (audit round, Q02).
+QUESTION_DEFINITION = ("A question to Milo is one request that passed the allowance, through chat, deep research, an "
+                       "earnings brief, a scan request, an investigation step or a portfolio briefing. Your own are "
+                       "left out.")
 
 
 # ------------------------------------------------------------------ recording
@@ -127,6 +133,54 @@ def owner_ids(users: Optional[List[Dict[str, Any]]] = None) -> set:
     return {u["id"] for u in users if (u["email"] or "").lower() in owners}
 
 
+def _question_tally(now: datetime, owners: Optional[set] = None, since_all: Optional[str] = None) -> Dict[str, Any]:
+    """Every `milo_questions` row counted once: by kind and in total, for today (UTC), the last 7 days, the last 30 days
+    and all rows at or after `since_all` (all rows when None). The owner's rows are left out and counted apart. The
+    one place a question is counted, so the Metrics page's table and the usage headline cannot disagree."""
+    if owners is None:
+        owners = owner_ids()
+    rows = db.rows("SELECT at, user_id, kind FROM milo_questions")
+    day_cut = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    cuts = {"today": day_cut, "last_7_days": now - timedelta(days=7), "last_30_days": now - timedelta(days=30)}
+    since = _ts(since_all) if since_all else None
+
+    def blank(kind: str, label: str) -> Dict[str, Any]:
+        return {"kind": kind, "label": label, "today": 0, "last_7_days": 0, "last_30_days": 0, "all": 0}
+
+    by_kind: Dict[str, Dict[str, Any]] = {}
+    total = blank("all", "All questions")
+    owner_questions, guests_7d, askers_7d = 0, 0, set()
+    for r in rows:
+        at = _ts(r["at"])
+        if r["user_id"] in owners:
+            owner_questions += 1
+            continue
+        k = by_kind.setdefault(r["kind"], blank(r["kind"], KINDS.get(r["kind"], r["kind"])))
+        for tgt in (k, total):
+            if since is None or (at and at >= since):
+                tgt["all"] += 1
+            for name, cut in cuts.items():
+                if at and at >= cut:
+                    tgt[name] += 1
+        if at and at >= cuts["last_7_days"]:
+            if r["user_id"]:
+                askers_7d.add(r["user_id"])
+            else:
+                guests_7d += 1
+    ordered = sorted(by_kind.values(), key=lambda k: list(KINDS).index(k["kind"]) if k["kind"] in KINDS else 99)
+    return {"by_kind": ordered, "total": total, "owner_questions": owner_questions, "guests_7d": guests_7d,
+            "askers_7d": askers_7d}
+
+
+def question_totals(now: Optional[datetime] = None, since_all: Optional[str] = None) -> Dict[str, int]:
+    """Questions to Milo with the owner's left out: {"today", "last_7_days", "last_30_days", "all"} (`all` from
+    `since_all` when given). What the usage page's headline row shows; the Metrics table's total row is the same
+    number by construction."""
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    t = _question_tally(now, None, since_all)["total"]
+    return {k: t[k] for k in ("today", "last_7_days", "last_30_days", "all")}
+
+
 def overview(now: Optional[datetime] = None) -> Dict[str, Any]:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     today = now.date()
@@ -182,28 +236,10 @@ def overview(now: Optional[datetime] = None) -> Dict[str, Any]:
                         "retained": len(kept),
                         "retained_pct": round(len(kept) / len(due) * 100.0, 1) if due else None})
 
-    # ---- Milo questions, by what was asked through
-    rows = db.rows("SELECT at, user_id, kind FROM milo_questions")
-    week_cut, month_cut = now - timedelta(days=7), now - timedelta(days=30)
-    by_kind: Dict[str, Dict[str, Any]] = {}
-    owner_questions, guests_7d, askers_7d = 0, 0, set()
-    for r in rows:
-        at = _ts(r["at"])
-        if r["user_id"] in owner_ids_:
-            owner_questions += 1
-            continue
-        k = by_kind.setdefault(r["kind"], {"kind": r["kind"], "label": KINDS.get(r["kind"], r["kind"]),
-                                           "last_7_days": 0, "last_30_days": 0, "all": 0})
-        k["all"] += 1
-        if at and at >= month_cut:
-            k["last_30_days"] += 1
-        if at and at >= week_cut:
-            k["last_7_days"] += 1
-            if r["user_id"]:
-                askers_7d.add(r["user_id"])
-            else:
-                guests_7d += 1
-    questions = sorted(by_kind.values(), key=lambda k: list(KINDS).index(k["kind"]) if k["kind"] in KINDS else 99)
+    # ---- Milo questions, by what was asked through (the same rows and the same function the usage page's headline reads)
+    tally = _question_tally(now, owner_ids_)
+    questions = tally["by_kind"]
+    askers_7d, guests_7d, owner_questions = tally["askers_7d"], tally["guests_7d"], tally["owner_questions"]
 
     # ---- plans, as the entitlement code reads them
     plans: Dict[str, Dict[str, Any]] = {}
@@ -221,7 +257,8 @@ def overview(now: Optional[datetime] = None) -> Dict[str, Any]:
                      "active_7_days": active_within(7), "active_30_days": active_within(30)},
         "weeks": weeks,
         "retention": {"days": RETENTION_DAYS, "cohorts": cohorts},
-        "questions": {"by_kind": questions, "askers_7_days": len(askers_7d), "guest_questions_7_days": guests_7d,
+        "questions": {"definition": QUESTION_DEFINITION, "by_kind": questions, "total": tally["total"],
+                      "askers_7_days": len(askers_7d), "guest_questions_7_days": guests_7d,
                       "owner_questions_left_out": owner_questions},
         "model_calls": ai_store.calls_by_feature(now.timestamp()),
         "plans": sorted(plans.values(), key=lambda p: -p["accounts"]),

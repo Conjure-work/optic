@@ -6626,27 +6626,6 @@ async def usage_event(request: Request) -> Dict[str, Any]:
     return {"ok": True, "recorded": bool(wrote)}
 
 
-def _usage_milo(request: Request, payload: Dict[str, Any]) -> None:
-    """A question to Milo passed the allowance: one milo_question row, with the screen it came from, the
-    symbol in focus and the level (app/usage.py). Never the question's text. Never raises."""
-    try:
-        try:
-            user = auth_deps.current_user(request)
-        except Exception:                                         # noqa: BLE001
-            user = None
-        ctx = payload.get("context") if isinstance(payload.get("context"), dict) else {}
-        focus = ctx.get("focus") if isinstance(ctx.get("focus"), dict) else {}
-        visitor = request.headers.get("x-optic-visitor") or None
-        actor = usage_mod.actor_for(user, visitor)
-        if actor is None:
-            return
-        level = knowledge_mod.three(payload.get("mode"))
-        usage_mod.record("milo_question", actor, symbol=focus.get("ticker") if isinstance(focus.get("ticker"), str) else None,
-                         source_screen=focus.get("view") if isinstance(focus.get("view"), str) else None, level=level)
-    except Exception:                                             # noqa: BLE001
-        pass
-
-
 # Resolving a report, one or all. The same guard as reading them, because it is
 # the same person, and writes as well: the token, or the signed-in owner with
 # the CSRF header. An update and never a delete (see feedback.resolve).
@@ -8377,15 +8356,31 @@ def ai_allowance(request: Request) -> Dict[str, Any]:
                 "signed_in_allowance": auth_store.PLANS["free"]["ai_calls_per_day"]}
 
 
-def _count_question(request: Request, kind: str) -> None:
-    """A question passed `_spend_guard`: count it for the owner's Metrics page
-    (`kind`: chat, research, scan, portfolio). The owner's own are recorded and
-    left out there. Never raises."""
+def _count_question(request: Request, kind: str, payload: Optional[Dict[str, Any]] = None) -> None:
+    """A question passed `_spend_guard`: the one place it is counted. Writes the `milo_questions` row the owner's
+    Metrics table reads and the `milo_question` usage event the three signals' reader count reads, together
+    (`kind`: chat, research, earnings_brief, scan, investigation, portfolio). `payload` is what the request sent, for
+    the screen, the symbol in focus and the level the event carries; never the question's text. The owner's own are
+    recorded and left out there. Never raises."""
     try:
         user = auth_deps.current_user(request)
     except Exception:                                             # noqa: BLE001
         user = None
     metrics_mod.note_question((user or {}).get("id"), kind)
+    try:
+        given = isinstance(payload, dict)
+        payload = payload if given else {}
+        ctx = payload.get("context") if isinstance(payload.get("context"), dict) else {}
+        focus = ctx.get("focus") if isinstance(ctx.get("focus"), dict) else {}
+        actor = usage_mod.actor_for(user, request.headers.get("x-optic-visitor") or None)
+        if actor is None:
+            return
+        level = knowledge_mod.three(payload.get("mode")) if given else None
+        usage_mod.record("milo_question", actor,
+                         symbol=focus.get("ticker") if isinstance(focus.get("ticker"), str) else None,
+                         source_screen=focus.get("view") if isinstance(focus.get("view"), str) else None, level=level)
+    except Exception:                                             # noqa: BLE001
+        pass
 
 
 def _spend_guard(request: Request) -> None:
@@ -9076,8 +9071,7 @@ async def chat(request: Request,
     if too_long:
         raise HTTPException(status_code=413, detail=too_long)      # before the allowance is charged (BUG-112)
     _spend_guard(request)
-    _count_question(request, "chat")
-    _usage_milo(request, payload)
+    _count_question(request, "chat", payload)
     history = payload.get("messages") or []
     context = payload.get("context")
     use_web = bool(payload.get("web"))
@@ -9251,8 +9245,7 @@ async def research(request: Request,
     if too_long:
         raise HTTPException(status_code=413, detail=too_long)      # before the allowance is charged (BUG-112)
     _spend_guard(request)
-    _count_question(request, "research")
-    _usage_milo(request, payload)
+    _count_question(request, "research", payload)
     ticker = (payload.get("ticker") or "").upper()
     question = payload.get("question")
     # Research is about a company or the market, never the reader's accounts. The reader's own blocks (a paper book,
