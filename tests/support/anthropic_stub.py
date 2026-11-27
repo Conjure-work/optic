@@ -9,6 +9,9 @@ assert what Milo was sent, and the stub plays the provider's behaviours a test a
 * ``tool`` (round three, 2026-11-23): the first round asks for one tool (``tool_name`` with ``tool_input``, a quote by
   default), and the round after the tool result waits ``text_delay`` seconds before the answer, so a journey can see
   Milo's steps arrive before any answer text.
+* ``script`` (audit F04, 2026-11-27): ``stub.script`` is a list of answers, one returned per request in order (the
+  last repeats when the list runs out); every request is still recorded, so a journey can see how many were made and
+  what the later ones carried.
 
 The base address is a setting (ANTHROPIC_BASE_URL) that the tests point here; nothing reaches the real host.
 """
@@ -36,6 +39,7 @@ class AnthropicStub:
         self.tool_name = "get_quote"
         self.tool_input: Dict[str, Any] = {"ticker": "AAPL"}
         self.text_delay = 1.5
+        self.script: List[str] = []
         self._lock = threading.Lock()
         stub = self
 
@@ -102,6 +106,7 @@ class AnthropicStub:
                     return
                 if mode == "tool":
                     time.sleep(stub.text_delay)
+                text = stub._next_scripted() if mode == "script" else ANSWER
                 self.send_response(200)
                 self.send_header("content-type", "text/event-stream")
                 self.send_header("cache-control", "no-cache")
@@ -113,7 +118,7 @@ class AnthropicStub:
                                                                              "model": model, "content": [], "stop_reason": None,
                                                                              "stop_sequence": None, "usage": {"input_tokens": 10, "output_tokens": 1}}}),
                     _sse("content_block_start", {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}),
-                    _sse("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": ANSWER}}),
+                    _sse("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": text}}),
                     _sse("content_block_stop", {"type": "content_block_stop", "index": 0}),
                     _sse("message_delta", {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": None},
                                            "usage": {"output_tokens": 12}}),
@@ -157,6 +162,14 @@ class AnthropicStub:
         with self._lock:
             self.requests.append({"method": method, "path": path, "body": body})
 
+    def _next_scripted(self) -> str:
+        with self._lock:
+            n = len([r for r in self.requests if r["method"] == "POST" and r["path"].startswith("/v1/messages")
+                     and not r["path"].startswith("/v1/messages/count_tokens") and r["body"].get("stream")])
+            if not self.script:
+                return ANSWER
+            return self.script[min(n - 1, len(self.script) - 1)]
+
     def messages(self) -> List[Dict[str, Any]]:
         with self._lock:
             return [r for r in self.requests if r["method"] == "POST" and r["path"].startswith("/v1/messages")
@@ -166,6 +179,7 @@ class AnthropicStub:
         with self._lock:
             self.requests.clear()
         self.mode = mode
+        self.script = []
 
     def start(self) -> "AnthropicStub":
         self.thread.start()
