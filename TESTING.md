@@ -196,6 +196,8 @@ Generated from the app's route table by `tests/support/guard_inventory.py`; `tes
 
 <!-- guard-inventory:end -->
 
+**The denial test for every guarded route.** The inventory above reads the guards from the code; `tests/test_audit_guard_denials.py` sends a request each guarded route must refuse (signed out, and as a signed-in reader who is not the owner for the owner routes) and checks the code: 401 for the session and write guards, 403 for a reader on an owner route, 400 for an unsigned Stripe delivery, 401 for an unsigned brokerage one. The sweep is `tests/support/guard_denials.py`; five routes use a guard as a question rather than a refusal and are listed there under `PREDICATE`, and two need a request shaped to reach their guard (`OVERRIDES`). Against a running copy: `python -m tests.support.guard_denials --base <url> [--reader-cookie-file <path>]` (the file holds a reader's Cookie header; it sends only requests that must be refused and exits 1 on any miss).
+
 ## The three legs on the surfaces Pass 1 added
 
 | Surface | No user | Wrong user | Wrong role |
