@@ -1436,8 +1436,6 @@ def has_policy(system: Any) -> bool:
 # figure has nothing behind it is taken out, with a note, as an advice-policy sentence is. Each supported figure is
 # returned with where it came from, so the panel can name the tool under the answer.
 
-GROUND_NOTE = ("Milo removed a sentence with a figure that no Optic data behind this answer supports. Every figure "
-               "it gives comes from the page or a lookup listed under the answer.")
 _FIG = re.compile(r"(?<![\w.])(?P<money>\$\s?)?(?P<num>-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)"
                   r"\s?(?P<unit>%|percent\b|trillion\b|billion\b|million\b|thousand\b|tn\b|bn\b|[TBMK]\b)?", _I)
 _EV_NUM = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
@@ -1482,33 +1480,382 @@ def figures_in(text: str) -> List[Dict[str, Any]]:
     return found
 
 
+GROUND_NOTE_STEM = ("whose figures no Optic data behind this answer supports, and {how}. Every figure it gives "
+                    "comes from the page or a lookup listed under the answer.")
+
+
+def ground_note(n: int, kind: str) -> str:
+    """The note under an answer that was checked against its data (audit F04): how many statements were removed and
+    what became of the answer. `kind` is "rewritten" (Milo wrote it again from the figures that remain) or "limited"
+    (the server's own answer, which says what could not be supported)."""
+    how = ("says above what it could not support" if kind == "limited"
+           else "rewrote the answer from the figures that remain")
+    if n <= 0:
+        # an answer that did not read whole, with nothing removed for its figures (a table with no units)
+        return ("Milo rewrote this answer because part of it did not read whole. Every figure it gives comes from "
+                "the page or a lookup listed under the answer." if kind != "limited" else
+                "Milo left out part of this answer that did not read whole, and says above what it could not "
+                "support. Every figure it gives comes from the page or a lookup listed under the answer.")
+    return "Milo removed {} statement{} {}".format(n, "" if n == 1 else "s", GROUND_NOTE_STEM.format(how=how))
+
+
+# ---- blocks: the shape of an answer (audit F04, 2026-11-27)
+#
+# `sentences()` reads every line as a sentence, which is right for the advice check and wrong for taking figures out:
+# a table's header and separator are not statements, and a blank line between a table's rows ends the table. An
+# answer is read here as blocks, each kept with the separator that followed it, so an untouched answer comes back
+# byte for byte and a changed one is put back together the way it was written.
+_PIPE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$")
+_LI = re.compile(r"^\s*(?:[-*+•]|\d{1,2}[.)])\s+\S")
+_HEAD = re.compile(r"^\s{0,3}#{1,6}\s+\S")
+_BOLD_HEAD = re.compile(r"^\s*\*\*[^*\d$%]{1,80}\*\*\s*:?\s*$")
+_TAGLINE = re.compile(r"^\s*\[\[[^\]]*\]\]\s*$")
+_CODE_FENCE = re.compile(r"^\s*```")
+_BARE_NUM = re.compile(r"^[\s*_(]*[-+−]?\d[\d,]*(?:\.\d+)?[\s*_)]*$")
+_UNIT_HEAD = re.compile(r"[$€£%]|\b(?:usd|eur|gbp|dollars?|percent|pct|bn|mn|billions?|millions?|thousands?|trillions?|shares?|"
+                        r"ratio|multiple|times|days|years?|quarters?|period|date|rank|count|number|no\.?|bps|"
+                        r"basis points?|x)\b|\(\s*[$€£]?\s*[bmkt]n?\s*\)|#", _I)
+
+
+def _is_pipe(line: str) -> bool:
+    s = line.strip()
+    return s.startswith("|") or s.count("|") >= 2
+
+
+def _line_kind(line: str) -> str:
+    if not line.strip():
+        return "blank"
+    if _HEAD.match(line) or _BOLD_HEAD.match(line):
+        return "heading"
+    if _TAGLINE.match(line):
+        return "tag"
+    if line.strip().startswith(FOLLOW_UP) or line.strip().startswith("->"):
+        return "followups"
+    if _is_pipe(line):
+        return "table"
+    if _LI.match(line):
+        return "list"
+    return "paragraph"
+
+
+def _units(text: str) -> Tuple[str, List[Dict[str, Any]], str]:
+    """(lead, units, trail): `lead` and `trail` are the whitespace round the answer; each unit is {kind, text, sep}
+    with `sep` the whitespace that followed it. Kinds: paragraph, list, table, heading, tag, followups, fence."""
+    text = str(text or "")
+    m = re.match(r"^(\s*)(.*?)(\s*)$", text, re.S)
+    lead, body, trail = m.group(1), m.group(2), m.group(3)
+    if not body:
+        return lead + trail, [], ""
+    parts = re.split(r"(\n[ \t]*\n+)", body)
+    blocks = []
+    i = 0
+    while i < len(parts):
+        chunk, sep = parts[i], (parts[i + 1] if i + 1 < len(parts) else "")
+        # a code fence may hold blank lines: keep it as one block until it closes
+        while sum(1 for ln in chunk.split("\n") if _CODE_FENCE.match(ln)) % 2 == 1 and i + 2 < len(parts):
+            chunk = chunk + sep + parts[i + 2]
+            sep = parts[i + 3] if i + 3 < len(parts) else ""
+            i += 2
+        blocks.append((chunk, sep))
+        i += 2
+    units: List[Dict[str, Any]] = []
+    for chunk, bsep in blocks:
+        if _CODE_FENCE.match(chunk.lstrip()):
+            units.append({"kind": "fence", "text": chunk, "sep": bsep})
+            continue
+        groups: List[List[Any]] = []          # [kind, [lines]]
+        for line in chunk.split("\n"):
+            k = _line_kind(line)
+            if k == "blank" and groups:
+                groups[-1][1].append(line)
+                continue
+            if groups and ((k == groups[-1][0] and k in ("paragraph", "table", "list", "followups", "tag"))
+                           or (k == "paragraph" and groups[-1][0] == "list" and line[:1] in (" ", "\t"))):
+                groups[-1][1].append(line)
+            else:
+                groups.append([k if k != "blank" else "paragraph", [line]])
+        for gi, (k, lines) in enumerate(groups):
+            units.append({"kind": k, "text": "\n".join(lines), "sep": "\n" if gi + 1 < len(groups) else bsep})
+    return lead, units, trail
+
+
+def _assemble(lead: str, units: List[Dict[str, Any]], trail: str, collapse: bool = False) -> str:
+    out = [lead]
+    for i, u in enumerate(units):
+        out.append(u["text"])
+        if i + 1 < len(units):
+            sep = u["sep"]
+            if collapse and sep.count("\n") > 2:
+                sep = "\n\n"
+            out.append(sep)
+    out.append(trail)
+    return "".join(out)
+
+
+def _table_parts(text: str) -> Optional[Tuple[str, str, List[str]]]:
+    """(header, separator, data rows) for a pipe-line group that is a valid table, else None."""
+    lines = [ln for ln in text.split("\n") if ln.strip()]
+    if len(lines) >= 2 and _is_pipe(lines[0]) and "|" in lines[1] and _PIPE_SEP.match(lines[1]):
+        return lines[0], lines[1], lines[2:]
+    return None
+
+
+def blocks(text: str) -> List[Dict[str, Any]]:
+    """The answer as blocks: [{kind, text, sep}], `sep` being what followed the block in the original. Joining
+    every `text` and `sep` gives the answer back, whitespace round it apart."""
+    return _units(text)[1]
+
+
+def _list_items(text: str) -> List[str]:
+    items: List[str] = []
+    for line in text.split("\n"):
+        if _LI.match(line) or not items:
+            items.append(line)
+        else:
+            items[-1] += "\n" + line
+    return items
+
+
+def _sentence_spans(text: str) -> List[Tuple[str, str]]:
+    """[(gap before, sentence)], the gap being the whitespace the splitter cut at."""
+    out, pos = [], 0
+    for m in _SENT_SPLIT.finditer(text):
+        piece = text[pos:m.start()]
+        if piece.strip():
+            out.append((text[pos:pos + len(piece) - len(piece.lstrip())], piece.strip()))
+        pos = m.end()
+    tail = text[pos:]
+    if tail.strip():
+        out.append((tail[:len(tail) - len(tail.lstrip())], tail.strip()))
+    return out
+
+
+def _check_figures(stmt: str, sources: List[Tuple[Dict[str, Any], List[float]]], cited: List[Dict[str, Any]]) -> Tuple[bool, bool]:
+    """(unsupported money figure present, has money figure). Supported figures from a lookup are added to `cited`."""
+    bad = has_money = False
+    for fig in figures_in(stmt):
+        hit = None
+        for meta, nums in sources:
+            for c in fig["values"]:
+                if _near(nums, c, fig["step"] + abs(c) * 0.005):
+                    hit = meta
+                    break
+            if hit:
+                break
+        if fig["kind"] == "money":
+            has_money = True
+        if hit:
+            if hit["tool"] != "page" and not any(x["figure"] == fig["text"] for x in cited):
+                cited.append(dict(hit, figure=fig["text"]))
+            continue
+        if fig["kind"] == "money":
+            bad = True
+    return bad, has_money
+
+
 def ground(answer: str, context_text: str, tool_texts: List[Tuple[Dict[str, Any], str]]
            ) -> Dict[str, Any]:
-    """{text, removed, cited, note}: the answer with unsupported-figure sentences taken out, and the source of each
-    supported figure (`tool` and `label` for a lookup, "page" for the page's own figures)."""
+    """{text, removed, removed_items, supported, cited, note}: the answer with unsupported-figure statements taken
+    out, and the source of each supported figure (`tool` and `label` for a lookup, "page" for the page's own figures).
+
+    Block-aware (audit F04): a paragraph is read sentence by sentence, a list item by item, a table row by row; a
+    table's header and separator, a heading, a figure tag, a code fence and the follow-ups are never tested and never
+    dropped here. `removed` counts statements; `removed_items` is [{kind, text}] for the rewrite and the log, never
+    for the page; `supported` is the statements whose money figures are all backed (for `limit_answer`)."""
     sources = [({"tool": "page", "label": "The page's figures"}, _evidence_numbers(context_text))]
     sources += [({"tool": rec.get("tool") or "", "label": rec.get("label") or "", "source": rec.get("source")},
                  _evidence_numbers(body)) for rec, body in tool_texts]
-    kept, removed, cited = [], [], []
-    for sent in sentences(answer):
-        bad = False
-        for fig in figures_in(sent):
-            hit = None
-            for meta, nums in sources:
-                for c in fig["values"]:
-                    if _near(nums, c, fig["step"] + abs(c) * 0.005):
-                        hit = meta
-                        break
-                if hit:
-                    break
-            if hit:
-                if hit["tool"] != "page" and not any(x["figure"] == fig["text"] for x in cited):
-                    cited.append(dict(hit, figure=fig["text"]))
+    cited: List[Dict[str, Any]] = []
+    removed_items: List[Dict[str, str]] = []
+    supported: List[str] = []
+    lead, units, trail = _units(answer)
+    for u in units:
+        kind, text = u["kind"], u["text"]
+        if kind == "paragraph":
+            spans = _sentence_spans(text)
+            keep = []
+            for gap, sent in spans:
+                bad, money = _check_figures(sent, sources, cited)
+                if bad:
+                    removed_items.append({"kind": "sentence", "text": sent})
+                else:
+                    keep.append((gap, sent))
+                    if money:
+                        supported.append(sent)
+            if len(keep) != len(spans):
+                u["text"] = "".join((gap if i else "") + s for i, (gap, s) in enumerate(keep))
+        elif kind == "list":
+            items = _list_items(text)
+            keep = []
+            for it in items:
+                bad, money = _check_figures(it, sources, cited)
+                if bad:
+                    removed_items.append({"kind": "list_item", "text": it.strip()})
+                else:
+                    keep.append(it)
+                    if money:
+                        supported.append(it.strip())
+            if len(keep) != len(items):
+                u["text"] = "\n".join(keep)
+        elif kind == "table":
+            parts = _table_parts(text)
+            if not parts:
                 continue
-            if fig["kind"] == "money":
-                bad = True
-        (removed if bad else kept).append(sent)
-    if not removed:
-        return {"text": answer, "removed": 0, "cited": cited, "note": None}
-    return {"text": "\n\n".join(kept) if "\n" in answer else " ".join(kept), "removed": len(removed),
-            "cited": cited, "note": GROUND_NOTE}
+            head, sep, rows = parts
+            keep = []
+            for r in rows:
+                bad, money = _check_figures(r, sources, cited)
+                if bad:
+                    removed_items.append({"kind": "table_row", "text": r.strip()})
+                else:
+                    keep.append(r)
+                    if money:
+                        supported.append(r.strip())
+            if len(keep) != len(rows):
+                u["text"] = "\n".join([head, sep] + keep)
+    if not removed_items:
+        return {"text": answer, "removed": 0, "removed_items": [], "supported": supported, "cited": cited,
+                "note": None}
+    units, first = _without(units, {i for i, u in enumerate(units) if u["kind"] in ("paragraph", "list")
+                                    and not u["text"].strip()})
+    return {"text": _assemble("" if first else lead, units, trail if units else "", collapse=True) if units else "",
+            "removed": len(removed_items), "removed_items": removed_items,
+            "supported": supported, "cited": cited, "note": ground_note(len(removed_items), "rewritten")}
+
+
+def _dangling(units: List[Dict[str, Any]]) -> Dict[str, List[int]]:
+    """Indexes of lead-ins with nothing introduced, and of headings with nothing under them."""
+    intro, head = [], []
+    for i, u in enumerate(units):
+        nxt = next((v for v in units[i + 1:] if v["text"].strip() and v["kind"] not in ("followups",)), None)
+        txt = u["text"].strip()
+        if u["kind"] == "paragraph" and txt.endswith(":"):
+            if nxt is None or nxt["kind"] in ("heading", "paragraph"):
+                intro.append(i)
+        elif u["kind"] == "heading":
+            if nxt is None or nxt["kind"] == "heading":
+                head.append(i)
+    return {"dangling_intro": intro, "orphan_heading": head}
+
+
+def _empty_unit(u: Dict[str, Any]) -> bool:
+    if not u["text"].strip():
+        return True
+    if u["kind"] == "table":
+        parts = _table_parts(u["text"])
+        return parts is None or not parts[2]      # a valid table with no data rows, or pipe lines that are not a table
+    return False
+
+
+def _without(units: List[Dict[str, Any]], drop: Any) -> Tuple[List[Dict[str, Any]], bool]:
+    """`units` less the indexes in `drop`; a dropped block leaves the longer of the separators round it. The second
+    value says whether the first block went (the whitespace before the answer then goes with it)."""
+    kept: List[Dict[str, Any]] = []
+    gap = ""
+    for i, u in enumerate(units):
+        if i in drop:
+            if u["sep"].count("\n") > gap.count("\n"):
+                gap = u["sep"]
+            continue
+        if kept and gap and gap.count("\n") > kept[-1]["sep"].count("\n"):
+            kept[-1]["sep"] = gap
+        kept.append(u)
+        gap = ""
+    return kept, 0 in drop
+
+
+def repair(text: str) -> str:
+    """The structure of an answer put right after statements were taken out of it (audit F04): a table with no data
+    rows, a list with no items, a lead-in whose block is gone and a heading with nothing under it are dropped, and
+    the blank lines left behind collapsed. Text that needs none of this is returned unchanged."""
+    lead, units, trail = _units(text)
+    changed = False
+    while True:
+        drop = {i for i, u in enumerate(units) if _empty_unit(u)}
+        if not drop:
+            d = _dangling(units)
+            drop = set(d["dangling_intro"]) | set(d["orphan_heading"])
+        if not drop:
+            break
+        units, first = _without(units, drop)
+        if first:
+            lead = ""
+        changed = True
+    if not changed:
+        return text
+    return _assemble(lead, units, trail, collapse=True) if units else ""
+
+
+def _bare_number_columns(text: str) -> List[str]:
+    parts = _table_parts(text)
+    if not parts or not parts[2]:
+        return []
+    split = lambda ln: [c.strip() for c in ln.strip().strip("|").split("|")]
+    head, rows = split(parts[0]), [split(r) for r in parts[2]]
+    bad = []
+    for col in range(1, len(head)):
+        cells = [r[col] for r in rows if col < len(r) and r[col].strip()]
+        if not cells or not all(_BARE_NUM.match(c) for c in cells):
+            continue
+        if _UNIT_HEAD.search(head[col]):
+            continue
+        if all(re.fullmatch(r"\D*(?:19|20|21)\d\d\D*", c) for c in cells):     # a column of years
+            continue
+        bad.append(head[col])
+    return bad
+
+
+def integrity(text: str) -> List[str]:
+    """The problems that stop an answer reading whole (audit F04); empty when it does: `empty_table`,
+    `stray_table_line`, `dangling_intro`, `orphan_heading`, `unitless_table`, `empty`."""
+    lead, units, _ = _units(text)
+    problems: List[str] = []
+
+    def add(p: str) -> None:
+        if p not in problems:
+            problems.append(p)
+    prose = False
+    for u in units:
+        if u["kind"] == "table":
+            parts = _table_parts(u["text"])
+            if parts is None:
+                add("stray_table_line")
+            elif not parts[2]:
+                add("empty_table")
+            elif _bare_number_columns(u["text"]):
+                add("unitless_table")
+            if parts and parts[2]:
+                prose = True
+        elif u["kind"] in ("paragraph", "list") and u["text"].strip():
+            prose = True
+    d = _dangling(units)
+    if d["dangling_intro"]:
+        add("dangling_intro")
+    if d["orphan_heading"]:
+        add("orphan_heading")
+    if not prose:
+        add("empty")
+    return problems
+
+
+LIMIT_LEAD = ("Optic's data behind this answer does not carry some of the figures this question asks for, so Milo has "
+              "left them out instead of estimating them.")
+LIMIT_SUPPORTED = "What the data does support:"
+
+
+def limit_answer(kept_supported: List[str]) -> str:
+    """The server's own answer when the model's could not be made to read whole from supported figures. By
+    construction it passes `integrity`."""
+    items = []
+    for s in kept_supported or []:
+        s = str(s).strip()
+        if s.startswith("|"):
+            if _PIPE_SEP.match(s):
+                continue
+            s = ", ".join(c.strip() for c in s.strip("|").split("|") if c.strip())
+        s = re.sub(r"^(?:[-*+•]|\d{1,2}[.)])\s+", "", s).strip()
+        if s:
+            items.append("- " + s.replace("\n", " "))
+    if not items:
+        return LIMIT_LEAD
+    return LIMIT_LEAD + "\n\n" + LIMIT_SUPPORTED + "\n" + "\n".join(items)

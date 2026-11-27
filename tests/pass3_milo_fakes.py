@@ -51,13 +51,31 @@ def tool_round(name, args, tid="t1"):
                                                  usage=_usage())
 
 
+class _Raises(_Stream):
+    """A round whose request fails when it is opened (a timeout, the API down); the request is still recorded."""
+    def __init__(self, exc):
+        super().__init__([], None)
+        self.exc = exc
+
+    async def __aenter__(self):
+        raise self.exc
+
+
+def failing_round(exc=None):
+    return _Raises(exc or RuntimeError("the rewrite call failed"))
+
+
 def install(monkeypatch, rounds):
-    """Replace the client with one that plays `rounds` in order; returns the list each request is appended to."""
+    """Replace the client with one that plays `rounds` in order; returns the list each request is appended to.
+    A round made with `failing_round()` raises when its request is opened."""
     sent, queue = [], list(rounds)
 
     def stream(**kw):
         sent.append(kw)
-        events, final = queue.pop(0) if queue else text_round("")
+        item = queue.pop(0) if queue else text_round("")
+        if isinstance(item, _Raises):
+            return item
+        events, final = item
         return _Stream(events, final)
     monkeypatch.setattr(ai, "_client", lambda: types.SimpleNamespace(
         beta=types.SimpleNamespace(messages=types.SimpleNamespace(stream=stream))))

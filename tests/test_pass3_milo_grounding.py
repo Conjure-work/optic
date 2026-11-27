@@ -78,11 +78,15 @@ def test_a_figure_is_cited_with_the_lookup_that_produced_it(monkeypatch):
 
 
 def test_a_money_figure_with_nothing_behind_it_is_taken_out_with_a_note(monkeypatch):
-    F.install(monkeypatch, [F.text_round("Revenue is growing. ", "Next year it will earn $412.50 a share. ")])
+    # audit F04: the draft is written again once from the data that remains, and the note says how many went
+    sent = F.install(monkeypatch, [F.text_round("Revenue is growing. ", "Next year it will earn $412.50 a share. "),
+                                   F.text_round("Revenue is growing. The data here has no forecast. ")])
     events = F.run("Tell me about the business.")
     amend = [d for k, d in events if k == "amend"]
+    assert len(sent) == 2
     assert amend and "$412.50" not in amend[0]["text"] and "Revenue is growing." in amend[0]["text"]
-    assert "unsupported_figure" in amend[0]["rules"] and amend[0]["note"] == P.GROUND_NOTE
+    assert "unsupported_figure" in amend[0]["rules"] and amend[0]["note"] == P.ground_note(1, "rewritten")
+    assert amend[0]["kind"] == "rewritten"
 
 
 def test_grounding_reads_units_and_rounding():

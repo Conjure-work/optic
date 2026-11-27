@@ -230,8 +230,10 @@ def test_missing_data_is_said_plainly_by_rule_and_by_prompt():
 
 # ---------------------------------------------------------------------------- every entry point
 def test_every_model_call_in_app_goes_through_the_three_policy_points():
-    """No module may call the Anthropic client except ai._ask, ai.stream_chat and ai.deep_research."""
-    allowed = {("app/ai.py", "_ask"), ("app/ai.py", "stream_chat"), ("app/ai.py", "deep_research")}
+    """No module may call the Anthropic client except ai._ask, ai.stream_chat, ai._rewrite_answer (the one bounded
+    rewrite stream_chat makes after grounding, audit F04) and ai.deep_research."""
+    allowed = {("app/ai.py", "_ask"), ("app/ai.py", "stream_chat"), ("app/ai.py", "deep_research"),
+               ("app/ai.py", "_rewrite_answer")}
     found = set()
     for path in (ROOT / "app").rglob("*.py"):
         tree = ast.parse(path.read_text())
