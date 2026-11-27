@@ -132,6 +132,33 @@ function pricing(sym) {
     ${historyRatio(pr, imx, (e.surprise || {}).quarters)}
     ${pr.stale ? html`<p class="stale">${clean(pr.stale_note || '')}</p>` : ''}${how(html`<p>${clean(pr.caveat || '')}</p>`, ev ? html`<p>The report day's move is the variance the ${shortDate(ev.after)} expiry carries beyond what the ${shortDate(ev.before)} expiry's rate implies for the ordinary days in between.</p>` : '')}</section>`;
 }
+/**
+ * The brief's paragraphs as blocks (audit F08). The writer marks a section title as its own paragraph, "## The
+ * setup", the way the Read does; the page printed the markers. A line that starts with "#" markers and a space is a
+ * heading (markers and closing markers removed); a paragraph of several lines is split so a heading on its first
+ * line is still a heading; a paragraph of markers alone is dropped, and so is a heading left at the end with
+ * nothing under it; "- " and "* " list markers are removed and the line kept as its own paragraph.
+ */
+export function briefBlocks(paragraphs) {
+  const out = [];
+  for (const para of paragraphs || []) {
+    let run = [];
+    const flush = () => { if (run.length) { out.push({ kind: 'p', text: run.join(' ') }); run = []; } };
+    for (const raw0 of String(para == null ? '' : para).split(/\r?\n/)) {
+      const line = raw0.trim();
+      if (!line) { flush(); continue; }
+      if (/^#+$/.test(line)) { flush(); continue; }
+      const h = /^#+\s+(.*?)\s*#*\s*$/.exec(line);
+      if (h) { flush(); if (h[1].trim()) out.push({ kind: 'h', text: h[1].trim() }); continue; }
+      const li = /^[-*]\s+(.*)$/.exec(line);
+      if (li) { flush(); if (li[1].trim()) out.push({ kind: 'p', text: li[1].trim() }); continue; }
+      run.push(line);
+    }
+    flush();
+  }
+  while (out.length && out[out.length - 1].kind === 'h') out.pop();
+  return out;
+}
 function brief(sym) {
   const b = D.brief;
   return html`<section class="section" data-v2-metric="" aria-labelledby="br-h"><div class="section-head"><div><h2 class="t-h2" id="br-h">Pre-earnings brief</h2><p class="section-sub">A short summary of this page's figures, written by an AI model when a reader asks.</p></div></div>
@@ -142,7 +169,7 @@ function brief(sym) {
           : b.error ? failed('The brief', b.error, { retry: 'brief' })
             : !b.available && b.written === false && b.can_write ? html`<p class="t-muted">${clean(b.reason || '')}</p><button type="button" class="btn" data-v2-brief>Write the pre-earnings brief</button>`
               : !b.available ? html`<p class="${b.refused ? 'stale' : 't-muted'}" role="status">${clean(b.reason || 'No brief right now.')}</p>`
-          : html`<p class="t-label">${STANCE_WORDS[b.stance] || capFirst(b.stance || '')}</p><p class="t-h3">${clean(b.headline || '')}</p>${(b.paragraphs || []).map((p) => html`<p>${raw(bolded(p))}</p>`)}${generated(b.written_by ? b : Object.assign({ written_by: 'model' }, b), { at: b.generated_at })}<p class="asof">${clean(b.method || '')} ${clean(b.disclaimer || '')}</p>`}
+          : html`<p class="t-label">${STANCE_WORDS[b.stance] || capFirst(b.stance || '')}</p><p class="t-h3">${clean(b.headline || '')}</p>${briefBlocks(b.paragraphs).map((x) => (x.kind === 'h' ? html`<h3 class="t-label">${raw(bolded(x.text))}</h3>` : html`<p>${raw(bolded(x.text))}</p>`))}${generated(b.written_by ? b : Object.assign({ written_by: 'model' }, b), { at: b.generated_at })}<p class="asof">${clean(b.method || '')} ${clean(b.disclaimer || '')}</p>`}
   </section>`;
 }
 
