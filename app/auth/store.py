@@ -788,13 +788,21 @@ def subscription(user_id: str) -> Dict[str, Any]:
     if plan not in PLANS or status not in ENTITLED_STATUSES:
         plan = "free"
     limits = PLANS[plan]
+    cancel_at = (found or {}).get("cancel_at")
+    period_end = (found or {}).get("current_period_end")
+    at_period_end = bool((found or {}).get("cancel_at_period_end"))
+    # when it ends: the date Stripe scheduled, else the period end when it was set to stop there
+    ends_on = cancel_at or (period_end if at_period_end else None)
     return {
         "plan": plan,
         "label": limits["label"],
         "status": status,
         "provider": (found or {}).get("provider"),
         "current_period_end": (found or {}).get("current_period_end"),
-        "cancel_at_period_end": bool((found or {}).get("cancel_at_period_end")),
+        "cancel_at_period_end": at_period_end,
+        "cancel_at": cancel_at,
+        "ends_on": ends_on,
+        "cancels": bool(ends_on) and plan != "free",
         "limits": {k: v for k, v in limits.items() if k != "label"},
     }
 

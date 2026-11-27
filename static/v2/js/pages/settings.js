@@ -59,7 +59,7 @@ function account() {
       <p class="section-sub">Keep more than one way in. If a device is lost, another method is how you get back to this account, and Optic will not let you remove the last one.</p>
       ${security()}</section>
     <section class="section" aria-labelledby="pl-h"><h2 class="t-h2" id="pl-h">Plan</h2>
-      ${row(plan.label || 'Free', html`${lim.watchlists !== undefined ? `${lim.watchlists} watchlists, ${lim.saved_research} saved items, ${lim.ai_calls_per_day} assistant messages a day${lim.ai_calls_per_month ? ` (${lim.ai_calls_per_month} in any 30 days)` : ''}.` : ''}${plan.cancel_at_period_end && plan.current_period_end ? ` Ends on ${prefs.stamp(plan.current_period_end).split(',').slice(0, 2).join(',')}; it will not renew.` : ''}`, billing(), tag(true, plan.status || 'active'))}
+      ${row(plan.label || 'Free', html`${lim.watchlists !== undefined ? `${lim.watchlists} watchlists, ${lim.saved_research} saved items, ${lim.ai_calls_per_day} assistant messages a day${lim.ai_calls_per_month ? ` (${lim.ai_calls_per_month} in any 30 days)` : ''}.` : ''}${endingNote(plan) ? ` ${endingNote(plan)}` : ''}`, billing(), tag(true, plan.status || 'active'))}
       ${ladder()}
       ${D.flash ? html`<p class="stale" role="status">${D.flash}</p>` : ''}
       ${D.brokerage ? row('Linked brokerages', 'Read-only connections, what they can see, and how to disconnect or delete the data.', html`<a class="btn btn-sm" href="#/brokerage/connections">Manage</a>`) : ''}</section>
@@ -73,6 +73,16 @@ function account() {
           <p class="form-error" role="alert">${ui.delErr || ''}</p>
           <div class="cluster"><button type="submit" class="btn btn-danger">Delete the account</button><button type="button" class="btn" data-v2-set-del-cancel>Cancel</button></div></form>`
         : html`<button type="button" class="btn btn-danger" data-v2-set-del>Delete this account</button>`}</section>`;
+}
+
+// A cancellation Stripe has scheduled, by `cancel_at` or by the period end (audit round, Q01): said in one sentence with
+// its date, and the paid-through date when the two differ by more than a day. Nothing for a plan that is not ending.
+const dayOf = (iso) => prefs.stamp(iso).split(',').slice(0, 2).join(',');
+export function endingNote(plan, fmt = dayOf) {
+  if (!plan || !plan.cancels || !plan.ends_on) return '';
+  const said = `Cancellation scheduled. ${plan.label || 'Your plan'} stays active through ${fmt(plan.ends_on)}; it will not renew.`;
+  const a = Date.parse(plan.ends_on), b = Date.parse(plan.current_period_end);
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) > 86400000 ? `${said} Paid through ${fmt(plan.current_period_end)}.` : said;
 }
 
 function billing() {
