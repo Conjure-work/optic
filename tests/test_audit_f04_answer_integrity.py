@@ -129,3 +129,34 @@ def test_the_longest_set_of_notes_fits_what_the_page_stores():
     notes = " ".join([P.AMEND_NOTE, P.ground_note(100, "rewritten"), P.ECHO_NOTE, P.READ_NOTE])
     assert len(notes) < 900
     assert re.search(r"AMENDED_MAX = (\d+)", open("static/v2/js/ui/milo.js").read()).group(1) == "900"
+
+
+# ---------------------------------------------------------------- the page (JavaScriptCore and the client's contract)
+from pathlib import Path
+
+from tests.test_frontend_v2_stage0 import V2, _run
+
+MILO_JS = (V2 / "js" / "ui" / "milo.js").read_text()
+
+
+def test_mdlite_draws_no_table_for_a_header_and_separator_alone(tmp_path):
+    got = _run(tmp_path, f"""
+      const m = await import('{(V2 / "js/core/milo-text.js").as_posix()}');
+      print(JSON.stringify({{
+        alone: m.mdLite('Intro.\\n\\n| Quarter | OCF |\\n|---|---|\\n\\nOutro.'),
+        whole: m.mdLite('| Quarter | OCF |\\n|---|---|\\n| Q4 | $28.1B |'),
+        rendered: m.renderAnswer('Intro.\\n\\n| Quarter | OCF |\\n|---|---|\\n\\n\\u2192 Next?', 'AAPL'),
+      }}));
+    """)
+    assert "<table" not in got["alone"] and "|" not in got["alone"] and "Intro." in got["alone"] and "Outro." in got["alone"]
+    assert "<table" not in got["rendered"]["html"] and got["rendered"]["ups"] == ["Next?"]
+    assert got["whole"].count("<tr>") == 2 and "<tbody><tr><td>Q4</td>" in got["whole"]
+
+
+def test_the_amend_kind_is_kept_with_the_note_and_comes_back_on_reopen():
+    # the amend handler keeps the kind in the message's meta, both persist shapes write it and both loaders read it
+    assert "meta.get(ai).amendKind = String(p.kind || '')" in MILO_JS
+    assert "o.kind = String(inf.amendKind).slice(0, 20)" in MILO_JS and "o.kind = inf.amendKind" in MILO_JS
+    assert MILO_JS.count("amendKind: m.kind || ''") == 1 and MILO_JS.count("amendKind: saved.kind || ''") == 1
+    # the note is stored at its full length (a cut at 400 lands mid-sentence in a pair of notes)
+    assert "o.amended = String(inf.amended).slice(0, 400)" not in MILO_JS and "slice(0, AMENDED_MAX)" in MILO_JS
