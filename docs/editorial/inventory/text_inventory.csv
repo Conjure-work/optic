@@ -2581,7 +2581,15 @@ v2 Financials (#/T/financials),static/v2/js/pages/financials.js,170,client,,,Ope
 v2 Financials (#/T/financials),static/v2/js/pages/financials.js,170,client,,,"Capital spending, shown as cash out",,,reviewed: no finding
 v2 Financials (#/T/financials),static/v2/js/pages/financials.js,170,client,,,Free cash flow,,,reviewed: no finding
 v2 Financials (#/T/financials),static/v2/js/pages/financials.js,170,client,,,"Fiscal years,",,,reviewed: no finding
-v2 Financials (#/T/financials),static/v2/js/pages/financials.js,170,client,,,. The statements Optic reads carry no quarterly cash flow,,,reviewed: no finding
+v2 Financials (#/T/financials),static/v2/js/pages/financials.js,208,client,,,". Quarters are in Cash flow by quarter, below.",,,added 2026-11 audit round
+v2 Financials (#/T/financials),static/v2/js/pages/financials.js,208,client,,,. The statements Optic reads carry no quarterly cash flow for ${sym}.,,,added 2026-11 audit round
+v2 Financials (#/T/financials),static/v2/js/pages/financials.js,242,client,,,"Quarters, ${ccyWords()}. Each bar is one fiscal quarter alone, three months, not the year to date. Free cash flow is operating cash flow less capital spending, which is shown as cash out.",,,added 2026-11 audit round
+v2 Financials (#/T/financials),static/v2/js/pages/financials.js,238,client,,,The four quarters of ${fy} add up to the fiscal-year total.,,,added 2026-11 audit round
+v2 Financials (#/T/financials),static/v2/js/pages/financials.js,239,client,,,The statements give these year to date; each quarter here is that figure less the quarter before it in the same fiscal year.,,,added 2026-11 audit round
+v2 Financials (#/T/financials),static/v2/js/pages/financials.js,240,client,,,As Yahoo Finance reports each quarter; there are not four quarters of one fiscal year on hand to check them against the year's total.,,,added 2026-11 audit round
+v2 Financials (#/T/financials),static/v2/js/pages/financials.js,242,client,,," Free cash flow is left out for ${gone.join(', ')} because the three figures do not reconcile there.",,,added 2026-11 audit round
+v2 Financials (#/T/financials),static/v2/js/pages/financials.js,227,client,,,The balance sheet lines are yearly here; cash and debt by quarter are in the chart above.,,,added 2026-11 audit round
+v2 Financials (#/T/financials),static/v2/js/pages/financials.js,227,client,,,The balance sheet lines are yearly here.,,,added 2026-11 audit round
 v2 Financials (#/T/financials),static/v2/js/pages/financials.js,171,client,,,: from operating cash flow to free cash flow,,,reviewed: no finding
 v2 Financials (#/T/financials),static/v2/js/pages/financials.js,172,client,,,Cash and debt,,,reviewed: no finding
 v2 Financials (#/T/financials),static/v2/js/pages/financials.js,173,client,,,Cash and equivalents,,,reviewed: no finding

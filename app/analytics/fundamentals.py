@@ -9,7 +9,7 @@ who know most buying or selling, and does this company usually beat?
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from .. import insider_fill, session as session_mod
@@ -260,6 +260,110 @@ def analyse_short_interest(raw: Dict[str, Any], avg_volume: Optional[float]) -> 
     }
 
 
+def _within(a: float, b: float, rel: float = 0.01, floor: float = 0.0) -> bool:
+    return abs(a - b) <= max(rel * abs(b), floor)
+
+
+def _num(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v == v
+
+
+def _quarter_no(label: Optional[str]) -> Optional[Tuple[str, int]]:
+    """("FY26", 2) from "Q2 FY26": the fiscal year a quarter belongs to and its number in that year."""
+    if not label or not label.startswith("Q"):
+        return None
+    head, _, year = label.partition(" ")
+    try:
+        return year, int(head[1:])
+    except ValueError:
+        return None
+
+
+def quarterly_cash_basis(q_periods: List[str], a_periods: List[str],
+                         quarter_lines: Dict[str, Any], annual_lines: Dict[str, Any]) -> Dict[str, Any]:
+    """What the provider's quarterly cash-flow figures are, checked against the fiscal year's own (audit 2026-11-27,
+    F03). `discrete`: the four quarters of one fiscal year add up to the year's operating cash flow. `year_to_date`:
+    the quarter that ends the year equals the year and the four do not add up; each quarter is then converted to
+    the quarter alone. `unchecked`: no fiscal year with four quarters and its total on hand, or neither test passes;
+    the provider's values are returned as given. Free cash flow is kept only where it equals operating cash flow
+    plus capital expenditure (capital spending is a negative number); else None, never a guess.
+    Returns the block the page reads plus `lines` (the three converted lines) and `reported` (the provider's own)."""
+    names = ("operating_cash_flow", "capital_expenditure", "free_cash_flow")
+    reported = {k: (list(quarter_lines.get(k)) if quarter_lines.get(k) is not None else None) for k in names}
+    out = {"basis": "unchecked", "fiscal_year": None, "sum": None, "annual": None, "fcf_unavailable": [],
+           "lines": {k: (list(v) if v is not None else None) for k, v in reported.items()}, "reported": reported}
+    ocf_q = reported["operating_cash_flow"]
+    if not q_periods or ocf_q is None:
+        return out
+
+    def day(p):
+        try:
+            return dt.date.fromisoformat(str(p)[:10])
+        except ValueError:
+            return None
+
+    q_days = [day(p) for p in q_periods]
+    a_days = [day(p) for p in a_periods]
+    ocf_a = (annual_lines or {}).get("operating_cash_flow") or []
+    slack = dt.timedelta(days=10)
+    checked = None
+    for i, end in enumerate(a_days):
+        if end is None or i + 1 >= len(a_days) or a_days[i + 1] is None or i >= len(ocf_a) or not _num(ocf_a[i]):
+            continue
+        start = a_days[i + 1]
+        idx = [j for j, d in enumerate(q_days) if d is not None and start + slack < d <= end + slack]
+        if len(idx) != 4 or not all(j < len(ocf_q) and _num(ocf_q[j]) for j in idx):
+            continue
+        idx.sort(key=lambda j: q_days[j])
+        checked = (i, idx)
+        break
+    if checked is None:
+        return out
+    i, idx = checked
+    annual = float(ocf_a[i])
+    total = float(sum(ocf_q[j] for j in idx))
+    out.update({"fiscal_year": a_periods[i], "sum": total, "annual": annual})
+    if _within(total, annual):
+        out["basis"] = "discrete"
+    elif _within(float(ocf_q[idx[-1]]), annual):
+        out["basis"] = "year_to_date"
+        fy_end = a_periods[0]
+        keys = [_quarter_no(fiscal_label(p, fy_end)) for p in q_periods]
+        where = {k: j for j, k in enumerate(keys) if k is not None}
+        for name in names:
+            src = reported[name]
+            if src is None:
+                continue
+            conv = []
+            for j, k in enumerate(keys):
+                v = src[j] if j < len(src) else None
+                if k is None or not _num(v):
+                    conv.append(None)
+                elif k[1] == 1:
+                    conv.append(v)
+                else:
+                    pj = where.get((k[0], k[1] - 1))
+                    pv = src[pj] if pj is not None and pj < len(src) else None
+                    conv.append(float(v) - float(pv) if _num(pv) else None)
+            out["lines"][name] = conv
+    # free cash flow reconciles to operating cash flow plus capital expenditure, or it is not shown
+    lines = out["lines"]
+    if lines["free_cash_flow"] is not None:
+        o, c, f = lines["operating_cash_flow"] or [], lines["capital_expenditure"] or [], lines["free_cash_flow"]
+        gone = []
+        for j in range(len(f)):
+            ov = o[j] if j < len(o) else None
+            cv = c[j] if j < len(c) else None
+            fv = f[j]
+            ok = _num(ov) and _num(cv) and _num(fv) and _within(fv, ov + cv, floor=1.0)
+            if not ok:
+                f[j] = None
+                if _num(ov) or _num(cv) or _num(reported["free_cash_flow"][j] if j < len(reported["free_cash_flow"]) else None):
+                    gone.append(j)
+        out["fcf_unavailable"] = gone
+    return out
+
+
 # ---------------------------------------------------------------- financials
 
 
@@ -326,6 +430,8 @@ def analyse_financials(raw: Dict[str, Any]) -> Dict[str, Any]:
                            ("total_equity", bq), ("operating_cash_flow", cq), ("capital_expenditure", cq),
                            ("free_cash_flow", cq)):
             quarter_lines[key] = _pick_row(block, key, q_periods) if block else None
+    cash_basis = quarterly_cash_basis(q_periods, a_periods, quarter_lines,
+                                      {"operating_cash_flow": ocf, "capital_expenditure": capex, "free_cash_flow": fcf})
     shares_a = _pick_row(annual, "diluted_shares")
     shares_q = _pick_row(quarterly, "diluted_shares")
 
@@ -389,7 +495,11 @@ def analyse_financials(raw: Dict[str, Any]) -> Dict[str, Any]:
                             "total_liabilities": liab_hist, "total_equity": equity_hist},
         # under quarterly_periods; each line None where the feed has no quarterly statement for it
         "quarterly_balance": {k: quarter_lines.get(k) for k in ("cash", "total_debt", "total_assets", "total_liabilities", "total_equity")},
-        "quarterly_cash": {k: quarter_lines.get(k) for k in ("operating_cash_flow", "capital_expenditure", "free_cash_flow")},
+        # one fiscal quarter alone, converted from year to date where the statements give it that way; free cash
+        # flow None where the three figures do not reconcile (quarterly_cash_basis)
+        "quarterly_cash": {k: cash_basis["lines"][k] for k in ("operating_cash_flow", "capital_expenditure", "free_cash_flow")},
+        "quarterly_cash_reported": cash_basis["reported"],
+        "quarterly_cash_basis": {k: cash_basis[k] for k in ("basis", "fiscal_year", "sum", "annual", "fcf_unavailable")},
         # Yahoo carries the filings' statements; the diluted EPS here is the statement's (GAAP), which is not
         # the basis analysts' estimates and surprises use (usually adjusted)
         "source": "The company's annual and quarterly statements as Yahoo Finance carries them.",

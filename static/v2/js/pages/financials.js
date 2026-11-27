@@ -157,7 +157,8 @@ function jumpList() {
 }
 
 // The figures for the period chosen: fiscal years from the annual statements, or quarters from the quarterly
-// income statement (Yahoo carries no quarterly cash flow, so free cash flow is a yearly figure only).
+// income statement. Cash flow stays a fiscal-year figure in the Cash flow card; the quarters are drawn on their own
+// in Cash flow by quarter, where the feed carries the quarterly cash flow statement (server: quarterly_cash_basis).
 export function periodView(f, which, t = D.t) {
   const q = which === 'quarter' && (f.quarterly_periods || []).length;
   const per = q ? f.quarterly_periods : f.annual_periods || [];
@@ -185,6 +186,7 @@ function statements(sym) {
   const opm = FV.marginSeries(a.operating_income, a.revenue), gpm = FV.marginSeries(a.gross_profit, a.revenue), npm = FV.marginSeries(a.net_income, a.revenue);
   const qoq = V.q && C.back === 4 && per.length > 1 ? FV.growthLine('Against the quarter before, revenue', a.revenue, labels, 1, '', usd).replace('Against the quarter before, revenue was', 'Against the quarter before, revenue was') : '';
   const bh = f.balance_history || {}, hasBal = (bh.cash || []).some(isNum) && (bh.total_debt || []).some(isNum);
+  const qcf = f.quarterly_cash || {}, hasQcf = (qcf.operating_cash_flow || []).some(isNum);
   const hasCf = (ya.operating_cash_flow || []).some(isNum) || (ya.free_cash_flow || []).some(isNum);
   const latestBridge = FV.bridges((ya.operating_cash_flow || [])[0], (ya.capital_expenditure || [])[0], (ya.free_cash_flow || [])[0]);
   const shares = a.diluted_shares || [];
@@ -203,14 +205,14 @@ function statements(sym) {
       <figure class="fv" data-v2-metric=""><figcaption><h3>Margins</h3><p class="fv-take">${FV.marginLine('Operating margin', opm, labels, C.back)}</p>
         ${key([['s1', 'Gross margin'], ['s2', 'Operating margin'], ['s3', 'Net margin']])}<p class="fv-unit">${unit}, percent of revenue</p>${src}</figcaption><div class="chart-slot" data-chart="margins"></div></figure>
       ${hasCf ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash flow</h3><p class="fv-take">${FV.cashFlowLine(ya.operating_cash_flow, ya.capital_expenditure, ya.free_cash_flow, ysaid, usd)}</p>
-        ${key([['s1', 'Operating cash flow'], ['s2', 'Capital spending, shown as cash out'], ['s3', 'Free cash flow, non-GAAP']])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}Fiscal years, ${ccyWords()}${V.q ? '. The statements Optic reads carry no quarterly cash flow' : ''}</p>${src}</figcaption>
+        ${key([['s1', 'Operating cash flow'], ['s2', 'Capital spending, shown as cash out'], ['s3', 'Free cash flow, non-GAAP']])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}Fiscal years, ${ccyWords()}${V.q ? (hasQcf ? '. Quarters are in Cash flow by quarter, below.' : html`. The statements Optic reads carry no quarterly cash flow for ${sym}.`) : ''}</p>${src}</figcaption>
         <div class="chart-slot" data-chart="cashflow"></div>${latestBridge ? html`<p class="t-label fv-bridge-h">${Y.said(0)}: from operating cash flow to free cash flow</p><div class="chart-slot" data-chart="bridge"></div>` : ''}</figure>` : ''}
       ${hasBal ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash and debt</h3><p class="fv-take">${FV.netCashLine(bh.cash, bh.total_debt, yat, usd)}</p>
         ${key([['s1', 'Cash and equivalents'], ['s2', 'Total debt']])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}At each fiscal year end, ${ccyWords()}</p>${src}</figcaption><div class="chart-slot" data-chart="balance"></div></figure>` : ''}
       ${shapeOk(bh) ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Balance sheet</h3><p class="fv-take">${shapeLine(bh, ysaid)}</p>
         ${key([['s2', 'Total liabilities'], ['s1', "Shareholders' equity"]])}<p class="fv-unit">${V.q ? html`${typeBadge('annual')} ` : ''}At each fiscal year end, ${ccyWords()}; the bar's height is total assets</p>${src}</figcaption><div class="chart-slot" data-chart="shape"></div></figure>` : ''}
-      ${V.q && ((f.quarterly_cash || {}).operating_cash_flow || []).some(isNum) ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash flow by quarter</h3>
-        ${key([['s1', 'Operating cash flow'], ['s2', 'Capital spending, shown as cash out'], ['s3', 'Free cash flow, non-GAAP']])}<p class="fv-unit">Quarters, ${ccyWords()}</p>${src}</figcaption><div class="chart-slot" data-chart="qcash"></div></figure>` : ''}
+      ${V.q && hasQcf ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash flow by quarter</h3>
+        ${key([['s1', 'Operating cash flow'], ['s2', 'Capital spending, shown as cash out'], ['s3', 'Free cash flow, non-GAAP']])}<p class="fv-unit">${qcashCaption(f, V, Y)}</p>${src}</figcaption><div class="chart-slot" data-chart="qcash"></div></figure>` : ''}
       ${V.q && ((f.quarterly_balance || {}).cash || []).some(isNum) ? html`<figure class="fv" data-v2-metric=""><figcaption><h3>Cash and debt by quarter</h3>
         ${key([['s1', 'Cash and equivalents'], ['s2', 'Total debt']])}<p class="fv-unit">At each quarter end, ${ccyWords()}</p>${src}</figcaption><div class="chart-slot" data-chart="qbal"></div></figure>` : ''}
       ${(a.diluted_eps || []).some(isNum) ? html`<figure class="fv fv-wide" data-v2-metric=""><figcaption><h3>Per share</h3><p class="fv-take">${FV.perShareLine(a.diluted_eps, shares, labels, C.back, C.against)}</p>
@@ -220,11 +222,24 @@ function statements(sym) {
     <details class="more-inline fv-data"><summary>View data</summary>
       <div class="tscroll"><table class="t fin-table"><thead><tr><th scope="col">${V.q ? 'Quarter' : 'Fiscal year'}</th>${per.map((pe, i) => html`<th scope="col">${colHead(V.desc[i])}</th>`)}</tr></thead>
         <tbody>${rows.filter(([, k]) => (a[k] || []).some(isNum)).map(([l, k, ng]) => html`<tr><th scope="row">${l}${ng ? nonGaap() : ''}</th>${per.map((pe, i) => html`<td>${cell(k, (a[k] || [])[i])}</td>`)}</tr>`)}
+          ${V.q && hasQcf ? QROWS.map(([l, k, ng]) => html`<tr><th scope="row">${l}${ng ? nonGaap() : ''}</th>${per.map((pe, i) => html`<td>${isNum((qcf[k] || [])[i]) ? usd(qcf[k][i]) : 'Unavailable'}</td>`)}</tr>`) : ''}
           ${!V.q && hasBal ? html`<tr><th scope="row">Cash and equivalents</th>${per.map((pe, i) => html`<td>${usd((bh.cash || [])[i])}</td>`)}</tr><tr><th scope="row">Total debt</th>${per.map((pe, i) => html`<td>${usd((bh.total_debt || [])[i])}</td>`)}</tr>` : ''}</tbody></table></div>
-      <p class="asof">${clean(f.eps_basis || '')} Earnings uses analysts' basis for EPS, usually adjusted, so the two can differ. Margins are each line over revenue in the same period. ${V.q ? 'Cash flow and the balance sheet are yearly only here.' : ''}</p>
+      <p class="asof">${clean(f.eps_basis || '')} Earnings uses analysts' basis for EPS, usually adjusted, so the two can differ. Margins are each line over revenue in the same period. ${V.q ? (((f.quarterly_balance || {}).cash || []).some(isNum) ? 'The balance sheet lines are yearly here; cash and debt by quarter are in the chart above.' : 'The balance sheet lines are yearly here.') : ''}</p>
       <h3>Balance sheet and margins, ${Y.at(0)}</h3>${kv([['Cash', usd(bs.cash)], ...(isNum(bs.cash_and_short_term) ? [['Cash and short-term investments', usd(bs.cash_and_short_term)]] : []), ['Debt', usd(bs.total_debt)], ['Debt to equity', num(bs.debt_to_equity, 2)], ['Gross margin', pct(m.gross_pct)], ['Operating margin', pct(m.operating_pct)], ['EBITDA margin', pct(m.ebitda_pct)]], 4)}
       ${nd || nm ? html`<p class="asof">${[nd ? html`Net debt ${fig(nd, { sym: D.sym })}, ${regWhen(nd).replace(/^On /, 'on ')}` : '', nm ? html`net margin ${fig(nm, { sym: D.sym })}, ${regWhen(nm).replace(/^Fiscal/, 'fiscal')}` : ''].filter(Boolean).map((x, i) => (i ? html`; ${x}` : x))}: the registry's figures, which can be from a later filing than the columns above.</p>` : ''}
       <ul class="plain">${(f.notes || []).filter((n) => !NET_NOTE.test(n)).map((n) => html`<li>${clean(ccy === 'USD' ? n : n.replace(/\$/g, `${ccy} `))}</li>`)}</ul></details></section>`;
+}
+export const QROWS = [['Operating cash flow', 'operating_cash_flow'], ['Capital expenditure', 'capital_expenditure'], ['Free cash flow', 'free_cash_flow', true]];
+// The caption under Cash flow by quarter: what a bar is, the sign convention, and how the quarters were checked
+// against the fiscal year (the server's quarterly_cash_basis; an older cached payload has none, so "unchecked").
+export function qcashCaption(f, V, Y) {
+  const b = f.quarterly_cash_basis || {}, fyAt = (f.annual_periods || []).indexOf(b.fiscal_year);
+  const fy = fyAt >= 0 ? Y.said(fyAt) : 'the fiscal year';
+  const basis = b.basis === 'discrete' ? `The four quarters of ${fy} add up to the fiscal-year total.`
+    : b.basis === 'year_to_date' ? 'The statements give these year to date; each quarter here is that figure less the quarter before it in the same fiscal year.'
+    : 'As Yahoo Finance reports each quarter; there are not four quarters of one fiscal year on hand to check them against the year\'s total.';
+  const gone = (b.fcf_unavailable || []).map((i) => V.said(i));
+  return `Quarters, ${ccyWords()}. Each bar is one fiscal quarter alone, three months, not the year to date. Free cash flow is operating cash flow less capital spending, which is shown as cash out. ${basis}${gone.length ? ` Free cash flow is left out for ${gone.join(', ')} because the three figures do not reconcile there.` : ''}`;
 }
 // A statement or segment column's heading: the company's name for the period with its end date under it, or the date
 // alone when no filing names it (Handoff 2).

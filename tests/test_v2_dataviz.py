@@ -166,7 +166,8 @@ def test_financials_figures_and_their_data():
     for h in ("Revenue and profit", "Margins", "Cash flow", "Cash and debt", "Per share"):
         assert f"<h3>{h}</h3>" in st, h
     assert '<details class="more-inline fv-data"><summary>View data</summary>' in st, "the table one step away"
-    assert "The statements Optic reads carry no quarterly cash flow" in st and "Fiscal years, ${ccyWords()}" in st
+    # the "no quarterly cash flow" sentence is only the no-quarterly-data branch; with quarterly data the card points to the quarters (F03)
+    assert "hasQcf ? '. Quarters are in Cash flow by quarter, below.' : html`. The statements Optic reads carry no quarterly cash flow for ${sym}.`" in st and "Fiscal years, ${ccyWords()}" in st
     assert "usd = FV.moneyIn(ccy);" in FIN and "financial_currency" in FIN, "statements in the currency they are filed in"
     assert "FV.bridges(o, c, fc)" in FIN, "a waterfall only when the figures reconcile"
     seg = FIN[FIN.index("function segments() {"):FIN.index("function paint() {")]
