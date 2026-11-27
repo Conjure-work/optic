@@ -78,7 +78,7 @@ def test_settings_has_both_controls_and_says_each_leaves_the_other_alone():
     assert "seg('View', [['simple', 'Simple'], ['advanced', 'Advanced']], prefs.density(), 'density')" in st
     assert "prefs.setDensity(b.dataset.v2Density)" in st
     assert "${levelSlider({ id: 'set-lvl', label: 'Explain things for' })}" in st, "the level is the slider, three positions since 2026-11-09"
-    assert "it does not change what a page shows" in st
+    assert "On Home and a stock's page it also sets how much the screen shows." in st
     # The Overview's own switch is gone (decision card B, 2026-11-09): there the level control decides
     frame = (JS / "pages/dossier-frame.js").read_text()
     assert "data-v2-adv-toggle" not in frame and "data-v2-adv-toggle" not in (JS / "pages/dossier.js").read_text()

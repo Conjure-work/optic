@@ -176,11 +176,11 @@ function preferences() {
       ${row('Shortcuts', 'Every key the terminal answers to, in one list. Press ? anywhere outside a field to open it.', html`<button type="button" class="btn btn-sm" data-v2-shortcuts>Show the shortcuts</button>`)}</section>
     <!-- two settings, kept apart (Phase 04, D-019): what a page shows, and how Milo explains it -->
     <section class="section" aria-labelledby="dn-h"><h2 class="t-h2" id="dn-h">How much each page shows</h2>
-      <p class="section-sub">Simple leads with each page's main finding and folds the specialist research one press away. Advanced opens it, and Home shows every panel of its layout.</p>
-      ${row('View', 'The Dossier\'s "Show advanced analysis" switch is the same setting. It does not change how Milo explains things.', seg('View', [['simple', 'Simple'], ['advanced', 'Advanced']], prefs.density(), 'density'))}</section>
+      <p class="section-sub">Simple leads with each page's main finding and folds the specialist research one press away. Advanced opens it. Home and a stock's page follow the level below instead.</p>
+      ${row('View', 'It does not change how Milo explains things.', seg('View', [['simple', 'Simple'], ['advanced', 'Advanced']], prefs.density(), 'density'))}</section>
     <!-- the knowledge level (Phase 05): one slider, the same one Home's first visit and Milo's Response settings show -->
     <section class="section" aria-labelledby="hm-h"><h2 class="t-h2" id="hm-h">How Optic explains things</h2>
-      <p class="section-sub">Milo's answers, deep research and the written portfolio briefing are worded for this level, and terms on the pages explain themselves to match. It changes the words, never the figures, sources or caveats, and it does not change what a page shows. ${store.signedIn() ? 'Saved to your account.' : 'Kept in this browser; sign in to keep it on your account.'}</p>
+      <p class="section-sub">Milo's answers, deep research and the written portfolio briefing are worded for this level, and terms on the pages explain themselves to match. On Home and a stock's page it also sets how much the screen shows. It never changes a figure, a source, a caveat or a disclosure. ${store.signedIn() ? 'Saved to your account.' : 'Kept in this browser; sign in to keep it on your account.'}</p>
       ${levelSlider({ id: 'set-lvl', label: 'Explain things for' })}</section>
     <section class="section" aria-labelledby="tz-h"><h2 class="t-h2" id="tz-h">Time zone</h2>
       <p class="section-sub"><b>US market hours are defined in Eastern Time and don't move.</b> This setting only changes the clock they're displayed against, so you can see when the open and close land where you are.</p>
