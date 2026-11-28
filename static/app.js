@@ -18526,7 +18526,7 @@ function renderCompany(co) {
       ${ow.available ? `
         <p class="sub">${ow.insider_signal === 'unavailable' ? 'Insider transactions are unavailable right now.' : `Insiders are net <strong>${esc(ow.insider_signal)}</strong> over the last six months.`}</p>
         <div class="grid c3" style="margin-bottom:var(--space-3)">
-          ${tile('Insider net (6m)', fmtCompact((ow.insider_6m || {}).net_shares) + ' sh', null,
+          ${tile('Insider net (6m)', (ow.insider_6m || {}).net_shares == null ? 'Unavailable' : fmtCompact(ow.insider_6m.net_shares) + ' sh', null,
     signClass((ow.insider_6m || {}).net_shares), FIN_DEFS.insider_net)}
           ${tile('Institutional held', ow.institutional_pct_held !== null && ow.institutional_pct_held !== undefined
     ? fmt(ow.institutional_pct_held * 100, 1) + '%' : '—', null, '', FIN_DEFS.institutional)}

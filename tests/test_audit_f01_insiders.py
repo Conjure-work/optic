@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from pathlib import Path
 
 import pytest
 
@@ -147,3 +148,10 @@ def test_no_surface_prints_a_neutral_word_for_the_unavailable_state(tmp_path):
 def test_classic_prints_unavailable_without_a_signal_row():
     src = (V2.parent / "app.js").read_text()
     assert src.count("Insider transactions are unavailable right now.") == 2
+
+
+def test_classic_insider_tile_says_unavailable_not_a_dash():
+    """F01 on the Classic view: with no transactions net_shares is None, and the tile read "— sh"."""
+    src = (Path(__file__).resolve().parents[1] / "static" / "app.js").read_text(encoding="utf-8")
+    line = next(l for l in src.splitlines() if "tile('Insider net (6m)'" in l)
+    assert "net_shares == null ? 'Unavailable'" in line
