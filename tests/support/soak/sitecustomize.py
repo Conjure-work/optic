@@ -8,8 +8,9 @@ only in the uvicorn process. The app is not edited.
   live pandas frames, every module-level cache's entries and estimated size, the provider cache by key prefix) and,
   when SOAK_TRACE=1 (tracemalloc, SOAK_FRAMES frames, default 25, started here), `snap-NNN.tm` (the tracemalloc snapshot) and the traced
   memory.
-- Linux: SIGUSR2 calls malloc_trim(0) and writes `trim-NNN.json` with resident memory before and after, to tell memory
-  the allocator holds from memory the program holds.
+- SIGUSR2 does what the file SOAK_OUT/cmd says and writes `ctl-NNN.json` with resident memory before and after: "gc"
+  collects (the settled measurement), "trim" calls malloc_trim(0) on Linux, to tell memory the allocator holds from
+  memory the program holds. Kept apart from SIGUSR1 because the census allocates a great deal of its own.
 """
 import os
 import sys
@@ -158,20 +159,30 @@ if _IN_SERVER and os.environ.get("SOAK_OUT"):
             json.dump(rec, f)
         os.replace(tmp, os.path.join(_OUT, "snap-%03d.json" % n))
 
-    def _trim(signum=None, frame=None) -> None:
+    def _control(signum=None, frame=None) -> None:
+        """SIGUSR2: do what SOAK_OUT/cmd says, "gc" (collect) or "trim" (malloc_trim, Linux), and write ctl-NNN.json."""
         _seq["trim"] += 1
-        before = _rss_kb()
         try:
-            import ctypes
-            ok = int(ctypes.CDLL("libc.so.6").malloc_trim(0))
-        except Exception as exc:                                  # noqa: BLE001
-            ok = "unavailable: %s" % exc
-        rec = {"n": _seq["trim"], "rss_before_kb": before, "rss_after_kb": _rss_kb(), "malloc_trim": ok}
-        tmp = os.path.join(_OUT, "trim-%03d.json.tmp" % _seq["trim"])
+            with open(os.path.join(_OUT, "cmd")) as f:
+                cmd = f.read().strip()
+        except OSError:
+            cmd = "gc"
+        before = _rss_kb()
+        result = None
+        if cmd == "gc":
+            gc.collect()
+            gc.collect()
+        elif cmd == "trim":
+            try:
+                import ctypes
+                result = int(ctypes.CDLL("libc.so.6").malloc_trim(0))
+            except Exception as exc:                              # noqa: BLE001
+                result = "unavailable: %s" % exc
+        rec = {"n": _seq["trim"], "cmd": cmd, "rss_before_kb": before, "rss_after_kb": _rss_kb(), "result": result}
+        tmp = os.path.join(_OUT, "ctl-%03d.json.tmp" % _seq["trim"])
         with open(tmp, "w") as f:
             json.dump(rec, f)
-        os.replace(tmp, os.path.join(_OUT, "trim-%03d.json" % _seq["trim"]))
+        os.replace(tmp, os.path.join(_OUT, "ctl-%03d.json" % _seq["trim"]))
 
     signal.signal(signal.SIGUSR1, _snapshot)
-    if sys.platform.startswith("linux"):
-        signal.signal(signal.SIGUSR2, _trim)
+    signal.signal(signal.SIGUSR2, _control)

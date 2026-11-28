@@ -1,7 +1,7 @@
 """The memory soak (audit round, package E): `python -m tests.support.soak.run --symbols 40 --cycles 12 --fresh 3 --out DIR`.
 
 Starts the recording Anthropic stub and the server (tests/support/memprobe.py Server) with the soak's hooks on
-PYTHONPATH (tests/support/soak/sitecustomize.py: synthetic market data, snapshots on SIGUSR1, malloc_trim on SIGUSR2),
+PYTHONPATH (tests/support/soak/sitecustomize.py: synthetic market data, census on SIGUSR1, collect or malloc_trim on SIGUSR2),
 walks it (workload.py) and writes `soak.json` and `soak.md` to DIR.
 
 Phase A, same symbols, `--cycles` identical cycles: a cache fills in cycle 1 and is flat after; a leak keeps growing.
@@ -58,6 +58,7 @@ class Soak:
         self._stop = threading.Event()
         self.snaps = 0
         self.trims = 0
+        self.census_spans: List[Any] = []
 
     # ------------------------------------------------------------- measuring
     def measure(self, label: str, **extra: Any) -> Dict[str, Any]:
@@ -72,23 +73,28 @@ class Soak:
         target = self.out / ("snap-%03d.json" % self.snaps)
         if target.exists():
             target.unlink()
+        began = time.time() - self.t0
         os.kill(self.server.proc.pid, signal.SIGUSR1)
-        if not _wait_file(target):
+        arrived = _wait_file(target)
+        self.census_spans.append((began, time.time() - self.t0 + 5.0))
+        if not arrived:
             print("snapshot %d did not arrive" % self.snaps, flush=True)
             return None
         rec = json.loads(target.read_text())
         rec["label"] = label
         return rec
 
-    def trim(self) -> Optional[Dict[str, Any]]:
-        if not sys.platform.startswith("linux"):
+    def control(self, cmd: str) -> Optional[Dict[str, Any]]:
+        """Ask the server to "gc" or (Linux only) "trim", and return what it recorded."""
+        if cmd == "trim" and not sys.platform.startswith("linux"):
             return None
         self.trims += 1
-        target = self.out / ("trim-%03d.json" % self.trims)
+        target = self.out / ("ctl-%03d.json" % self.trims)
         if target.exists():
             target.unlink()
+        (self.out / "cmd").write_text(cmd)
         os.kill(self.server.proc.pid, signal.SIGUSR2)
-        return json.loads(target.read_text()) if _wait_file(target, 30) else None
+        return json.loads(target.read_text()) if _wait_file(target, 60) else None
 
     def _sampler(self) -> None:
         while not self._stop.wait(2.0):
@@ -112,41 +118,47 @@ class Soak:
                              start_timeout=300)   # tracemalloc at import makes the start about a minute
         threading.Thread(target=self._sampler, daemon=True).start()
         snaps: Dict[str, Any] = {}
-        trims: Dict[str, Any] = {}
+        ctl: Dict[str, Any] = {}
+        settled = 0
         codes: Dict[str, Any] = {}
         try:
             reader = workload.Reader(self.server.base, self.data)
             base = self.measure("baseline")
             sets = [workload.symbol_set(0, a.symbols)]
+            every = a.snapshots == "all"
             for c in range(1, a.cycles + 1):
                 t = time.time()
                 got = workload.cycle(reader, sets[0])
                 codes["A%d" % c] = got
                 self.measure("A%d" % c, phase="A", seconds=round(time.time() - t, 1))
-                if c == 2:
+                if every and c == 2:
                     snaps["after_A2"] = self.snapshot("after A2")
-                if c == a.cycles:
+                if every and c == a.cycles:
                     snaps["end_A"] = self.snapshot("end of A")
-                    trims["end_A"] = self.trim()
             for k in range(1, a.fresh + 1):
                 t = time.time()
                 got = workload.cycle(reader, workload.symbol_set(k, a.symbols))
                 codes["B%d" % k] = got
                 self.measure("B%d" % k, phase="B", seconds=round(time.time() - t, 1))
-            snaps["end_B"] = self.snapshot("end of B")
-            trims["end_B"] = self.trim()
+            if every:
+                snaps["end_B"] = self.snapshot("end of B")
             time.sleep(a.idle)
             self.measure("idle", phase="C")
-            snaps["idle"] = self.snapshot("after idle")
-            self.measure("settled", phase="C")
-            trims["settled"] = self.trim()
-            if trims["settled"]:
+            ctl["gc"] = self.control("gc")
+            self.measure("settled", phase="C")           # after a collection, before anything else is asked of it
+            settled = self.measures[-1]["rss_kb"]
+            ctl["trim"] = self.control("trim")
+            if ctl["trim"]:
                 self.measure("after_trim", phase="C")
+            if a.snapshots != "none":                    # last: the census allocates a great deal of its own
+                snaps["end"] = self.snapshot("end, settled")
         finally:
             self._stop.set()
             self.server.stop()
             stub.stop()
-        peak = max([r for _, r in self.samples] + [m["rss_kb"] for m in self.measures])
+        # the census allocates a great deal of its own, so samples taken while it ran are not the app's peak
+        peak = max([r for t, r in self.samples if not any(a <= t <= b for a, b in self.census_spans)]
+                   + [m["rss_kb"] for m in self.measures])
         try:
             commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=str(ROOT), capture_output=True, text=True).stdout.strip()
         except Exception:                                         # noqa: BLE001
@@ -154,8 +166,8 @@ class Soak:
         result = {
             "settings": {k: v for k, v in vars(a).items()}, "commit": commit, "platform": platform.platform(),
             "python": sys.version.split()[0], "machine": platform.machine(), "baseline_kb": base["rss_kb"],
-            "peak_kb": peak, "settled_kb": self.measures[-1 if not trims.get("settled") else -2]["rss_kb"],
-            "measures": self.measures, "samples": self.samples, "codes": codes, "snapshots": snaps, "trims": trims,
+            "peak_kb": peak, "settled_kb": settled,
+            "measures": self.measures, "samples": self.samples, "codes": codes, "snapshots": snaps, "control": ctl,
         }
         (self.out / "soak.json").write_text(json.dumps(result, indent=1))
         (self.out / "soak.md").write_text(report(result, self.out))
@@ -206,7 +218,7 @@ def report(r: Dict[str, Any], out: Path) -> str:
     L.append("")
     L.append("- Baseline (booted, signed in, before the walk): **%.1f MB**" % _mb(r["baseline_kb"]))
     L.append("- Peak (sampled every 2 s and after every cycle): **%.1f MB**" % _mb(r["peak_kb"]))
-    L.append("- Settled (after %ds idle and a collection): **%.1f MB**" % (s["idle"], _mb(r["settled_kb"])))
+    L.append("- Settled (after %ds idle and a forced collection): **%.1f MB**" % (s["idle"], _mb(r["settled_kb"])))
     for ph, name in (("A", "A, same symbols"), ("B", "B, new symbols")):
         g = _growth(m, ph)
         if g:
@@ -269,6 +281,8 @@ def report(r: Dict[str, Any], out: Path) -> str:
                 L.append("%s to %s: %s" % (a_, b_, ", ".join("%s %+d" % (t, d) for d, t in grew if d > 0) or "nothing"))
         if not s["no_trace"]:
             for a_, b_, title in (("after_A2", "end_A", "after cycle 2 to the end of A"), ("end_A", "end_B", "the end of A to the end of B")):
+                if a_ not in snaps or b_ not in snaps:
+                    continue
                 fa, fb = out / ("snap-%03d.tm" % snaps[a_]["n"]), out / ("snap-%03d.tm" % snaps[b_]["n"])
                 if fa.exists() and fb.exists():
                     L.append("")
@@ -278,14 +292,15 @@ def report(r: Dict[str, Any], out: Path) -> str:
                     L.append("| --- | --- | --- | --- |")
                     L.extend(_tm_diff(fa, fb))
     L.append("")
-    L.append("## malloc_trim (Linux only)")
+    L.append("## Collection and malloc_trim (measured, after the idle wait; trim is Linux only)")
     L.append("")
-    tr = {k: v for k, v in r["trims"].items() if v}
-    if not tr:
-        L.append("Not available on this platform.")
-    for k, v in tr.items():
-        L.append("- %s: resident %.1f MB before, %.1f MB after (returned %.1f MB)" % (k, _mb(v["rss_before_kb"]), _mb(v["rss_after_kb"]),
-                                                                                       _mb(v["rss_before_kb"] - v["rss_after_kb"])))
+    for k, v in r["control"].items():
+        if not v:
+            L.append("- %s: not available on this platform." % k)
+            continue
+        L.append("- %s: resident %.1f MB before, %.1f MB after (returned %.1f MB)%s" % (
+            k, _mb(v["rss_before_kb"]), _mb(v["rss_after_kb"]), _mb(v["rss_before_kb"] - v["rss_after_kb"]),
+            "" if k == "gc" else ", malloc_trim returned %s" % v.get("result")))
     L.append("")
     L.append("Limit: the synthetic source replaces yfinance, so curl_cffi's own network path is not exercised; the soak can "
              "clear or implicate everything above it.")
@@ -300,9 +315,14 @@ def main(argv: Optional[List[str]] = None) -> None:
     p.add_argument("--idle", type=int, default=30, help="seconds idle before the settled measurement")
     p.add_argument("--settle", type=float, default=3.0, help="seconds to wait before each measurement")
     p.add_argument("--no-trace", action="store_true")
+    p.add_argument("--snapshots", choices=["all", "end", "none"], default=None,
+                   help="when to take the census (it allocates a great deal of its own, so a clean headline run "
+                        "takes it only at the end); default all with tracing, end without")
     p.add_argument("--env", action="append", help="NAME=VALUE set in the server process")
     p.add_argument("--out", required=True)
-    Soak(p.parse_args(argv)).run()
+    args = p.parse_args(argv)
+    args.snapshots = args.snapshots or ("end" if args.no_trace else "all")
+    Soak(args).run()
 
 
 if __name__ == "__main__":
