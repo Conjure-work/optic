@@ -1462,7 +1462,8 @@ def _near(values: List[float], target: float, tol: float) -> bool:
 def figures_in(text: str) -> List[Dict[str, Any]]:
     """The money and percentage figures in a text, each with the values it may stand for."""
     found = []
-    for m in _FIG.finditer(str(text or "")):
+    text = str(text or "")
+    for m in _FIG.finditer(text):
         unit = (m.group("unit") or "").lower()
         money, pct = bool(m.group("money")), unit in ("%", "percent")
         if not (money or pct):
@@ -1475,6 +1476,11 @@ def figures_in(text: str) -> List[Dict[str, Any]]:
         dp = len(raw.split(".")[1]) if "." in raw else 0
         scale = _SCALE.get(unit, 1.0)
         cands = [v * scale] + ([v / 100.0] if pct else [])
+        # "-$2.2B": the match starts at the "$", so the minus sign sits before it. Capital expenditure is negative
+        # in the evidence, so the negated value is added as a second candidate (audit 2026-11-27 F04); candidates
+        # only widen, "$2.2B" still means +2.2e9 first. Limit: "sub-$5" gains a -5 candidate that matches nothing.
+        if money and re.search(r"[-\u2212]\s?$", text[max(0, m.start() - 2):m.start()]):
+            cands.append(-v * scale)
         found.append({"text": m.group(0).strip(), "kind": "percent" if pct else "money", "values": cands,
                       "step": 0.5 * (10 ** -dp) * scale})
     return found
