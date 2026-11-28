@@ -152,6 +152,30 @@ def complete(ticker: str, insiders: Dict[str, Any], today: Optional[dt.date] = N
     return out
 
 
+def six_month_rows(ticker: str, today: Optional[dt.date] = None, days: int = 182) -> Tuple[List[Dict[str, Any]], bool]:
+    """(rows, complete): the issuer's own open-market trades in the last `days` days from the kept Form 4 store, and
+    whether the kept list covers the whole window (listed, fresh, reaching back past the window's start, nothing
+    unread). Makes no request and starts no reader. Used by the six-month insider summary when Yahoo's list is
+    empty, which `complete` leaves alone (audit 2026-11-27, F01)."""
+    end = today or _today()
+    since = (end - dt.timedelta(days=days)).isoformat()
+    until = end.isoformat()
+    kept = form4_store.load_list(ticker)
+    if not kept:
+        return [], False
+    window = _window(kept, since, until)
+    parsed = form4_store.load_many(acc for acc, _ in window)
+    unread = sum(1 for acc, _ in window if acc not in parsed)
+    rows: List[Dict[str, Any]] = []
+    for acc, _ in window:
+        p = parsed.get(acc)
+        if not p or not p.get("available") or p.get("issuer_cik") != kept.get("cik"):
+            continue
+        rows += [_row(t, p, acc) for t in p.get("trades") or [] if since <= t.get("date", "") <= until]
+    rows.sort(key=lambda r: r["date"], reverse=True)
+    return rows, bool(_fresh(kept, since) and not unread)
+
+
 # ------------------------------------------------------------------------------------------ the reader
 
 def start(ticker: str, until: str, days: int = DAYS) -> bool:

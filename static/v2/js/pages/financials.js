@@ -13,6 +13,7 @@ import { num, signed, dir, money, compact, clean, capFirst, fullDate, shortDate,
 import { lineChart, mountCharts } from '../ui/chart.js';
 import { signedBars, hbars, groupedBars, periodLines, bridgeBars, stackedBars } from '../ui/bars.js';
 import * as FV from '../core/finviz.js';
+import { insiderRead } from '../core/insider.js';
 import { closeCell, CLOSE_NOTE } from '../core/congress.js';
 import { skeleton, empty, failed } from '../ui/states.js';
 import { button as miloButton, provideContext } from '../ui/milo.js';
@@ -63,12 +64,7 @@ const key = (items) => html`<p class="legend-line fv-key">${items.map(([cls, nam
 
 // The six-month insider reading in words: open-market purchases and sales only (awards and exercises are not
 // decisions to trade), and what it leaves out.
-export function insiderLine(ow) {
-  const i6 = ow.insider_6m || {}, open = i6.basis === 'open_market';
-  if (open && !i6.purchase_count && !i6.sale_count) return `No open-market purchases or sales by insiders in six months${i6.other_count ? `; ${i6.other_count} awards, grants and exercises, which are not trades` : ''}.`;
-  const dirn = (i6.net_shares || 0) > 0 ? 'Net buying' : (i6.net_shares || 0) < 0 ? 'Net selling' : 'Even';
-  return `${dirn} on the open market over six months: ${num(i6.purchase_count, 0)} ${i6.purchase_count === 1 ? 'purchase' : 'purchases'} and ${num(i6.sale_count, 0)} ${i6.sale_count === 1 ? 'sale' : 'sales'}, net ${signed(i6.net_shares, 0, '')} shares.${open && i6.other_count ? ` ${i6.other_count} awards, grants and exercises not counted.` : ''}${open ? '' : ' As Yahoo Finance tallies them, awards included.'}`;
-}
+export function insiderLine(ow) { return insiderRead(ow).line; }
 // A registry figure for a reading (Handoff 1): its own text as the control that defines it, and its period, which can
 // be a later year than the statements' when the filings are ahead of the provider (AAPL's 10-K, 2026-11-03).
 const andList = (xs) => (xs.length <= 1 ? xs[0] || '' : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
@@ -300,10 +296,12 @@ function record(which) {
 function ownership(sym) {
   const ow = ((D.t || {}).company || {}).ownership || {};
   if (!ow.available) return '';
-  const i6 = ow.insider_6m || {};
+  const i6 = ow.insider_6m || {}, ir = insiderRead(ow), off = ir.state === 'unavailable';
+  const cnt = (n, sh) => (off ? 'Unavailable' : `${num(n, 0)} (${compact(sh)} shares)`);
   return html`<section class="section" id="fin-ownership" data-v2-metric="" aria-labelledby="ow-h"><div class="section-head"><h2 class="t-h2" id="ow-h">Insider and institutional activity</h2>${ask(sym, 'Ask Milo about insiders', `What does recent insider and institutional activity in ${sym} suggest?`)}</div>
     <p>${insiderLine(ow)}</p>
-    ${kv([['Open-market purchases, 6 months', `${num(i6.purchase_count, 0)} (${compact(i6.purchase_shares)} shares)`], ['Open-market sales, 6 months', `${num(i6.sale_count, 0)} (${compact(i6.sale_shares)} shares)`], ['Net shares', signed(i6.net_shares, 0, '')], ['Held by institutions', isNum(ow.institutional_pct_held) ? pct(ow.institutional_pct_held * 100) : 'Not reported'], ['Held by insiders', isNum(ow.insider_pct_held) ? pct(ow.insider_pct_held * 100, 2) : 'Not reported']], 3)}
+    ${kv([['Open-market purchases, 6 months', cnt(i6.purchase_count, i6.purchase_shares)], ['Open-market sales, 6 months', cnt(i6.sale_count, i6.sale_shares)], ['Net shares', off ? 'Unavailable' : signed(i6.net_shares, 0, '')], ['Held by institutions', isNum(ow.institutional_pct_held) ? pct(ow.institutional_pct_held * 100) : 'Not reported'], ['Held by insiders', isNum(ow.insider_pct_held) ? pct(ow.insider_pct_held * 100, 2) : 'Not reported']], 3)}
+    <p class="asof">Window: ${ir.window}. Counted: ${ir.types}. Not counted: ${ir.excluded}.</p>
     <p>${ow.holders_adding} of the ${ow.holders_counted || (ow.top_holders || []).length} largest holders raised their stake and ${ow.holders_trimming} cut it by more than ${num(ow.holder_change_threshold_pct || 2, 0)}% at their last 13F filing; the rest changed by less. ${(ow.top_holders || []).length > 6 ? `The bars show the ${6} largest.` : ''}</p>
     ${raw(hbars((ow.top_holders || []).filter((h) => isNum(h.pct_held)).slice(0, 6).map((h) => ({ label: h.holder, v: h.pct_held * 100, note: `${compact(h.shares)} shares, ${isNum(h.pct_change) ? `${signed(h.pct_change * 100, 1)} at` : 'change not reported, filed'} ${fullDate(h.date_reported)}` }))))}
     <details class="more-inline"><summary>Recent insider transactions</summary><p class="asof">Each row's date is when the trade happened; this feed does not carry when it was filed. The <a class="textlink" href="#/insiders?symbol=${sym}&view=insiders">Insiders page</a> lists ${sym}'s Form 4s with their filing times and links.</p><div class="tscroll"><table class="t"><thead><tr><th>Traded</th><th>Insider</th><th>Role</th><th>Action</th><th>Shares</th><th>Value</th></tr></thead><tbody>${(ow.recent_transactions || []).slice(0, 20).map((t) => html`<tr><td>${fullDate(t.date)}</td><td>${t.insider}</td><td>${t.position || ''}</td><td>${capFirst(t.action || '')}</td><td>${compact(t.shares)}</td><td>${usd(t.value)}</td></tr>`)}</tbody></table></div>${(ow.recent_transactions || []).length > 20 ? html`<p class="asof">The latest 20 of ${(ow.recent_transactions || []).length} filings from the last two years. The Chart marks every purchase and sale among them, and the <a class="textlink" href="#/insiders">Insiders page</a> reads filings straight from EDGAR.</p>` : ''}</details>

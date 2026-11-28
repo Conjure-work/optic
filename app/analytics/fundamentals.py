@@ -594,6 +594,11 @@ def analyse_earnings_history(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
 # ------------------------------------------------ insider & institutional flow
 
 
+INSIDER_TYPES = "Open-market purchases and sales, Form 4 codes P and S"
+INSIDER_EXCLUDED = "awards, grants, gifts and option exercises"
+INSIDER_UNAVAILABLE = "Insider transactions for the last six months are unavailable right now. This is not a reading of no activity."
+
+
 def _six_month_trades(trades: List[Dict[str, Any]], now: Optional[dt.date] = None,
                       coverage: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Open-market purchases and sales over the last six months, from the classified Form 4 rows.
@@ -619,6 +624,10 @@ def _six_month_trades(trades: List[Dict[str, Any]], now: Optional[dt.date] = Non
     return {
         "basis": "open_market",
         "since": cutoff,
+        "until": today.isoformat(),
+        "window_days": 182,
+        "types": INSIDER_TYPES,
+        "excluded": INSIDER_EXCLUDED,
         "purchase_count": len(buys), "purchase_shares": total(buys, "shares"), "purchase_value": total(buys, "value"),
         "sale_count": len(sells), "sale_shares": total(sells, "shares"), "sale_value": total(sells, "value"),
         "other_count": len(rows) - len(buys) - len(sells),
@@ -628,7 +637,7 @@ def _six_month_trades(trades: List[Dict[str, Any]], now: Optional[dt.date] = Non
 
 
 def analyse_ownership(insiders: Dict[str, Any], institutions: Dict[str, Any],
-                      now: Optional[dt.date] = None) -> Dict[str, Any]:
+                      now: Optional[dt.date] = None, ticker: Optional[str] = None) -> Dict[str, Any]:
     summary = (insiders or {}).get("summary_6m") or {}
     trades = (insiders or {}).get("transactions") or []
     breakdown = (institutions or {}).get("breakdown") or {}
@@ -651,15 +660,29 @@ def analyse_ownership(insiders: Dict[str, Any], institutions: Dict[str, Any],
     notes: List[str] = []
     insider_signal = "neutral"
     coverage = (insiders or {}).get("coverage")
+    # The state comes before the signal (audit 2026-11-27, F01). An empty list from the feed is "nothing read", not
+    # "no activity": the provider returns [] both when Yahoo has no rows and when its request failed. Rows from Yahoo
+    # are ok; an empty list is ok only when the kept SEC Form 4 filings cover the whole six months; else unavailable.
+    state, source = "unavailable", None
+    if trades:
+        state = "ok"
+        source = "yahoo+sec" if any(r.get("source") == "sec" for r in trades) else "yahoo"
+    elif ticker:
+        sec_rows, sec_complete = insider_fill.six_month_rows(ticker, now or session_mod.market_today())
+        if sec_complete:
+            state, source, trades = "ok", "sec", sec_rows
     six = _six_month_trades(trades, now, coverage)
-    net_shares = six["net_shares"] if trades else (net or {}).get("shares")
+    net_shares = six["net_shares"] if state == "ok" else None
     other = " {} awards, grants, gifts and option exercises are not counted: they are not decisions to buy or sell.".format(
         six["other_count"]) if six["other_count"] else ""
-    if trades and not six["purchase_count"] and not six["sale_count"]:
-        # "neutral", the word the classic page already prints ("Insiders are net neutral"); the counts say none
+    if state == "unavailable":
+        insider_signal = "unavailable"
+        notes.append(INSIDER_UNAVAILABLE)
+    elif not six["purchase_count"] and not six["sale_count"]:
+        # a true zero: rows were read and none is an open-market purchase or sale in the window
         insider_signal = "neutral"
         notes.append("No open-market purchases or sales by insiders in six months." + other)
-    elif net_shares is not None and trades:
+    elif net_shares is not None:
         if net_shares > 0:
             insider_signal = "buying"
             notes.append(
@@ -706,15 +729,16 @@ def analyse_ownership(insiders: Dict[str, Any], institutions: Dict[str, Any],
 
     return {
         "available": bool(summary or holders),
+        "insider_state": state,
         "insider_signal": insider_signal,
-        # Open-market purchases and sales over six months, from the Form 4 rows below (since 2026-10-20).
-        "insider_6m": six if trades else {
-            "basis": "yahoo_tally",
-            "purchase_shares": (purchases or {}).get("shares"),
-            "purchase_count": (purchases or {}).get("transactions"),
-            "sale_shares": (sales or {}).get("shares"),
-            "sale_count": (sales or {}).get("transactions"),
-            "net_shares": net_shares,
+        # Open-market purchases and sales over six months, from the Form 4 rows below (since 2026-10-20). When the
+        # state is unavailable every count is None: never a zero that was not read.
+        "insider_6m": dict(six, source=source, zero=not six["purchase_count"] and not six["sale_count"]) if state == "ok" else {
+            "basis": "unavailable", "since": six["since"], "until": six["until"], "window_days": 182,
+            "types": INSIDER_TYPES, "excluded": INSIDER_EXCLUDED,
+            "reason": "The feed returned no insider transaction rows, and Optic's kept SEC Form 4 filings do not yet cover the six months.",
+            "purchase_count": None, "purchase_shares": None, "purchase_value": None,
+            "sale_count": None, "sale_shares": None, "sale_value": None, "other_count": None, "net_shares": None,
         },
         # Yahoo's own six-month tally, kept and named for what it counts: every acquisition and disposal
         "yahoo_tally_6m": {
@@ -760,5 +784,5 @@ def analyse(provider, ticker: str, quote: Dict[str, Any]) -> Dict[str, Any]:
         "short_interest": analyse_short_interest(short_raw, quote.get("avg_volume")),
         "financials": analyse_financials(fin_raw),
         "earnings_history": analyse_earnings_history(earn_raw),
-        "ownership": analyse_ownership(ins_raw, inst_raw),
+        "ownership": analyse_ownership(ins_raw, inst_raw, ticker=ticker),
     }

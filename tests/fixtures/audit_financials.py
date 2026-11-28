@@ -60,3 +60,46 @@ def ticker_payload_with(kind="discrete", sym="AAPL"):
     p = ticker_payload(sym)
     p["company"]["financials"] = financials(kind)
     return p
+
+
+# ------------------------------------------------------------------------------------------------ insiders (F01)
+INSIDER_NOW = "2026-11-27"      # the "today" every insider fixture is read at; the six-month window opens 2026-05-29
+
+
+def _row(date, action, shares, value=None, who="A. Director"):
+    return {"insider": who, "position": "Director", "date": date, "shares": shares, "value": value if value is not None else shares * 100.0,
+            "action": action, "detail": ""}
+
+
+def insider_rows(kind):
+    if kind == "recent_sales":         # his case as it should have read: two sales and an award inside the window
+        return [_row("2026-11-10", "sale", 1000.0), _row("2026-10-02", "sale", 500.0), _row("2026-09-01", "other", 4000.0)]
+    if kind == "none":                 # rows on hand, none an open-market purchase or sale in the window
+        return [_row("2026-09-01", "other", 4000.0), _row("2025-01-15", "sale", 900.0)]
+    if kind == "offsetting":
+        return [_row("2026-11-01", "purchase", 800.0), _row("2026-10-15", "sale", 800.0)]
+    return []
+
+
+def insiders_raw(kind):
+    return {"transactions": insider_rows(kind), "summary_6m": {}}
+
+
+def institutions_raw():
+    return {"top_holders": [{"holder": "Invented Fund LP", "pct_held": 0.05, "pct_change": 0.0}],
+            "breakdown": {"institutionsPercentHeld": 0.62, "insidersPercentHeld": 0.017}}
+
+
+def ownership(kind, ticker=None):
+    from datetime import date
+    from app.analytics import fundamentals
+    return fundamentals.analyse_ownership(insiders_raw(kind), institutions_raw(), now=date.fromisoformat(INSIDER_NOW), ticker=ticker)
+
+
+def ticker_payload_insiders(kind, sym="AAPL"):
+    """`/api/ticker/<sym>` carrying the ownership block for `kind` ("unavailable" is an empty list from the feed)."""
+    from tests.e2e.fixtures import ticker_payload
+    p = ticker_payload(sym)
+    p["company"]["financials"] = financials("discrete")
+    p["company"]["ownership"] = ownership(kind)
+    return p

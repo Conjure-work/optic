@@ -84,3 +84,75 @@ def test_without_quarterly_cash_flow_the_true_sentence_shows_and_no_quarterly_ch
         assert not page.errors
     finally:
         ctx.close()
+
+
+# ------------------------------------------------------------------------------------------------ F01: insiders
+NEVER = ("Neutral", "Even", "No net")
+
+
+def _three_surfaces(chrome, server, stub, kind):
+    """Overview, Financials and the Home Ownership panel for AAPL in one browser, from one ownership block."""
+    stub.reset("ok")
+    _, jar = make_account(server)
+    ctx, page = open_page(chrome, server, level="advanced", viewport=DESKTOP, cookies=jar)
+    serve(page, fx.ticker_payload_insiders(kind))
+    out = {}
+    page.goto(server["base"] + "/#/AAPL", wait_until="domcontentloaded")
+    page.wait_for_selector("#oc-own ~ .ov-fig-c", state="attached", timeout=30000)
+    out["overview"] = page.locator("section.ov-card", has=page.locator("#oc-own")).inner_text()
+    page.goto(server["base"] + "/#/AAPL/financials", wait_until="domcontentloaded")
+    page.wait_for_selector("#fin-ownership", timeout=30000)
+    out["financials"] = page.locator("#fin-ownership").inner_text()
+    page.goto(server["base"] + "/#/", wait_until="domcontentloaded")
+    page.wait_for_selector("[data-ws-panel]")
+    page.click("[data-ws-preset='longterm']")
+    page.wait_for_selector("[data-ws-panel='own']")
+    page.fill("#ws-link", "AAPL")
+    page.press("#ws-link", "Enter")
+    page.wait_for_function("() => { const p = document.querySelector(\"[data-ws-panel='own']\"); return p && /Insiders, 6 months/.test(p.innerText) && p.innerText.includes('AAPL'); }", timeout=30000)
+    out["home"] = page.locator("[data-ws-panel='own'] dl.ws-kv").first.inner_text()
+    out["page"] = page
+    out["ctx"] = ctx
+    return out
+
+
+def test_recent_sales_read_the_same_on_overview_financials_and_home(chrome, server, stub):
+    got = _three_surfaces(chrome, server, stub, "recent_sales")
+    try:
+        win = "May 29, 2026 to Nov 27, 2026"
+        assert "Insiders sold, net, from May 29, 2026 to Nov 27, 2026." in got["overview"]
+        fin = got["financials"]
+        assert "Net selling on the open market from " + win in fin and "2 sales" in fin and "0 (0 shares)" in fin
+        assert "Window: " + win + "." in fin and "Not counted: awards, grants, gifts and option exercises." in fin
+        assert "Selling" in got["home"] and "0 buys, 2 sales, " + win in got["home"]
+        assert not got["page"].errors
+    finally:
+        got["ctx"].close()
+
+
+def test_genuinely_none_shows_zeros_and_its_dates_on_all_three(chrome, server, stub):
+    got = _three_surfaces(chrome, server, stub, "none")
+    try:
+        win = "May 29, 2026 to Nov 27, 2026"
+        assert "No open-market purchases or sales by insiders from " + win in got["overview"]
+        assert "No open-market purchases or sales by insiders from " + win in got["financials"]
+        assert "0 (0 shares)" in got["financials"] and "Window: " + win in got["financials"]
+        assert "None" in got["home"] and "0 buys, 0 sales, " + win in got["home"]
+        assert not got["page"].errors
+    finally:
+        got["ctx"].close()
+
+
+def test_unavailable_says_so_on_all_three_and_never_neutral_even_or_no_net(chrome, server, stub):
+    got = _three_surfaces(chrome, server, stub, "unavailable")
+    try:
+        assert "unavailable right now. That is not the same as no activity." in got["overview"]
+        assert "unavailable right now. That is not the same as no activity." in got["financials"] and "Unavailable" in got["financials"]
+        assert "Unavailable" in got["home"]
+        for name in ("overview", "financials", "home"):
+            for word in NEVER:
+                assert word not in got[name], (name, word, got[name])
+        assert "n/a buys" not in got["home"]
+        assert not got["page"].errors
+    finally:
+        got["ctx"].close()

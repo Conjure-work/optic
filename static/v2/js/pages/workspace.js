@@ -10,6 +10,7 @@
 // loading only when opened. VISUAL-SPEC-DARK.md and WORKSPACE.md.
 import { $, $$, html, raw, render as draw, announce } from '../core/dom.js';
 import * as api from '../core/api.js';
+import { insiderRead } from '../core/insider.js';
 import * as store from '../core/store.js';
 import * as LIB from '../core/library.js';
 import * as prefs from '../core/prefs.js';
@@ -981,9 +982,9 @@ export const PANELS = {
       const o = ((t.company || {}).ownership) || {};
       if (kindOf(link) === 'fund') return notCompany(link);
       if (!o.available) return html`<p class="ws-note">No ownership data for ${link} in the feed.</p>`;
-      const i6 = o.insider_6m || {};
+      const i6 = o.insider_6m || {}, ir = insiderRead(o);
       return html`<dl class="ws-kv">
-        <div><dt>Insiders, 6 months</dt><dd>${capFirst(o.insider_signal || 'n/a')}</dd><dd class="ws-kv-note">${num(i6.purchase_count, 0)} buys, ${num(i6.sale_count, 0)} sales</dd></div>
+        <div><dt>Insiders, 6 months</dt><dd>${ir.short}</dd><dd class="ws-kv-note">${ir.state === 'unavailable' ? 'Unavailable' : `${num(i6.purchase_count, 0)} buys, ${num(i6.sale_count, 0)} sales, ${ir.window}`}</dd></div>
         <div><dt>Held by institutions</dt><dd>${isNum(o.institutional_pct_held) ? `${num(o.institutional_pct_held * 100, 0)}%` : 'n/a'}</dd></div>
         <div><dt>Largest holders</dt><dd>${o.holders_adding} raised, ${o.holders_trimming} cut</dd><dd class="ws-kv-note">of ${o.holders_counted || (o.top_holders || []).length}, by more than ${num(o.holder_change_threshold_pct || 2, 0)}%</dd></div></dl>`;
     },

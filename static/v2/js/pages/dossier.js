@@ -18,6 +18,7 @@
 // tied to the visit that asked for it, so nothing from an earlier ticker, or an
 // earlier visit to the same one, is ever drawn.
 import * as FV from '../core/finviz.js';
+import { insiderRead } from '../core/insider.js';
 import * as PER from '../core/periods.js';
 import { term } from '../ui/term.js';
 import { $, $$, html, render as draw, raw } from '../core/dom.js';
@@ -559,7 +560,7 @@ function figOwners() {
   const o = (((D.ticker || {}).company) || {}).ownership || {};
   const inst = isNum(o.institutional_pct_held) ? o.institutional_pct_held * 100 : null, ins = isNum(o.insider_pct_held) ? o.insider_pct_held * 100 : null;
   if (!o.available || (inst === null && ins === null)) return html`<section class="ov-card" aria-labelledby="oc-own"><h2 class="t-h3" id="oc-own">Who owns it</h2>${gone('No holder figures came back for it.')}</section>`;
-  const sig = o.insider_signal === 'selling' ? 'Insiders sold, net, over six months.' : o.insider_signal === 'buying' ? 'Insiders bought, net, over six months.' : 'No net insider buying or selling over six months.';
+  const sig = insiderRead(o).headline;
   return html`<section class="ov-card" aria-labelledby="oc-own"><h2 class="t-h3" id="oc-own">Who owns it</h2>
     ${pairBars([{ label: 'Institutions', v: inst, text: `${num(inst, 0)}%`, cls: 'gold' }, { label: 'Insiders', v: ins, text: `${num(ins, 1)}%`, cls: 'mute' }], { max: 100, label: 'Share of the company held by institutions and by insiders' })}
     <p class="ov-fig-c">${sig}</p><p class="asof">Holders' filings, via Yahoo Finance.</p></section>`;
