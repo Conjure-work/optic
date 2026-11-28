@@ -91,13 +91,87 @@ _CACHE: Dict[str, Any] = {}
 # CACHE_MAX entries the oldest stored go first, which costs a refetch and nothing else. A key's lock goes with its entry
 # when nobody holds it.
 CACHE_MAX = int(os.environ.get("YF_CACHE_MAX", "20000"))
+# A ceiling by size as well, because a count is the wrong unit: an entry is a price history or an option chain of one
+# symbol, about 3 MB of frames per symbol served across its dozen keys (soak, docs/operations/memory-and-open-files.md),
+# so 20,000 entries is about a gigabyte and a half (frames, and lists of rows at 480 bytes a row), and the entries nobody asks for again (a history lives five minutes,
+# a chain one) sat in memory for the day they were allowed. Past this many megabytes of frame data the oldest stored go
+# first, which costs a refetch and nothing else. A frame held under two keys (the history and its stand-in) counts once.
+CACHE_MAX_BYTES = int(float(os.environ.get("YF_CACHE_MAX_MB", "200")) * 1048576)
 _CACHE_OLDEST = 86400.0 + 300.0
 _SWEEP_EVERY = 60.0
 _SWEPT = {"at": 0.0}
 
 
+# What a row of a cached list of dicts (the analysts' actions, a news list) weighs, measured in the soak: 11.7 MB for 63
+# lists of 400 rows is 465 bytes a row.
+_ROW_BYTES = 480
+
+
+def _frames_in(value: Any) -> List[Any]:
+    """The price and chain frames an entry holds: the frame itself, or a batch's frames by symbol."""
+    if isinstance(value, pd.DataFrame):
+        return [value]
+    if isinstance(value, dict):
+        return [v for v in value.values() if isinstance(v, pd.DataFrame)]
+    return []
+
+
+def _rows_in(value: Any) -> int:
+    """How many rows of dicts an entry holds as a list."""
+    return len(value) if isinstance(value, list) and value and isinstance(value[0], dict) else 0
+
+
+def _frame_bytes(frame: "pd.DataFrame") -> int:
+    """About what a frame holds: its buffers, and 56 bytes for each text cell (a contract's name), which is what
+    `memory_usage(deep=True)` finds there at a tenth of the cost."""
+    try:
+        text = sum(1 for dtype in frame.dtypes if dtype == object)
+        return int(frame.memory_usage(deep=False, index=True).sum()) + text * len(frame) * 56
+    except Exception:                                           # noqa: BLE001
+        return 0
+
+
+def _evict_to_byte_ceiling() -> List[str]:
+    """The oldest entries holding frames or lists of rows, dropped until what is still held fits CACHE_MAX_BYTES."""
+    held = []
+    refs: Dict[int, List[int]] = {}                  # id of a frame -> [its bytes, how many entries hold it]
+    total = 0
+    for key, entry in list(_CACHE.items()):
+        if not (isinstance(entry, tuple) and len(entry) == 2):
+            continue
+        frames = _frames_in(entry[1])
+        rows = _rows_in(entry[1]) * _ROW_BYTES
+        if not frames and not rows:
+            continue
+        held.append((float(entry[0]), key, frames, rows))
+        total += rows
+        for frame in frames:
+            ref = refs.get(id(frame))
+            if ref is None:
+                ref = refs[id(frame)] = [_frame_bytes(frame), 0]
+                total += ref[0]
+            ref[1] += 1
+    gone: List[str] = []
+    if total <= CACHE_MAX_BYTES:
+        return gone
+    for _, key, frames, rows in sorted(held, key=lambda h: h[0]):
+        if total <= CACHE_MAX_BYTES:
+            break
+        if _CACHE.pop(key, None) is None:
+            continue
+        gone.append(key)
+        total -= rows
+        for frame in frames:
+            ref = refs[id(frame)]
+            ref[1] -= 1
+            if ref[1] == 0:
+                total -= ref[0]
+    return gone
+
+
 def sweep_cache(now: Optional[float] = None) -> int:
-    """Drop entries no reader can be served again, then the oldest past CACHE_MAX. Returns how many went."""
+    """Drop entries no reader can be served again, then the oldest past CACHE_MAX, then the oldest past the byte
+    ceiling. Returns how many went."""
     now = time.time() if now is None else now
     entries = list(_CACHE.items())                     # one copy under the GIL; writers may carry on meanwhile
     gone = [k for k, v in entries if isinstance(v, tuple) and v and now - float(v[0]) > _CACHE_OLDEST]
@@ -109,6 +183,7 @@ def sweep_cache(now: Optional[float] = None) -> int:
         for _, k in oldest:
             _CACHE.pop(k, None)
         gone += [k for _, k in oldest]
+    gone += _evict_to_byte_ceiling()
     with _KEY_GUARD:
         for k in [k for k, lock in _KEY_LOCKS.items() if k not in _CACHE and not lock.locked()]:
             _KEY_LOCKS.pop(k, None)

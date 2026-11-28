@@ -238,14 +238,15 @@ def report(r: Dict[str, Any], out: Path) -> str:
         L.append("")
         L.append("## Traced Python memory against resident memory (measured)")
         L.append("")
-        L.append("| Snapshot | Resident MB | Traced MB | Live frames | Frame data MB | Provider cache entries | Provider cache MB (unique) | Threads |")
-        L.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+        L.append("| Snapshot | Resident MB | Traced MB | Live frames | Frame data MB | Provider cache entries | Provider cache MB (unique) | Frames held by it, MB (shallow) | Threads |")
+        L.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
         for k, v in snaps.items():
             pc = v.get("provider_cache") or {}
-            L.append("| %s | %.1f | %s | %s | %.1f | %s | %.1f | %s |" % (
+            L.append("| %s | %.1f | %s | %s | %.1f | %s | %.1f | %.1f | %s |" % (
                 v["label"], _mb(v["rss_kb"]), "%.1f" % (v["traced_bytes"] / 1048576.0) if "traced_bytes" in v else "-",
                 v.get("live_frames", "-"), v.get("live_frame_bytes", 0) / 1048576.0, pc.get("entries", "-"),
-                pc.get("unique_bytes_total", 0) / 1048576.0, v.get("threads", "-")))
+                pc.get("unique_bytes_total", 0) / 1048576.0, pc.get("frame_bytes_shallow_unique", 0) / 1048576.0,
+                v.get("threads", "-")))
         L.append("")
         L.append("## Caches at each snapshot (entries, estimated MB; estimate = deep size of what each holds, shared objects once)")
         L.append("")

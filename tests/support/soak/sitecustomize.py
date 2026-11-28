@@ -119,7 +119,20 @@ if _IN_SERVER and os.environ.get("SOAK_OUT"):
             row["entries"] += 1
             row["bytes"] += _deep(entry, set())                   # standalone: what the prefix would hold alone
             unique += _deep(entry, seen)                          # each shared object once across the whole cache
-        return {"by_prefix": by, "standalone_bytes_total": sum(r["bytes"] for r in by.values()),
+        frames, held = set(), 0                                   # frame buffers by shallow size, each frame once: what a
+        for entry in list(cache.values()):                        # byte ceiling on the cache would count
+            value = entry[1] if isinstance(entry, tuple) and len(entry) == 2 else None
+            try:
+                import pandas as pd
+                found = [value] if isinstance(value, pd.DataFrame) else (
+                    [v for v in value.values() if isinstance(v, pd.DataFrame)] if isinstance(value, dict) else [])
+                for f in found:
+                    if id(f) not in frames:
+                        frames.add(id(f))
+                        held += int(f.memory_usage(deep=False, index=True).sum())
+            except Exception:                                     # noqa: BLE001
+                pass
+        return {"frame_bytes_shallow_unique": held, "frames_held": len(frames), "by_prefix": by, "standalone_bytes_total": sum(r["bytes"] for r in by.values()),
                 "unique_bytes_total": unique, "entries": len(cache), "max": getattr(mod, "CACHE_MAX", None)}
 
     def _frames() -> dict:
