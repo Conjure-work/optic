@@ -95,3 +95,9 @@ def test_the_rewrite_tokens_are_in_the_done_usage(monkeypatch):
 
 def test_the_format_prompt_asks_for_units_in_the_cell_or_the_heading():
     assert "currency and unit, in the cell or in the column heading" in " ".join(ai.FORMAT_PROMPT.split())
+
+
+def test_an_answer_with_no_text_at_all_is_not_written_again(monkeypatch):
+    sent = F.install(monkeypatch, [F.text_round("")])
+    events = F.run("Hello")
+    assert len(sent) == 1 and "amend" not in [k for k, _ in events]

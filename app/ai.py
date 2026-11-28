@@ -4268,6 +4268,8 @@ async def stream_chat(
         grounded = ai_policy.ground(base, context_text, tool_texts)
         repaired = ai_policy.repair(grounded["text"]) if grounded["removed"] else base
         problems = ai_policy.integrity(repaired)
+        if not grounded["removed"] and not base.strip():
+            problems = []      # no text came back at all (a refusal handled above, a stopped answer): nothing to write again
         if grounded["removed"] or problems:
             log.warning("ai policy: pulse: removed %s statement(s) with unsupported figures, integrity: %s",
                         grounded["removed"], ", ".join(problems) or "ok")
