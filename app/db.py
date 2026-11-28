@@ -1092,6 +1092,12 @@ MIGRATION_27 = [
 MIGRATION_28 = ["ALTER TABLE subscriptions ADD COLUMN cancel_at TEXT"]
 
 
+# Audit round (2026-11-28, Q01 backfill): when the row last took its cancellation state from Stripe (a subscription event
+# or one retrieval). A subscription whose cancellation was scheduled before cancel_at was recorded has NULL here and is
+# read from Stripe once. Add only.
+MIGRATION_29 = ["ALTER TABLE subscriptions ADD COLUMN cancel_synced_at TEXT"]
+
+
 MIGRATIONS: List[Tuple[int, str, List[str]]] = [
     (1, "accounts", MIGRATION_1),
     (2, "oauth_pkce", MIGRATION_2),
@@ -1121,6 +1127,7 @@ MIGRATIONS: List[Tuple[int, str, List[str]]] = [
     (26, "chart_layouts", MIGRATION_26),
     (27, "watch_delivery", MIGRATION_27),
     (28, "subscription_cancel_at", MIGRATION_28),
+    (29, "subscription_cancel_synced", MIGRATION_29),
 ]
 
 

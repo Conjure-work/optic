@@ -279,6 +279,7 @@ async def billing_status(request: Request) -> Dict[str, Any]:
     user = deps.current_user(request)
     out = status()
     if user:
+        backfill_cancellation(user["id"])
         out["subscription"] = auth_store.subscription(user["id"])
         out["can_manage"] = bool((_sub_row(user["id"]) or {}).get("provider_customer_id"))
     return out
@@ -498,7 +499,8 @@ def apply_event(event: Dict[str, Any]) -> str:
                        provider_customer_id=obj.get("customer"), provider_subscription_id=obj.get("id"),
                        cancel_at_period_end=1 if obj.get("cancel_at_period_end") else 0,
                        current_period_end=_period_end(obj),
-                       cancel_at=None if etype == "customer.subscription.deleted" else _cancel_at(obj))
+                       cancel_at=None if etype == "customer.subscription.deleted" else _cancel_at(obj),
+                       cancel_synced_at=db.utcnow())
         if wrote:
             brokerage.on_plan_change(uid)
         return (ours if entitled else "free") if wrote else "stale"
@@ -517,6 +519,50 @@ def apply_event(event: Dict[str, Any]) -> str:
         # to change here, and past_due stays entitled while Stripe retries.
         return "noted"
     return "ignored"
+
+
+_BACKFILL_RETRY_SECONDS = 600
+_backfill_tried: Dict[str, float] = {}       # subscription id -> monotonic time of the last failed retrieval
+
+
+def backfill_cancellation(user_id: str) -> bool:
+    """Read a subscription's cancellation state from Stripe once, for a row that predates `cancel_at` (audit, Q01).
+
+    A cancellation scheduled in the portal before `cancel_at` was recorded sent its event to code that dropped the
+    field, so the row never learns of it until some later event. Observed live: Stripe's portal said "Cancels Dec
+    25" and Settings said nothing. The row's `cancel_synced_at` is NULL until a subscription event or this retrieval
+    has written it, so each subscription is retrieved once, and the write goes through `apply_event` (the same code
+    the webhook runs, as `invoice.paid` does) so the two cannot diverge. Never raises. A failure leaves the row as it
+    is and is retried no sooner than every ten minutes. Does nothing when billing is off or the key is absent."""
+    try:
+        if not _key() or not status().get("available"):
+            return False
+        row = _sub_row(user_id) or {}
+        sid = row.get("provider_subscription_id")
+        if (row.get("provider") != "stripe" or not sid or row.get("cancel_synced_at")
+                or row.get("provider_status") not in auth_store.ENTITLED_STATUSES):
+            return False
+        last = _backfill_tried.get(sid)
+        if last is not None and time.monotonic() - last < _BACKFILL_RETRY_SECONDS:
+            return False
+        try:
+            current = _stripe("GET", "/subscriptions/{}".format(sid))
+            # `created` is the last event applied, so the row's own ordering rule neither rejects this nor moves it
+            apply_event({"type": "customer.subscription.updated", "created": int(row.get("last_event_at") or 0),
+                         "data": {"object": current}})
+        except Exception as exc:     # HTTPException from _stripe, or anything a malformed body raises
+            log.warning("stripe: cancellation backfill for %s failed (%s); retry in %ss", sid,
+                        type(exc).__name__, _BACKFILL_RETRY_SECONDS)
+            _backfill_tried[sid] = time.monotonic()
+            return False
+        if not (_sub_row(user_id) or {}).get("cancel_synced_at"):      # an event the row had already passed
+            _backfill_tried[sid] = time.monotonic()
+            return False
+        _backfill_tried.pop(sid, None)
+        return True
+    except Exception:
+        log.exception("stripe: cancellation backfill failed")
+        return False
 
 
 def cancel_for_deletion(user_id: str) -> None:
