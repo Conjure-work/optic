@@ -19,7 +19,7 @@ starts:
   `app/main.py`;
 - the server's symbol lookup (`_named_and_unknown`), so that "What is AAPL at?" is not read as a definition.
 
-It was scored against the 181 benchmark cases' workload labels. Those labels were set by the benchmark's authors, so
+It was scored against the 183 benchmark cases' workload labels. Those labels were set by the benchmark's authors, so
 "accuracy" here means agreement with them, not ground truth.
 
 **The architecture priced** is the directive's example, mapped to models:
@@ -38,20 +38,20 @@ here on whether it sends questions where they belong, what that would save, and 
 
 ### Routing accuracy (measured)
 
-126 of 181 cases go where their label says: **69.6%** (95% interval 62.6% to 75.8%). One decision takes 0.127 ms.
+127 of 183 cases go where their label says: **69.4%** (95% interval 62.4% to 75.6%). One decision takes 0.127 ms.
 
 | Workload | Routed as labelled | 95% interval | Where the rest went |
 |---|---|---|---|
 | W1 definitions | 13 of 16 | 57% to 93% | W3 2, W2 1 |
 | W2 market data | 31 of 32 | 84% to 99% | W3 1 |
-| W3 fundamentals | 12 of 12 | 76% to 100% | |
+| W3 fundamentals | 13 of 13 | 77% to 100% | |
 | W4 technical | 6 of 16 | 19% to 61% | W1 4 (indicator definitions), W5 3, W7 2, W2 1 |
 | W5 Dossier | 11 of 17 | 41% to 83% | W2 5, W4 1 |
 | W6 portfolio | 13 of 17 | 53% to 90% | W2 2, W7 2 |
 | W7 multi-source | 5 of 5 | 57% to 100% | |
 | W8 follow-ups | 13 of 15 | 62% to 96% | S1 2 |
 | W9 help | 5 of 8 | 31% to 86% | W1 1, W2 1, W6 1 |
-| **W10 unavailable data** | **1 of 15** | 1% to 30% | **W2 12**, W3 2 |
+| **W10 unavailable data** | **1 of 16** | 1% to 28% | **W2 12**, W3 3 |
 | S1 advice requests | 13 of 13 | 77% to 100% | |
 | **S2 adversarial input** | **3 of 15** | 7% to 45% | W2 4, S1 3, W5 2, W6 2, W8 1 |
 

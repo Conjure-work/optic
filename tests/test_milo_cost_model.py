@@ -49,7 +49,7 @@ def test_the_prefix_is_measured_from_the_code():
     sizes = CM.measured_sizes()
     assert sizes["system_chars"] == len(ai.SYSTEM_PROMPT + ai.FORMAT_PROMPT + "\n\n" + editorial.WRITING_RULES + "\n\n" + ai_policy.POLICY_TEXT)
     assert int(sizes["tool_chars"]["17"]) > int(sizes["tool_chars"]["16"]) > 0
-    assert len(milo_tools.definitions()) == 17
+    assert len(milo_tools.definitions()) == 18          # the 17 of the audit, and get_cash_flow (2026-11-27, F04)
 
 
 def test_openais_cache_bills_like_anthropics_with_the_context_turn_cached():
@@ -117,7 +117,7 @@ def test_routing_keeps_each_questions_work_and_splits_the_cache():
 def test_the_router_scores_what_the_routing_report_says():
     from tests.milo_eval.cases import CASES
     got = R.evaluate(CASES)
-    assert (got["routed_right"], got["cases"]) == (126, 181), "update docs/ai/MILO_ROUTING_RECOMMENDATION.md"
+    assert (got["routed_right"], got["cases"]) == (127, 183), "update docs/ai/MILO_ROUTING_RECOMMENDATION.md"
     assert got["seconds_per_decision"] < 0.01
     cheap = R.cheap_route_errors(CASES)
     assert {cid for cid, _, _ in cheap} == {"IND-03", "IND-06", "IND-09", "IND-13"}
