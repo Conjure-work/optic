@@ -59,7 +59,7 @@ the budget).
   instruction to you." (system prompt). The policy text appended to every chat and deep-research request says the same
   of data, tool results, headlines, filings, attachments and web pages.
 
-## The seventeen tools
+## The eighteen tools
 
 | Tool | Purpose and input | Runner and provider | Result (top level) | Freshness | Cache | Failure | Auth and use |
 |---|---|---|---|---|---|---|---|
@@ -80,6 +80,7 @@ the budget).
 | `get_price_history` | Bars over a window with the window's figures. `{ticker, period, interval?}` (1m, 3m, 6m, ytd, 1y, 2y, 5y; daily or weekly) | `milo_data.price_history` → `YF_PROVIDER.history` | source, ticker, period, interval, currency, as_of, window{first, last, change, change_pct, high_close, low_close, max_drawdown_pct and dates, realised_vol_annualised_pct}, recent_bars (40), method | the last bar's date; `stale` when it is before the last completed session; a note while today's bar forms | 300 s | no bars: `not_found` | public; **new this phase**; every figure computed in code, never by the model; a frame that starts more than a week before its window is cut to it, and `bars_note` says how many bars were left out (D-062) |
 | `get_filings` | Recent notable SEC filings with links. `{ticker, limit?}` (1 to 20) | `milo_data.filings` → `filings.recent` (SEC EDGAR submissions) | source, company, cik, filings[{form, filed, what, items, url}], as_of | the newest filing's date; `stale` with the reason when only an old copy or old filings stand | submissions 1 h, ticker map 1 day | not in EDGAR: `unavailable` | public; **new this phase** |
 | `get_financials` | Quarterly revenue and diluted EPS as filed. `{ticker}` | `milo_data.financials` → `sec_facts.history` (SEC XBRL company facts) | source, cik, revenue_quarters, revenue_ttm, revenue_yoy, eps_diluted_quarters, eps_ttm, counts, notes, fields, as_of | the newest period end; `stale` when EDGAR failed and a kept copy answered | 1 day | no filer: `unavailable` | public; **new this phase** |
+| `get_cash_flow` | Operating cash flow, capital expenditure and free cash flow by fiscal quarter and fiscal year, with how the quarters were checked against the year. `{ticker}` | `milo_data.cash_flow` → `YF_PROVIDER.financials` and `fundamentals.analyse_financials` (`quarterly_cash`, `quarterly_cash_basis`) | source, ticker, currency, as_of, quarters (period, period_end, operating_cash_flow, capital_expenditure, capital_spending, free_cash_flow, unavailable, note), basis (basis, fiscal_year, sums, said), fiscal_years, fields; with no quarterly statement: quarters empty, `quarterly_available` false, `missing` | the newest quarter end that has a figure; a statement is not stale | none | no statements: `unavailable` with no figures; no quarterly statement: `ok`, `partial` true, fiscal years only; a quarter that does not reconcile: that figure null with a note | public; **audit 2026-11-27, F04** |
 
 ## What the server puts in CONTEXT on its own
 
@@ -120,7 +121,7 @@ Web search: the reader's switch adds the provider's web search tool (at most 5 u
 | Capability | Where the terminal has it | Milo |
 |---|---|---|
 | A close on a given date, intraday bars | `/api/daily-bars`, `/api/intraday` | Daily or weekly bars over a named window (`get_price_history`, new); no arbitrary date range, no intraday |
-| Full financial statements (balance sheet, cash flow lines) | `/api/ticker` company financials, `/api/valuation-inputs`, `/api/segments` | Revenue and EPS as filed (`get_financials`, new); margins and growth (`get_fundamentals`); quality measures (`get_assessment`); no full statements |
+| Full financial statements (balance sheet, cash flow lines) | `/api/ticker` company financials, `/api/valuation-inputs`, `/api/segments` | Revenue and EPS as filed (`get_financials`, new); operating cash flow, capital expenditure and free cash flow by quarter and year (`get_cash_flow`); margins and growth (`get_fundamentals`); quality measures (`get_assessment`); no full statements |
 | Filing text | EDGAR links in the Dossier | The list with links (`get_filings`, new) and a 600-character business excerpt in the research pack; never the documents |
 | Insider, institutional and congressional trading | `/api/ticker` ownership, `/api/insiders/latest`, `/api/congress` | Not reachable |
 | Indicators beyond moving averages, RSI, MACD, ATR and relative volume (VWAP, Bollinger, Keltner, Donchian, ADX, stochastic, OBV, MFI, the RS line) | `/api/indicators` | Not reachable, unless the reader's chart sends them in CONTEXT |

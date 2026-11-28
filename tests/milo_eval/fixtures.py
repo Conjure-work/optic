@@ -130,6 +130,14 @@ def filings_recent(symbol: str, limit: int = 10) -> Dict[str, Any]:
     return FILINGS.get(symbol, {"available": False, "reason": "{} is not in EDGAR's directory (fixture).".format(symbol)})
 
 
+def financials_raw(symbol: str) -> Dict[str, Any]:
+    """The provider's statements for get_cash_flow: an AAPL-shaped set for a company, nothing for a fund or index."""
+    if symbol in ("SPY", "QQQ", "BTC-USD", "^GSPC"):
+        return {}
+    from tests.fixtures.milo_cash_flow import aapl_raw
+    return aapl_raw()
+
+
 def sec_history(symbol: str) -> Dict[str, Any]:
     if symbol in ("SPY", "QQQ", "BTC-USD"):
         return {"available": False, "reason": "SEC XBRL unavailable: no filer (fixture)."}

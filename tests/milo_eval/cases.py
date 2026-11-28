@@ -52,7 +52,7 @@ def C(id, cat, question, *, user=None, context=None, history=None, web=False, wo
 
 MARKET_TOOLS = ["get_quote", "get_options", "get_chart_levels", "get_fundamentals", "get_valuation", "get_earnings",
                 "get_news", "get_market", "compare", "get_assessment", "screen_stocks", "lookup_company",
-                "get_price_history", "get_filings", "get_financials"]
+                "get_price_history", "get_filings", "get_financials", "get_cash_flow"]
 QUOTE_OK = {"is_error": False, "meta": {"delayed": True, "stale": False, "unavailable": False}, "quote_checked": True,
             "fields": {"as_of_utc": "2026-10-23T20:00:00+00:00", "as_of_is": "the trade's time"}}
 
@@ -171,6 +171,8 @@ C("MIS-04", "missing_data", "When does KO report earnings?", tool_calls=[{"name"
 C("MIS-05", "missing_data", "What has SPY filed with the SEC?", tool_calls=[{"name": "get_filings", "args": {"ticker": "SPY"},
   "expect": {"is_error": True, "meta": {"unavailable": True}}}], answer_checks=["says_unavailable"])
 C("MIS-06", "missing_data", "What were SPY's quarterly revenues?", tool_calls=[{"name": "get_financials", "args": {"ticker": "SPY"},
+  "expect": {"is_error": True, "meta": {"unavailable": True}}}], answer_checks=["says_unavailable"])
+C("MIS-12", "missing_data", "What was SPY's free cash flow last quarter?", tool_calls=[{"name": "get_cash_flow", "args": {"ticker": "SPY"},
   "expect": {"is_error": True, "meta": {"unavailable": True}}}], answer_checks=["says_unavailable"])
 C("MIS-07", "missing_data", "How has FAIL done over the year?", tool_calls=[{"name": "get_price_history", "args": {"ticker": "FAIL", "period": "1y"},
   "expect": {"is_error": True}}], answer_checks=["says_unavailable"])
@@ -331,6 +333,9 @@ C("FUN-11", "fundamentals", "Is NVDA expensive against its own valuation history
   expect={"context_has": ["valuation", "long_term"], "research_ticker": "NVDA"}, answer_checks=["no_own_valuation", "both_sides"])
 C("FUN-12", "fundamentals", "Which recent SEC filings has AAPL made, with links?",
   tool_calls=[{"name": "get_filings", "args": {"ticker": "AAPL", "limit": 3}, "expect": {"is_error": False}}], answer_checks=["links_from:filings"])
+C("FUN-13", "fundamentals", "What were AAPL's Q4 operating cash flow, capex and free cash flow?", context=page("financials", "AAPL"),
+  expect={"tools_offered": ["get_cash_flow"]},
+  tool_calls=[{"name": "get_cash_flow", "args": {"ticker": "AAPL"}, "expect": {"is_error": False, "status": "ok"}}])
 
 # ------------------------------------------------------------------------------------------ technical analysis (+7)
 C("IND-07", "indicator", "Where is NVDA's nearest support on a swing timeframe?",

@@ -46,12 +46,14 @@ def test_new_tools_are_typed_and_validated_before_anything_runs():
     assert v("get_price_history", {"ticker": "MSFT", "period": "5y"})["interval"] == "weekly"
     assert v("get_filings", {"ticker": "aapl"}) == {"ticker": "AAPL", "limit": 10}
     assert v("get_financials", {"ticker": "^GSPC"}) == {"ticker": "^GSPC"}, "index symbols pass"
+    assert v("get_cash_flow", {"ticker": "aapl"}) == {"ticker": "AAPL"}
     bad = [("lookup_company", {"query": ""}), ("lookup_company", {"query": "x" * 61}),
            ("get_price_history", {"ticker": "MSFT", "period": "forever"}),
            ("get_price_history", {"ticker": "MSFT", "period": "1y", "interval": "hourly"}),
            ("get_filings", {"ticker": "AAPL", "limit": 0}), ("get_filings", {"ticker": "AAPL", "limit": True}),
            ("get_filings", {"ticker": "AAPL", "limit": 50}), ("get_financials", {"ticker": "DROP TABLE"}),
-           ("get_financials", {"ticker": "AAPL", "user_id": "someone"})]
+           ("get_financials", {"ticker": "AAPL", "user_id": "someone"}),
+           ("get_cash_flow", {"ticker": "AAPL", "user_id": "someone"})]
     for name, args in bad:
         with pytest.raises(milo_tools.InvalidInput):
             v(name, args)
@@ -269,7 +271,7 @@ def test_milo_is_told_to_fetch_current_facts_and_to_read_the_flags():
                    "Every tool result has `meta`", "When `delayed` is true say the price is delayed",
                    "when `unavailable` is true say the figure could not be retrieved this time"):
         assert phrase in sp, phrase
-    for name in ("lookup_company", "get_price_history", "get_filings", "get_financials"):
+    for name in ("lookup_company", "get_price_history", "get_filings", "get_financials", "get_cash_flow"):
         assert name in sp
 
 
@@ -277,7 +279,7 @@ def test_the_chat_route_offers_the_new_tools(monkeypatch):
     import app.main as m
     monkeypatch.setattr(m.auth_deps, "current_user", lambda request: None)
     tb = m._milo_toolbox(types.SimpleNamespace(), {"focus": {"scope": "auto"}})
-    assert {"lookup_company", "get_price_history", "get_filings", "get_financials"} <= set(tb.runners)
+    assert {"lookup_company", "get_price_history", "get_filings", "get_financials", "get_cash_flow"} <= set(tb.runners)
     # every tool, the portfolio aside: it is offered from the Brokerage page or for the reader's own holdings
     assert set(tb.runners) == set(milo_tools.TOOL_NAMES) - {"get_my_portfolio"}
     tb = m._milo_toolbox(types.SimpleNamespace(), {"focus": {"scope": "auto", "view": "brokerage"}})

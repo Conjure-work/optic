@@ -120,6 +120,7 @@ def world(user: Optional[str] = None, extra: Optional[Dict[str, Any]] = None):
         mock.patch.object(m.account_mod, "_list_payload", lambda w: {"name": w["name"], "symbols": w["_symbols"]}),
         mock.patch.object(m.PROVIDER, "quote", extra.get("quote", F.quote)),
         mock.patch.object(m.YF_PROVIDER, "quote", extra.get("quote", F.quote)),
+        mock.patch.object(m.YF_PROVIDER, "financials", extra.get("financials", F.financials_raw)),
         mock.patch.object(m.YF_PROVIDER, "history", lambda t, period="5y", interval="1d": F.history_frame(t, period, interval)),
         mock.patch.object(m.news_mod, "analyse", lambda p, t, n=12: F.news(t, n)),
         mock.patch.object(m, "_swing_snapshot", F.swing_snapshot),
