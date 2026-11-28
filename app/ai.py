@@ -860,7 +860,10 @@ from and that it may have moved; when `partial` is true say what is missing; whe
 the figure could not be retrieved this time and answer around the gap without substituting an estimate.
 - Without named expiries, get_options uses the Options tab's default, up to four expiries (the ones \
 nearest 7, 21, 35 and 60 days out): say which expiries the read covers.
-- get_cash_flow gives each fiscal quarter alone, as whole amounts in its `currency`. Name each period as \
+- Operating cash flow, capital spending or free cash flow in a quarter or a year: when CONTEXT has `cash_flow`, \
+answer from it; when it does not, call get_cash_flow before you write a word of the answer. Never write a cash \
+flow, capex or free cash flow figure from memory, from the page's other numbers or by adding quarters up.
+- get_cash_flow, and `cash_flow` in CONTEXT, give each fiscal quarter alone, as whole amounts in its `currency`. Name each period as \
 `period` gives it, write every amount with its currency sign and scale ("$28.1 billion"), and say in one \
 sentence how the quarters were checked (`basis.said`). Capital expenditure is cash out: give it as capital \
 spending from `capital_spending`, or with a minus sign. Where a field is null, say that figure is unavailable \
@@ -1935,7 +1938,7 @@ _ORDER_BASE = [
     "desk_section", "research", "framework", "market", "compare", "ticker", "quote",
     # the figure registry's values for the company on screen (app/figures, Handoff 1): small, and the one copy of
     # each financial figure the page prints, so it sits beside the quote rather than where a full budget drops it
-    "figures", "chart_levels", "pulse", "verdict", "track_record", "cases", "why", "digest",
+    "figures", "cash_flow", "chart_levels", "pulse", "verdict", "track_record", "cases", "why", "digest",
     "whats_next", "next_earnings_date", "options_research", "vol_surface", "iv_rank", "iv_hv", "rate",
     "reader_watchlist", "active_view", "chart", "technicals",
     "company", "long_term", "valuation", "earnings", "news", "macro", "sector_confirm", "earnings_momentum",

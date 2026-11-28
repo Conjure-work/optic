@@ -7816,6 +7816,37 @@ async def _with_research(history: List[Dict[str, Any]], context: Optional[Dict[s
     return ctx
 
 
+# Quarterly cash flow in CONTEXT (audit 2026-11-27, F04 follow-up). On the live evaluation copy the real model made no
+# get_cash_flow call for "What were AAPL's Q4 operating cash flow, capex and free cash flow?" on Financials: it
+# answered in one round from the context, where the page's statements held the quarterly lines only as raw arrays,
+# with capital expenditure negative and no capital spending figure, so 12 statements were removed. The server now
+# attaches the same block the tool returns whenever the reader is on Financials or the question is about cash flow.
+CASH_FLOW_WORDS = re.compile(r"\b(cash\s*flows?|capex|capital\s+(?:expenditures?|spending)|free\s+cash|fcf|"
+                             r"operating\s+cash)\b", re.I)
+CASH_FLOW_SECONDS = 8.0
+
+
+async def _with_cash_flow(history: List[Dict[str, Any]], context: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    last = next((t for t in reversed(history or []) if t.get("role") != "assistant"), None)
+    ctx = context or {}
+    focus = ctx.get("focus") if isinstance(ctx.get("focus"), dict) else {}
+    view = focus.get("view") or ctx.get("view") or ctx.get("active_view")
+    asked = bool(CASH_FLOW_WORDS.search(str((last or {}).get("content") or "")))
+    ticker = _research_ticker(ctx)
+    if not ticker or not (asked or view == "financials"):
+        return context
+    try:
+        block = await asyncio.wait_for(
+            _run(milo_data.cash_flow, YF_PROVIDER.financials, PROVIDER.quote, ticker), timeout=CASH_FLOW_SECONDS)
+    except Exception as exc:                                    # noqa: BLE001 - the answer goes out without it
+        logging.getLogger("uvicorn.error").warning("milo cash flow block skipped: %s", exc)
+        return context
+    if block.get("status") != "ok":
+        return context
+    return dict(ctx, cash_flow=dict(block, note="Loaded by the server for this question from the company's cash flow "
+                                                 "statements; the same block get_cash_flow returns."))
+
+
 # The research framework (app/research/): the assessment for the question's
 # mode, computed server-side like the research pack. Bounded: a slow build is
 # skipped and the answer goes out without it rather than waiting.
@@ -9001,7 +9032,7 @@ _LINKED_KEYS = ("brokerage_portfolio", "brokerage_linked")
 # ("Loaded for your question", "Sources Milo read", the screener's list, the daily brief), and the panel lists them
 # as such, so a browser copy let a page present forged figures as Optic's. No v2 or Classic page sends one
 # (checked 2026-11-02); `framework` and `track_record` are page data and stay.
-_SERVER_KEYS = _LINKED_KEYS + ("auto_loaded", "auto_load_skipped", "question_named", "research", "chart_levels",
+_SERVER_KEYS = _LINKED_KEYS + ("auto_loaded", "auto_load_skipped", "question_named", "research", "cash_flow", "chart_levels",
                                "screen_candidates", "market", "portfolio_summary")
 
 
@@ -9217,12 +9248,15 @@ async def _chat_context(request: Request, history: List[Dict[str, Any]], context
         # sources and neither needs the other's answer, so the slower of the
         # two (not their sum) is what the reader waits for. The linked
         # portfolio too: its sector and earnings lookups run per holding.
-        researched, framed, levelled, linked = await asyncio.gather(
+        researched, framed, levelled, linked, cashed = await asyncio.gather(
             _with_research(history, context, horizon),
             _with_framework(history, context, horizon, attachments),
             _with_take_levels(history, context, horizon),
-            _with_linked_portfolio(request, history, context))
+            _with_linked_portfolio(request, history, context),
+            _with_cash_flow(history, context))
         context = researched
+        if isinstance(cashed, dict) and "cash_flow" in cashed:
+            context = dict(context or {}, cash_flow=cashed["cash_flow"])
         if isinstance(framed, dict) and "framework" in framed:
             context = dict(context or {}, framework=framed["framework"])
         if isinstance(levelled, dict) and "chart_levels" in levelled:
