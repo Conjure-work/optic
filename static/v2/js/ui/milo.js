@@ -188,12 +188,15 @@ function saveHistory(list) {
   }
 }
 export const titleOf = (messages) => { const first = (messages || []).find((m) => m.role === 'user'); return (first && String(first.content || '').replace(/\s+/g, ' ').trim().slice(0, 70)) || 'Empty conversation'; };
+// What is stored of the note under an answer. Two or three notes can sit together (advice, grounding, a link, the
+// labelled read); the longest set measured is about 600 characters, so the cut leaves room and never lands mid-sentence.
+const AMENDED_MAX = 900;
 function persist() {
   if (!S.conv.messages.length) return;
   // the advice-policy notes go with their answer, so a reopened conversation still says what was declined or removed
   const from = Math.max(0, S.conv.messages.length - MAX_MESSAGES);
   const messages = S.conv.messages.slice(-MAX_MESSAGES).map((m, k) => { const inf = meta.get(from + k) || {}, o = { role: m.role, content: String(m.content || '').slice(0, MAX_CHARS) };
-    if (inf.policyLine) o.policy = String(inf.policyLine).slice(0, 400); if (inf.amended) o.amended = String(inf.amended).slice(0, 400); if (inf.level) o.level = String(inf.level).slice(0, 20);
+    if (inf.policyLine) o.policy = String(inf.policyLine).slice(0, 400); if (inf.amended) o.amended = String(inf.amended).slice(0, AMENDED_MAX); if (inf.amendKind) o.kind = String(inf.amendKind).slice(0, 20); if (inf.level) o.level = String(inf.level).slice(0, 20);
     if (inf.stance && inf.stance.label) o.stance = { id: String(inf.stance.id || '').slice(0, 20), label: String(inf.stance.label).slice(0, 60) }; if (inf.refused) o.refused = true;
     // what the answer was for (ticker, timeframe, indicators, tab), so a reopened answer still says it (Handoff 6)
     if (inf.used) o.context = keepUsed({ ...inf.used, at: ((inf.context || {}).focus || {}).captured_at }); return o; });
@@ -961,7 +964,7 @@ export function conversationSpec(conv, facts, savedFrom = '') {
   if (!syms.length && conv.lastTicker) syms.push(conv.lastTicker);
   const messages = msgs.map((m, i) => {
     const inf = facts.get(i) || {}, o = { role: m.role, content: String(m.content || '') };
-    if (inf.policyLine) o.policy = inf.policyLine; if (inf.amended) o.amended = inf.amended; if (inf.level) o.level = inf.level;
+    if (inf.policyLine) o.policy = inf.policyLine; if (inf.amended) o.amended = inf.amended; if (inf.amendKind) o.kind = inf.amendKind; if (inf.level) o.level = inf.level;
     if (m.role === 'assistant') {
       o.sources = { citations: inf.citations || [], read: inf.read || [], retrieved: inf.retrieved || [], loaded: inf.loaded || [] };
       const f = (inf.context || {}).focus; if (f) o.focus = { view_label: f.view_label || '', ticker: f.ticker || inf.symbol || '', captured_at: f.captured_at || '' };
@@ -987,7 +990,7 @@ export function restoreSaved(item, newConvId = newId) {
   msgs.forEach((m, i) => {
     if (m.role !== 'assistant') return;
     const src = m.sources || {}, f = m.focus || {};
-    facts.set(i, { question: (msgs[i - 1] || {}).content || '', symbol: f.ticker || ticker, policyLine: m.policy || '', amended: m.amended || '', level: m.level || '',
+    facts.set(i, { question: (msgs[i - 1] || {}).content || '', symbol: f.ticker || ticker, policyLine: m.policy || '', amended: m.amended || '', amendKind: m.kind || '', level: m.level || '',
       citations: src.citations || [], read: src.read || [], retrieved: src.retrieved || [], loaded: src.loaded || [],
       context: { focus: { scope: 'auto', view_label: f.view_label || '', ticker: f.ticker || ticker, captured_at: f.captured_at || '' } } });
   });
@@ -1339,7 +1342,7 @@ export async function send(text, { deep = false } = {}) {
           // round three: the stance the answer is written in, and each step as it happens (a source read, a lookup)
           else if (ev === 'stance') { if (p && p.label) { meta.get(ai).stance = { id: String(p.id || ''), label: String(p.label) }; paintLive(); } }
           else if (ev === 'step') { if (p && p.text) { S.live.steps = [...(S.live.steps || []), { kind: String(p.kind || ''), text: String(p.text), source: p.source ? String(p.source) : '', ok: p.ok }]; meta.get(ai).steps = S.live.steps; paintLive(); } }
-          else if (ev === 'amend') { if (typeof p.text === 'string') { S.live.text = p.text; S.live.amended = true; S.conv.messages[ai].content = p.text; meta.get(ai).amended = String(p.note || 'Milo removed a sentence that read as personal investment advice.'); paintLive(); } }
+          else if (ev === 'amend') { if (typeof p.text === 'string') { S.live.text = p.text; S.live.amended = true; S.conv.messages[ai].content = p.text; meta.get(ai).amended = String(p.note || 'Milo removed a sentence that read as personal investment advice.'); meta.get(ai).amendKind = String(p.kind || ''); paintLive(); } }
           else if (ev === 'error') { finished = true; failed = { text: p.message || 'Milo could not answer.' }; }
           else if (ev === 'done') { finished = true; Object.assign(meta.get(ai), { citations: p.sources || p.citations || [], read: Array.isArray(p.read) ? p.read : [], retrieved: Array.isArray(p.retrieved) ? p.retrieved : [], loaded: Array.isArray(p.loaded) ? p.loaded : [], named: p.named && typeof p.named === 'object' ? p.named : null, cited: Array.isArray(p.cited) ? p.cited : [] }); if (p.stance && p.stance.label) meta.get(ai).stance = { id: String(p.stance.id || ''), label: String(p.stance.label) }; }
         }
@@ -1805,7 +1808,7 @@ function wire(root) {
       const c = loadHistory().find((x) => x.id === b.dataset.v2MiloOpen); if (!c) return;
       S.conv = { id: c.id, messages: (c.messages || []).map((m) => ({ role: m.role, content: m.content })), lastTicker: c.ticker || null, lastChart: null }; S.report = null;
       meta.clear(); SC.rest = 'idle'; clearTimeout(settleT); S.items = S.conv.messages.map((m, i) => ({ kind: 'msg', i }));
-      S.conv.messages.forEach((m, i) => { if (m.role === 'assistant') { const saved = (c.messages || [])[i] || {}; meta.set(i, { question: (S.conv.messages[i - 1] || {}).content || '', symbol: c.ticker || null, policyLine: saved.policy || '', amended: saved.amended || '', used: keepUsed(saved.context), level: saved.level || '' }); Object.assign(meta.get(i), { stance: saved.stance || null, refused: !!saved.refused }); } });
+      S.conv.messages.forEach((m, i) => { if (m.role === 'assistant') { const saved = (c.messages || [])[i] || {}; meta.set(i, { question: (S.conv.messages[i - 1] || {}).content || '', symbol: c.ticker || null, policyLine: saved.policy || '', amended: saved.amended || '', amendKind: saved.kind || '', used: keepUsed(saved.context), level: saved.level || '' }); Object.assign(meta.get(i), { stance: saved.stance || null, refused: !!saved.refused }); } });
       S.showHistory = false; S.toEnd = true; S.follow = true; S.view = null; paintChrome(); paintLog(); const ta = $('#milo-q', root); if (ta) ta.focus(); return;
     }
     if ((b = t('[data-v2-milo-del]'))) { const id = b.dataset.v2MiloDel; if (S.busy && id === S.conv.id) { toast(WAIT_HISTORY); return; } saveHistory(loadHistory().filter((c) => c.id !== id)); if (S.conv.id === id && !S.busy) { S.conv = blankConv(); S.items = []; meta.clear(); } paintChrome(); paintLog(false); const hd = $('#milo-hist-h', root); if (hd) { hd.setAttribute('tabindex', '-1'); hd.focus({ preventScroll: true }); } return; }

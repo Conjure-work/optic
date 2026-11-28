@@ -80,6 +80,7 @@ export function mdLite(text) {
   out = out.replace(/(^|\n)((?:[ \t]*\|[^\n]*\|[ \t]*(?:\n|$)){2,})/g, (m, lead, block) => {
     const rows = block.trim().split('\n').map((l) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim()));
     if (rows.length < 2 || !rows[1].every((c) => /^:?-{2,}:?$/.test(c))) return m;
+    if (rows.length < 3) return lead;   // a header and a separator with no rows is not a table: draw nothing (the server's repair is the fix, this is the backstop)
     const fig = (c) => /^[−+\-]?[$€£]?\d[\d,.]*(?:%|x|bn|m|k|B|M|K)?$/.test(c);
     return `${lead}\n\n<div class="milo-tbl"><table><thead><tr>${rows[0].map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.slice(2).map((r) => `<tr>${r.map((c) => `<td${fig(c) ? ' class="n"' : ''}>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>\n\n`;
   });

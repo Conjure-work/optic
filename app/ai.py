@@ -64,6 +64,11 @@ MODEL = "claude-opus-5-5"
 # judged better on 9, worse on 2 and even on 3 against Optic's own figures, at the same list price and about
 # 29% less wait (docs/milo/reasoning-eval/LIVE-MODEL-TRIAL.md). Sonnet 5 is a legacy model.
 PULSE_MODEL = "claude-sonnet-5-5"
+# The one rewrite of an answer whose unsupported figures were taken out (audit F04, 2026-11-27): bounded in output
+# and in time, so a slow or failing model costs the reader a few seconds and the server's own limit answer
+MILO_REWRITE_MAX_TOKENS = 3000
+MILO_REWRITE_TIMEOUT = 45.0
+MILO_REWRITE_MAX_LISTED = 12      # statements named back to the model, so the instruction stays short
 
 # Server-side refusal fallback: on a policy decline the API re-runs the request
 # on Anthropic's recommended fallback model inside the same call, so a false
@@ -242,6 +247,7 @@ reply skimmable first and readable second:
 * Put levels in a small table when there are more than two. One column for the price, one for why it
   matters.
 * Bold the figures the argument rests on, so they are findable at a glance.
+* Every figure carries its currency and unit, in the cell or in the column heading, and its period.
 * Give the main thing that argues against the read its own short paragraph, under a heading only when the
   answer has others.
 * End on what would change the read: a level on a closing basis, an event or a figure in the next report. That
@@ -4201,20 +4207,43 @@ async def stream_chat(
         if tail:
             answer_parts.append(tail)
             yield _sse("delta", {"text": tail})
-        amend = ai_policy.amend_for_stream("".join(answer_parts), withheld=gate.findings)
+        draft = "".join(answer_parts)
+        amend = ai_policy.amend_for_stream(draft, withheld=gate.findings)
         # Grounding (round three): every money figure has the page or a lookup behind it, and each lookup that
-        # produced a figure is named under the answer (`cited`)
-        grounded = ai_policy.ground(amend["text"] if amend else "".join(answer_parts),
-                                    json.dumps(first_messages, default=str), tool_texts)
-        if grounded["removed"]:
-            log.warning("ai policy: pulse: removed %s sentence(s) with unsupported figures", grounded["removed"])
+        # produced a figure is named under the answer (`cited`). Audit F04 (2026-11-27): what is left must still
+        # read whole. A statement taken out can leave a table with no rows or a lead-in with nothing after it, so
+        # the draft is repaired and checked, written again once from the data when anything was removed, and
+        # replaced by the server's own limit answer when that does not hold either.
+        context_text = json.dumps(first_messages, default=str)
+        base = amend["text"] if amend else draft
+        grounded = ai_policy.ground(base, context_text, tool_texts)
+        repaired = ai_policy.repair(grounded["text"]) if grounded["removed"] else base
+        problems = ai_policy.integrity(repaired)
+        if not grounded["removed"] and not base.strip():
+            problems = []      # no text came back at all (a refusal handled above, a stopped answer): nothing to write again
+        if grounded["removed"] or problems:
+            log.warning("ai policy: pulse: removed %s statement(s) with unsupported figures, integrity: %s",
+                        grounded["removed"], ", ".join(problems) or "ok")
+            yield _sse("status", {"state": "checking the figures"})
+            rewritten = await _rewrite_answer(client, kwargs, repaired, grounded["removed_items"], usage_sum)
+            kind, final_text = "limited", ai_policy.limit_answer(grounded["supported"])
+            if rewritten:
+                again = ai_policy.amend_for_stream(rewritten, withheld=[])
+                second = ai_policy.ground(again["text"] if again else rewritten, context_text, tool_texts)
+                if not second["removed"]:
+                    tidy = ai_policy.repair(second["text"])
+                    if not ai_policy.integrity(tidy):
+                        kind, final_text = "rewritten", tidy
+            grounded = dict(ai_policy.ground(final_text, context_text, tool_texts), removed=grounded["removed"])
+            rules = {"unsupported_figure"} if grounded["removed"] else {"answer_integrity"}
+            note = ai_policy.ground_note(grounded["removed"], kind)
             if amend:
-                amend = dict(amend, text=grounded["text"], removed=amend["removed"] + grounded["removed"],
-                             rules=sorted(set(amend["rules"]) | {"unsupported_figure"}),
-                             note="{} {}".format(amend["note"], grounded["note"]))
+                amend = dict(amend, text=final_text, removed=amend["removed"] + grounded["removed"],
+                             rules=sorted(set(amend["rules"]) | rules), note="{} {}".format(amend["note"], note),
+                             kind=kind)
             else:
-                amend = {"text": grounded["text"], "removed": grounded["removed"], "rules": ["unsupported_figure"],
-                         "note": grounded["note"], "policy": ai_policy.POLICY_VERSION}
+                amend = {"text": final_text, "removed": grounded["removed"], "rules": sorted(rules),
+                         "note": note, "policy": ai_policy.POLICY_VERSION, "kind": kind}
         amend = _round_two_checks(amend, "".join(answer_parts), gate, meta)
         if amend:
             log.warning("ai policy: pulse: removed %s sentence(s) (%s)", amend["removed"], ", ".join(amend["rules"]))
@@ -4251,6 +4280,56 @@ async def stream_chat(
         ai_store.record("pulse", PULSE_MODEL, None, stop_reason="error",
                         note="{}: {}".format(type(exc).__name__, exc))
         yield _sse("error", {"message": _human_error(exc)})
+
+
+_REWRITE_INSTRUCTION = (
+    "The statements below were taken out of your answer because the figures in them are not in the data above "
+    "(the page and the lookups). Rewrite the answer so it reads whole, using only figures that are present in that "
+    "data. Where the question asks for something the data does not carry, say so in one plain sentence naming what "
+    "is missing. Every figure keeps its unit and its period. Use a table only if every row has its figures. Keep the "
+    "follow-up lines at the end. Write the answer only, with no mention of this instruction.\n\n"
+    "Statements removed:\n{listed}")
+
+
+async def _rewrite_answer(client: Any, kwargs: Dict[str, Any], draft: str, removed_items: List[Dict[str, str]],
+                          usage_sum: Dict[str, int]) -> Optional[str]:
+    """One more call, no tools, bounded in tokens and time: the checked draft is put back as Milo's own turn, with
+    what was removed and why, and Milo writes the answer again from the data it already holds. None when the call
+    fails, times out or comes back empty; the caller then uses the server's own limit answer. Never a loop."""
+    listed = "\n".join("- " + str(i.get("text") or "")[:300] for i in removed_items[:MILO_REWRITE_MAX_LISTED])
+    if len(removed_items) > MILO_REWRITE_MAX_LISTED:
+        listed += "\n- and {} more".format(len(removed_items) - MILO_REWRITE_MAX_LISTED)
+    kw = dict(kwargs)
+    kw.pop("thinking", None)
+    kw["messages"] = list(kwargs["messages"]) + [
+        {"role": "assistant", "content": draft.strip() or "(nothing was left of the answer)"},
+        {"role": "user", "content": _REWRITE_INSTRUCTION.format(listed=listed or "- (none listed)")}]
+    kw["tool_choice"] = {"type": "none"}
+    kw["max_tokens"] = MILO_REWRITE_MAX_TOKENS
+    kw["timeout"] = MILO_REWRITE_TIMEOUT
+
+    parts: List[str] = []
+    try:
+        async with asyncio.timeout(MILO_REWRITE_TIMEOUT):
+            async with client.beta.messages.stream(**kw) as stream:
+                async for event in stream:
+                    if getattr(event, "type", "") == "content_block_delta":
+                        delta = getattr(event, "delta", None)
+                        if getattr(delta, "type", "") == "text_delta":
+                            parts.append(delta.text)
+                final = await stream.get_final_message()
+        _streamed("pulse_rewrite", final, PULSE_MODEL)
+        usage = getattr(final, "usage", None)
+        for key in usage_sum:
+            usage_sum[key] += getattr(usage, key, None) or 0
+    except Exception as exc:        # the stub down, a timeout, an API error: the limit answer, never an error event
+        log.warning("milo rewrite failed: %s: %s", type(exc).__name__, exc)
+        ai_store.record("pulse_rewrite", PULSE_MODEL, None, stop_reason="error",
+                        note="{}: {}".format(type(exc).__name__, exc))
+        return None
+    text = "".join(parts)
+    return text if text.strip() else None
+
 
 
 # -------------------------------------------------------------- deep research

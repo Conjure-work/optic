@@ -57,7 +57,7 @@ def test_refusals_reach_the_reader_and_nothing_is_kept():
     # (Phase 02, 2026-10-29): no file data, no file names
     persist = MILO[MILO.index("function persist()"):MILO.index("/* ---------------- state")]
     assert "o = { role: m.role, content: String(m.content || '').slice(0, MAX_CHARS) };" in persist
-    assert "o.policy = String(inf.policyLine).slice(0, 400)" in persist and "o.amended = String(inf.amended).slice(0, 400)" in persist
+    assert "o.policy = String(inf.policyLine).slice(0, 400)" in persist and "o.amended = String(inf.amended).slice(0, AMENDED_MAX)" in persist
     assert not any(w in persist for w in ("files", "thumb", ".data", "name:")), "nothing of an attachment is kept"
     assert "Sent with your next question to Milo's model provider. Optic does not keep them." in MILO
     assert "if (going.length && !S.files.length) S.files = going;" in MILO, "a send that failed gives the files back"
