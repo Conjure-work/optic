@@ -3973,55 +3973,6 @@ def _round_two_checks(amend: Optional[Dict[str, Any]], streamed: str, gate: Any,
             "policy": ai_policy.POLICY_VERSION}
 
 
-_REWRITE_INSTRUCTION = (
-    "The statements below were taken out of your answer because the figures in them are not in the data above "
-    "(the page and the lookups). Rewrite the answer so it reads whole, using only figures that are present in that "
-    "data. Where the question asks for something the data does not carry, say so in one plain sentence naming what "
-    "is missing. Every figure keeps its unit and its period. Use a table only if every row has its figures. Keep the "
-    "follow-up lines at the end. Write the answer only, with no mention of this instruction.\n\n"
-    "Statements removed:\n{listed}")
-
-
-async def _rewrite_answer(client: Any, kwargs: Dict[str, Any], draft: str, removed_items: List[Dict[str, str]],
-                          usage_sum: Dict[str, int]) -> Optional[str]:
-    """One more call, no tools, bounded in tokens and time: the checked draft is put back as Milo's own turn, with
-    what was removed and why, and Milo writes the answer again from the data it already holds. None when the call
-    fails, times out or comes back empty; the caller then uses the server's own limit answer. Never a loop."""
-    listed = "\n".join("- " + str(i.get("text") or "")[:300] for i in removed_items[:MILO_REWRITE_MAX_LISTED])
-    if len(removed_items) > MILO_REWRITE_MAX_LISTED:
-        listed += "\n- and {} more".format(len(removed_items) - MILO_REWRITE_MAX_LISTED)
-    kw = dict(kwargs)
-    kw.pop("thinking", None)
-    kw["messages"] = list(kwargs["messages"]) + [
-        {"role": "assistant", "content": draft.strip() or "(nothing was left of the answer)"},
-        {"role": "user", "content": _REWRITE_INSTRUCTION.format(listed=listed or "- (none listed)")}]
-    kw["tool_choice"] = {"type": "none"}
-    kw["max_tokens"] = MILO_REWRITE_MAX_TOKENS
-    kw["timeout"] = MILO_REWRITE_TIMEOUT
-
-    parts: List[str] = []
-    try:
-        async with asyncio.timeout(MILO_REWRITE_TIMEOUT):
-            async with client.beta.messages.stream(**kw) as stream:
-                async for event in stream:
-                    if getattr(event, "type", "") == "content_block_delta":
-                        delta = getattr(event, "delta", None)
-                        if getattr(delta, "type", "") == "text_delta":
-                            parts.append(delta.text)
-                final = await stream.get_final_message()
-        _streamed("pulse_rewrite", final, PULSE_MODEL)
-        usage = getattr(final, "usage", None)
-        for key in usage_sum:
-            usage_sum[key] += getattr(usage, key, None) or 0
-    except Exception as exc:        # the stub down, a timeout, an API error: the limit answer, never an error event
-        log.warning("milo rewrite failed: %s: %s", type(exc).__name__, exc)
-        ai_store.record("pulse_rewrite", PULSE_MODEL, None, stop_reason="error",
-                        note="{}: {}".format(type(exc).__name__, exc))
-        return None
-    text = "".join(parts)
-    return text if text.strip() else None
-
-
 async def stream_chat(
     history: List[Dict[str, str]],
     context: Optional[Dict[str, Any]] = None,
@@ -4329,6 +4280,56 @@ async def stream_chat(
         ai_store.record("pulse", PULSE_MODEL, None, stop_reason="error",
                         note="{}: {}".format(type(exc).__name__, exc))
         yield _sse("error", {"message": _human_error(exc)})
+
+
+_REWRITE_INSTRUCTION = (
+    "The statements below were taken out of your answer because the figures in them are not in the data above "
+    "(the page and the lookups). Rewrite the answer so it reads whole, using only figures that are present in that "
+    "data. Where the question asks for something the data does not carry, say so in one plain sentence naming what "
+    "is missing. Every figure keeps its unit and its period. Use a table only if every row has its figures. Keep the "
+    "follow-up lines at the end. Write the answer only, with no mention of this instruction.\n\n"
+    "Statements removed:\n{listed}")
+
+
+async def _rewrite_answer(client: Any, kwargs: Dict[str, Any], draft: str, removed_items: List[Dict[str, str]],
+                          usage_sum: Dict[str, int]) -> Optional[str]:
+    """One more call, no tools, bounded in tokens and time: the checked draft is put back as Milo's own turn, with
+    what was removed and why, and Milo writes the answer again from the data it already holds. None when the call
+    fails, times out or comes back empty; the caller then uses the server's own limit answer. Never a loop."""
+    listed = "\n".join("- " + str(i.get("text") or "")[:300] for i in removed_items[:MILO_REWRITE_MAX_LISTED])
+    if len(removed_items) > MILO_REWRITE_MAX_LISTED:
+        listed += "\n- and {} more".format(len(removed_items) - MILO_REWRITE_MAX_LISTED)
+    kw = dict(kwargs)
+    kw.pop("thinking", None)
+    kw["messages"] = list(kwargs["messages"]) + [
+        {"role": "assistant", "content": draft.strip() or "(nothing was left of the answer)"},
+        {"role": "user", "content": _REWRITE_INSTRUCTION.format(listed=listed or "- (none listed)")}]
+    kw["tool_choice"] = {"type": "none"}
+    kw["max_tokens"] = MILO_REWRITE_MAX_TOKENS
+    kw["timeout"] = MILO_REWRITE_TIMEOUT
+
+    parts: List[str] = []
+    try:
+        async with asyncio.timeout(MILO_REWRITE_TIMEOUT):
+            async with client.beta.messages.stream(**kw) as stream:
+                async for event in stream:
+                    if getattr(event, "type", "") == "content_block_delta":
+                        delta = getattr(event, "delta", None)
+                        if getattr(delta, "type", "") == "text_delta":
+                            parts.append(delta.text)
+                final = await stream.get_final_message()
+        _streamed("pulse_rewrite", final, PULSE_MODEL)
+        usage = getattr(final, "usage", None)
+        for key in usage_sum:
+            usage_sum[key] += getattr(usage, key, None) or 0
+    except Exception as exc:        # the stub down, a timeout, an API error: the limit answer, never an error event
+        log.warning("milo rewrite failed: %s: %s", type(exc).__name__, exc)
+        ai_store.record("pulse_rewrite", PULSE_MODEL, None, stop_reason="error",
+                        note="{}: {}".format(type(exc).__name__, exc))
+        return None
+    text = "".join(parts)
+    return text if text.strip() else None
+
 
 
 # -------------------------------------------------------------- deep research
