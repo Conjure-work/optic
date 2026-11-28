@@ -297,7 +297,7 @@ def test_the_backfill_and_the_webhook_write_identical_rows(monkeypatch, stripe):
     # the webhook path
     send(event(with_cancel_at(sub(a["id"], [PRO]), end), created=t))
     # the backfill path: link, then retrieve (a different subscription id so the two rows can coexist)
-    send(event(sub(b["id"], [PRO], sid="sub_l2"), created=t))
+    send(event(sub(b["id"], [PRO], sid="sub_l2"), created=t - 100))
     db.execute("UPDATE subscriptions SET cancel_at = NULL, cancel_synced_at = NULL WHERE user_id = ?", (b["id"],))
     stripe.subscriptions["sub_l2"] = with_cancel_at(sub(b["id"], [PRO], sid="sub_l2"), end)
     assert billing.backfill_cancellation(b["id"]) is True
@@ -308,7 +308,7 @@ def test_the_backfill_and_the_webhook_write_identical_rows(monkeypatch, stripe):
             continue
         assert ra[k] == rb[k], k
     assert ra["cancel_at"] == iso(end) and rb["cancel_synced_at"]
-    assert rb["last_event_at"] == t                      # the backfill does not move the event clock
+    assert rb["last_event_at"] == t - 100                      # the backfill does not move the event clock
 
 
 def test_a_resumption_after_a_backfilled_cancellation_still_clears_it(monkeypatch, stripe):
