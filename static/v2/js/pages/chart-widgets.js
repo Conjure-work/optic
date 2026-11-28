@@ -17,6 +17,7 @@
 // short_interest.short_percent_float (the field is percent_of_float). Here each reads what is sent.
 import { html, raw } from '../core/dom.js';
 import * as api from '../core/api.js';
+import { insiderRead } from '../core/insider.js';
 import * as store from '../core/store.js';
 import { holds } from '../core/device.js';
 import { num, signed, money, compact, isNum, clean, capFirst, shortDate, fullDate, ago, dir } from '../core/format.js';
@@ -240,7 +241,7 @@ const BODY = {
   insiders() {
     const p = payload(); if (p.wait) return p.wait;
     const c = p.t.company || {}, own = c.ownership || {}, six = own.insider_6m || {}, si = c.short_interest || {}, tx = (own.recent_transactions || []).slice(0, 6), rows = [];
-    if (own.insider_signal) rows.push(['6-month signal', capFirst(own.insider_signal)]);
+    if (own.insider_signal) rows.push(['6-month signal', insiderRead(own).short]);
     if (isNum(six.net_shares)) rows.push(['Net shares', shares(six.net_shares, true)]);
     if (six.purchase_count) rows.push(['Buys', num(six.purchase_count, 0)]);
     if (six.sale_count) rows.push(['Sells', num(six.sale_count, 0)]);

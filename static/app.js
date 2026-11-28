@@ -18524,7 +18524,7 @@ function renderCompany(co) {
     <div class="panel">
       <h2>${hg('Insider & institutional activity')}</h2>
       ${ow.available ? `
-        <p class="sub">Insiders are net <strong>${esc(ow.insider_signal)}</strong> over the last six months.</p>
+        <p class="sub">${ow.insider_signal === 'unavailable' ? 'Insider transactions are unavailable right now.' : `Insiders are net <strong>${esc(ow.insider_signal)}</strong> over the last six months.`}</p>
         <div class="grid c3" style="margin-bottom:var(--space-3)">
           ${tile('Insider net (6m)', fmtCompact((ow.insider_6m || {}).net_shares) + ' sh', null,
     signClass((ow.insider_6m || {}).net_shares), FIN_DEFS.insider_net)}
@@ -26449,7 +26449,8 @@ function wsWidgetBody(id) {
     const six = own.insider_6m || {};
     const tx = (own.recent_transactions || []).slice(0, 6);
     const rows = [];
-    if (own.insider_signal) rows.push(['6-month signal', cap(own.insider_signal)]);
+    if (own.insider_signal === 'unavailable') rows.push(['Insiders', 'Insider transactions are unavailable right now.']);
+    else if (own.insider_signal) rows.push(['6-month signal', cap(own.insider_signal)]);
     if (six.net_shares !== undefined && six.net_shares !== null) {
       rows.push(['Net shares', fmtCompact(six.net_shares, 1)]);
     }

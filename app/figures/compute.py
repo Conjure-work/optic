@@ -449,7 +449,8 @@ def _from_yahoo(fin: Dict[str, Any], ccy: str) -> Dict[str, Dict[str, Any]]:
     else:
         out["net_margin_ttm"] = _missing("net_margin_ttm", "not_reported", "Fewer than four quarters of revenue "
                                          "and net income are available from the provider.", source=src, **kw)
-    why = "The fallback source, the provider's statements, carries no quarterly cash flow here."
+    why = ("Twelve-month cash flow is not added up from the provider's quarterly statements here; "
+           "the fiscal-year figure is the one given.")
     out["operating_cash_flow_ttm"] = _missing("operating_cash_flow_ttm", "not_reported", why, source=src, **kw)
     out["free_cash_flow_ttm"] = _missing("free_cash_flow_ttm", "not_reported", why, source=src, **kw)
     bs = fin.get("balance_sheet") or {}

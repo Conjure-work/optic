@@ -69,7 +69,9 @@ def test_an_amendment_is_paired_never_merged(monkeypatch):
 
 
 def test_the_pages_say_what_each_record_is():
-    assert "export function insiderLine" in FIN and "on the open market" in FIN and "Insider signal, 6 months" not in FIN
+    assert "export function insiderLine" in FIN and "Insider signal, 6 months" not in FIN
+    # the wording moved into the one reader every surface shares (F01)
+    assert "on the open market" in (V2 / "js/core/insider.js").read_text() and "insiderRead(ow).line" in FIN
     assert "does not carry when it was filed" in FIN and "#/insiders?symbol=${sym}&view=insiders" in FIN
     assert "Showing the newest ${rows.length}" in INS and "shown beside what they may correct, not merged" in INS
     assert "timeZone: 'America/New_York' })} ET" in INS and "Form ${r.form || '4'}${r.amendment ? ', amendment' : ''}" in INS
