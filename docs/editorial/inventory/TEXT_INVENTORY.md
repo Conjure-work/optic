@@ -5,47 +5,52 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 
 | Measure | Count |
 |---|---:|
-| Files read (client scripts, HTML shells, server modules) | 123, 2, 196 |
-| Texts inventoried | 18036 |
-| ... of kind `client` | 12758 |
-| ... of kind `legal` | 125 |
-| ... of kind `prompt` | 18 |
-| ... of kind `server` | 5135 |
-| ... in classic | 5505 |
-| ... in server | 5153 |
-| ... in v2 | 7378 |
+| Files read (client scripts, HTML shells, server modules) | 152, 2, 221 |
+| Texts inventoried | 19965 |
+| ... of kind `client` | 13991 |
+| ... of kind `legal` | 127 |
+| ... of kind `prompt` | 21 |
+| ... of kind `server` | 5826 |
+| ... in classic | 5509 |
+| ... in server | 5847 |
+| ... in v2 | 8609 |
 | Findings: error | 3 |
 | Findings: info | 3 |
-| Findings: warn | 243 |
+| Findings: warn | 270 |
 | Terminology variants | 10 |
-| Texts written out in more than one file (8 words or more) | 462 |
+| Texts written out in more than one file (8 words or more) | 470 |
 
 ## By route
 
 | Route or component | Texts | error | warn | info |
 |---|---:|---:|---:|---:|
 | Server: feeds.py REJECTED_SOURCES | 20 | 3 | 1 | 0 |
-| Classic (/classic): app.js | 5292 | 0 | 47 | 1 |
-| v2 Milo panel (every page) | 382 | 0 | 24 | 0 |
+| Classic (/classic): app.js | 5295 | 0 | 47 | 1 |
+| v2 Milo panel (every page) | 442 | 0 | 25 | 0 |
 | Server: milo_tools.py SPECS | 22 | 0 | 10 | 0 |
-| v2 Markets: Read (#/read) | 170 | 0 | 10 | 0 |
+| v2 Markets: Read (#/read) | 176 | 0 | 10 | 0 |
 | v2 Positions: Tracker (#/tracker) | 262 | 0 | 10 | 0 |
-| v2 Terms and Privacy (#/terms, #/privacy) | 99 | 0 | 9 | 0 |
+| v2 Terms and Privacy (#/terms, #/privacy) | 100 | 0 | 9 | 0 |
+| v2 Workspace | 615 | 0 | 8 | 0 |
 | Server: research/milo.py MODES | 6 | 0 | 6 | 0 |
-| v2 Dossier Overview, Advanced (#/T) | 309 | 0 | 6 | 0 |
-| v2 Workspace | 461 | 0 | 6 | 0 |
+| v2 Dossier Overview, Advanced (#/T) | 307 | 0 | 6 | 0 |
 | Server: research/quality.py VALUATION_RUBRICS | 5 | 0 | 5 | 0 |
-| v2 Insiders (#/T/insiders) | 93 | 0 | 5 | 0 |
-| v2 Earnings (#/T/earnings) | 122 | 0 | 4 | 1 |
-| v2 Reports (#/reports) | 87 | 0 | 4 | 0 |
+| v2 Earnings (#/T/earnings) | 131 | 0 | 5 | 1 |
+| v2 Insiders (#/T/insiders) | 94 | 0 | 5 | 0 |
+| v2 Reports (#/reports) | 142 | 0 | 5 | 0 |
+| Server: library.py list_items | 4 | 0 | 4 | 0 |
+| v2 Settings (#/settings) | 209 | 0 | 4 | 0 |
 | v2 Valuation, fair value (#/T/valuation) | 381 | 0 | 4 | 0 |
+| v2 portfolio | 38 | 0 | 4 | 0 |
 | Server: analytics/structure.py ema_stack | 7 | 0 | 3 | 0 |
 | Server: brokerage/performance.py DEFINITIONS | 17 | 0 | 3 | 0 |
+| v2 calendar | 24 | 0 | 3 | 0 |
 | Classic (/classic): auth.js | 123 | 0 | 2 | 0 |
 | Milo and the AI writers: PERSONAS | 10 | 0 | 2 | 0 |
 | Milo and the AI writers: write_morning_read | 2 | 0 | 2 | 0 |
 | Server: analytics/cases.py build | 42 | 0 | 2 | 0 |
-| Server: analytics/fundamentals.py ROW_ALIASES | 10 | 0 | 2 | 0 |
+| Server: analytics/fundamentals.py ROW_ALIASES | 11 | 0 | 2 | 0 |
+| Server: analytics/fundamentals.py analyse_ownership | 12 | 0 | 2 | 0 |
 | Server: analytics/pattern_stats.py _summarise | 1 | 0 | 2 | 0 |
 | Server: analytics/retirement.py _blended | 2 | 0 | 2 | 0 |
 | Server: analytics/technicals.py realised_vol_windows | 3 | 0 | 2 | 0 |
@@ -57,10 +62,11 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: milo_tools.py compact_options | 6 | 0 | 2 | 0 |
 | Server: priority.py EARNINGS_METHOD | 1 | 0 | 2 | 0 |
 | Server: research/quality.py RUBRICS | 5 | 0 | 2 | 0 |
-| v2 Alerts (#/alerts) | 157 | 0 | 2 | 0 |
+| v2 Alerts (#/alerts) | 168 | 0 | 2 | 0 |
 | v2 Chart studies (#/T/chart) | 35 | 0 | 2 | 0 |
-| v2 Settings (#/settings) | 195 | 0 | 2 | 0 |
-| v2 shared: legal | 26 | 0 | 2 | 0 |
+| v2 Dossier frame and Overview (#/T) | 254 | 0 | 2 | 0 |
+| v2 Saved research (#/saved) | 63 | 0 | 2 | 0 |
+| v2 shared: legal | 27 | 0 | 2 | 0 |
 | Milo and the AI writers: _human_error | 11 | 0 | 1 | 0 |
 | Milo and the AI writers: _session_line | 4 | 0 | 1 | 0 |
 | Milo and the AI writers: _write_sector_read | 7 | 0 | 1 | 0 |
@@ -85,6 +91,8 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: brokerage/routes.py _http | 2 | 0 | 1 | 0 |
 | Server: brokerage/scorecard.py _quality | 8 | 0 | 1 | 0 |
 | Server: desk/check.py ALLOWED_CAPS | 1 | 0 | 1 | 0 |
+| Server: figures/compute.py _from_yahoo | 18 | 0 | 1 | 0 |
+| Server: indicator_registry.py REGISTRY | 47 | 0 | 1 | 0 |
 | Server: knowledge.py MODES | 21 | 0 | 1 | 0 |
 | Server: legal.py SIMULATED | 1 | 0 | 1 | 0 |
 | Server: main.py _screen_candidates | 1 | 0 | 1 | 0 |
@@ -97,19 +105,20 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: research_book.py RESEARCH_STATUS | 1 | 0 | 1 | 0 |
 | Server: shortlist.py record_summary | 1 | 0 | 1 | 0 |
 | Server: signal_history.py history | 3 | 0 | 1 | 0 |
+| Server: symbol_check.py check | 5 | 0 | 1 | 0 |
 | Server: valuation/defaults.py default_drivers | 27 | 0 | 1 | 0 |
 | Server: watch_runner.py hits_for | 2 | 0 | 1 | 0 |
-| v2 Discover: Scan (#/scan) | 119 | 0 | 1 | 0 |
-| v2 Dossier frame and Overview (#/T) | 134 | 0 | 1 | 0 |
+| v2 Discover: Scan (#/scan) | 168 | 0 | 1 | 0 |
 | v2 Investing (#/T/investing) | 131 | 0 | 1 | 0 |
 | v2 News (#/T/news) | 37 | 0 | 1 | 0 |
-| v2 Options panels (#/T/options) | 230 | 0 | 1 | 0 |
-| v2 Options position builder (#/T/options) | 41 | 0 | 1 | 0 |
-| v2 Sign in and account (#/signin) | 55 | 0 | 1 | 0 |
+| v2 Options panels (#/T/options) | 231 | 0 | 1 | 0 |
+| v2 Options position builder (#/T/options) | 42 | 0 | 1 | 0 |
+| v2 Sign in and account (#/signin) | 56 | 0 | 1 | 0 |
+| v2 notfound | 25 | 0 | 1 | 0 |
 | v2 shared: glossary | 146 | 0 | 1 | 0 |
 | Classic (/classic): index.html | 84 | 0 | 0 | 0 |
 | Classic (/classic): knowledge.js | 5 | 0 | 0 | 0 |
-| Classic (/classic): scout.js | 1 | 0 | 0 | 0 |
+| Classic (/classic): scout.js | 2 | 0 | 0 | 0 |
 | Milo and the AI writers: CATALYST_PROMPT | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: CATALYST_READ_PROMPT | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: DESK_PROMPT | 1 | 0 | 0 | 0 |
@@ -124,11 +133,18 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Milo and the AI writers: RESEARCH_PROMPT | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: SCAN_PROMPT | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: SECTOR_PROMPT | 1 | 0 | 0 | 0 |
-| Milo and the AI writers: SYSTEM_PROMPT | 1 | 0 | 0 | 0 |
+| Milo and the AI writers: SYSTEM_PROMPT | 2 | 0 | 0 | 0 |
 | Milo and the AI writers: WEEKLY_PROMPT | 1 | 0 | 0 | 0 |
+| Milo and the AI writers: _CTX_INDICATORS | 1 | 0 | 0 | 0 |
+| Milo and the AI writers: _REWRITE_INSTRUCTION | 1 | 0 | 0 | 0 |
+| Milo and the AI writers: _SHARED_ASYNC | 1 | 0 | 0 | 0 |
+| Milo and the AI writers: _SHARED_SYNC | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: _WEEKLY_UNUSABLE | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: _ask | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: _open_write_refused | 2 | 0 | 0 | 0 |
+| Milo and the AI writers: _research_lines | 17 | 0 | 0 | 0 |
+| Milo and the AI writers: _rewrite_answer | 1 | 0 | 0 | 0 |
+| Milo and the AI writers: _shared | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: _weekly_failure | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: _weekly_update | 2 | 0 | 0 | 0 |
 | Milo and the AI writers: _write_catalyst_read | 2 | 0 | 0 | 0 |
@@ -145,7 +161,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Milo and the AI writers: open_write_full | 2 | 0 | 0 | 0 |
 | Milo and the AI writers: question_too_long | 1 | 0 | 0 | 0 |
 | Milo and the AI writers: read_scan_request | 4 | 0 | 0 | 0 |
-| Milo and the AI writers: stream_chat | 6 | 0 | 0 | 0 |
+| Milo and the AI writers: stream_chat | 10 | 0 | 0 | 0 |
 | Milo and the AI writers: write_edition | 5 | 0 | 0 | 0 |
 | Milo and the AI writers: write_morning_desk | 2 | 0 | 0 | 0 |
 | Milo and the AI writers: write_portfolio_brief | 3 | 0 | 0 | 0 |
@@ -155,6 +171,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: account.py _symbol | 1 | 0 | 0 | 0 |
 | Server: account.py _valuation_body | 1 | 0 | 0 | 0 |
 | Server: account.py _watch_params | 5 | 0 | 0 | 0 |
+| Server: account.py add_item | 1 | 0 | 0 | 0 |
 | Server: account.py adopt_local | 1 | 0 | 0 | 0 |
 | Server: account.py adopt_theses | 1 | 0 | 0 | 0 |
 | Server: account.py adopt_valuations | 1 | 0 | 0 | 0 |
@@ -176,10 +193,23 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: account.py save_research | 2 | 0 | 0 | 0 |
 | Server: account.py update_watch | 2 | 0 | 0 | 0 |
 | Server: ai_policy.py AMEND_NOTE | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py ECHO_NOTE | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py GROUND_NOTE_STEM | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py INSTEAD | 9 | 0 | 0 | 0 |
+| Server: ai_policy.py INSTEAD_DEFAULT | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py LIMIT_LEAD | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py LIMIT_SUPPORTED | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py OFFTOPIC_KINDS | 4 | 0 | 0 | 0 |
 | Server: ai_policy.py POLICY_TEXT | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py READ_NOTE | 1 | 0 | 0 | 0 |
 | Server: ai_policy.py REQUEST_KINDS | 1 | 0 | 0 | 0 |
 | Server: ai_policy.py RULES | 3 | 0 | 0 | 0 |
-| Server: ai_policy.py reader_line | 2 | 0 | 0 | 0 |
+| Server: ai_policy.py _OVERRIDE_REASON | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py _POLICY_INSTEAD | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py _POLICY_REASON | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py ground | 1 | 0 | 0 | 0 |
+| Server: ai_policy.py ground_note | 3 | 0 | 0 | 0 |
+| Server: ai_policy.py refusal_line | 1 | 0 | 0 | 0 |
 | Server: ai_store.py ET | 1 | 0 | 0 | 0 |
 | Server: ai_store.py FEATURES | 5 | 0 | 0 | 0 |
 | Server: ai_store.py calls_by_feature | 1 | 0 | 0 | 0 |
@@ -190,10 +220,12 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: alerts.py _closed_key | 2 | 0 | 0 | 0 |
 | Server: alerts.py _digest | 2 | 0 | 0 | 0 |
 | Server: alerts.py _opened_body | 2 | 0 | 0 | 0 |
+| Server: alerts.py _reader_digest | 3 | 0 | 0 | 0 |
 | Server: alerts.py deliver_pending | 2 | 0 | 0 | 0 |
 | Server: alerts.py delivery_status | 3 | 0 | 0 | 0 |
 | Server: alerts.py from_capacity | 6 | 0 | 0 | 0 |
 | Server: alerts.py from_scan | 3 | 0 | 0 | 0 |
+| Server: alerts.py set_my_delivery | 1 | 0 | 0 | 0 |
 | Server: analysts.py METHOD | 1 | 0 | 0 | 0 |
 | Server: analysts.py feed | 5 | 0 | 0 | 0 |
 | Server: analysts.py for_symbol | 1 | 0 | 0 | 0 |
@@ -230,6 +262,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: analytics/earnings.py _extended_move | 1 | 0 | 0 | 0 |
 | Server: analytics/earnings.py _growth | 4 | 0 | 0 | 0 |
 | Server: analytics/earnings.py _implied_move | 7 | 0 | 0 | 0 |
+| Server: analytics/earnings.py _name_quarters | 1 | 0 | 0 | 0 |
 | Server: analytics/earnings.py _next_report | 2 | 0 | 0 | 0 |
 | Server: analytics/earnings.py _reaction_map | 1 | 0 | 0 | 0 |
 | Server: analytics/earnings.py _reconcile_consensus | 3 | 0 | 0 | 0 |
@@ -270,9 +303,11 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: analytics/flow.py analyse | 20 | 0 | 0 | 0 |
 | Server: analytics/forex.py _reading | 4 | 0 | 0 | 0 |
 | Server: analytics/forex.py build | 1 | 0 | 0 | 0 |
+| Server: analytics/fundamentals.py INSIDER_EXCLUDED | 1 | 0 | 0 | 0 |
+| Server: analytics/fundamentals.py INSIDER_TYPES | 1 | 0 | 0 | 0 |
+| Server: analytics/fundamentals.py INSIDER_UNAVAILABLE | 1 | 0 | 0 | 0 |
 | Server: analytics/fundamentals.py analyse_earnings_history | 5 | 0 | 0 | 0 |
 | Server: analytics/fundamentals.py analyse_financials | 7 | 0 | 0 | 0 |
-| Server: analytics/fundamentals.py analyse_ownership | 11 | 0 | 0 | 0 |
 | Server: analytics/fundamentals.py analyse_short_interest | 9 | 0 | 0 | 0 |
 | Server: analytics/gex.py ASSUMPTION | 1 | 0 | 0 | 0 |
 | Server: analytics/gex.py CONVENTION | 9 | 0 | 0 | 0 |
@@ -296,7 +331,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: analytics/longterm.py _data_quality | 3 | 0 | 0 | 0 |
 | Server: analytics/longterm.py _long_trend | 5 | 0 | 0 | 0 |
 | Server: analytics/longterm.py _valuation_history | 1 | 0 | 0 | 0 |
-| Server: analytics/longterm.py _valuation_read | 14 | 0 | 0 | 0 |
+| Server: analytics/longterm.py _valuation_read | 15 | 0 | 0 | 0 |
 | Server: analytics/longterm.py analyse_holding | 27 | 0 | 0 | 0 |
 | Server: analytics/longterm.py analyse_indices | 8 | 0 | 0 | 0 |
 | Server: analytics/macro.py HY_SPREAD_SERIES | 1 | 0 | 0 | 0 |
@@ -364,7 +399,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: analytics/retirement.py analyse | 3 | 0 | 0 | 0 |
 | Server: analytics/scan_request.py _day | 2 | 0 | 0 | 0 |
 | Server: analytics/scan_request.py _returns | 2 | 0 | 0 | 0 |
-| Server: analytics/scan_request.py _rules | 13 | 0 | 0 | 0 |
+| Server: analytics/scan_request.py _rules | 19 | 0 | 0 | 0 |
 | Server: analytics/scan_request.py _side | 4 | 0 | 0 | 0 |
 | Server: analytics/scanners.py COLUMN_LABELS | 1 | 0 | 0 | 0 |
 | Server: analytics/scanners.py SCANS | 34 | 0 | 0 | 0 |
@@ -377,12 +412,17 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: analytics/screen.py cache_path_for | 1 | 0 | 0 | 0 |
 | Server: analytics/screen.py run | 1 | 0 | 0 | 0 |
 | Server: analytics/screener.py BLIND | 1 | 0 | 0 | 0 |
-| Server: analytics/screener.py FIELDS | 21 | 0 | 0 | 0 |
+| Server: analytics/screener.py FIELDS | 23 | 0 | 0 | 0 |
+| Server: analytics/screener.py PERIOD_WORDS | 2 | 0 | 0 | 0 |
 | Server: analytics/screener.py STATES | 2 | 0 | 0 | 0 |
+| Server: analytics/screener.py _loosen | 1 | 0 | 0 | 0 |
 | Server: analytics/screener.py parse_filters | 1 | 0 | 0 | 0 |
-| Server: analytics/screener.py run | 1 | 0 | 0 | 0 |
+| Server: analytics/screener.py run | 2 | 0 | 0 | 0 |
 | Server: analytics/seasonality.py _turn_of_month | 2 | 0 | 0 | 0 |
 | Server: analytics/sec_facts.py history | 8 | 0 | 0 | 0 |
+| Server: analytics/sec_frames.py SOURCE | 1 | 0 | 0 | 0 |
+| Server: analytics/sec_frames.py build | 1 | 0 | 0 | 0 |
+| Server: analytics/sec_frames.py periods | 1 | 0 | 0 | 0 |
 | Server: analytics/sector_board.py _action | 3 | 0 | 0 | 0 |
 | Server: analytics/sector_board.py _rotation | 6 | 0 | 0 | 0 |
 | Server: analytics/sector_board.py _session_price | 2 | 0 | 0 | 0 |
@@ -404,6 +444,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: analytics/segments.py METHOD | 1 | 0 | 0 | 0 |
 | Server: analytics/segments.py SUBTOTAL_NOTE | 1 | 0 | 0 | 0 |
 | Server: analytics/segments.py _member | 1 | 0 | 0 | 0 |
+| Server: analytics/segments.py _periods | 2 | 0 | 0 | 0 |
 | Server: analytics/segments.py _tidy | 3 | 0 | 0 | 0 |
 | Server: analytics/segments.py build | 1 | 0 | 0 | 0 |
 | Server: analytics/segments.py filings | 6 | 0 | 0 | 0 |
@@ -476,6 +517,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: analytics/valuation_inputs.py _statements | 7 | 0 | 0 | 0 |
 | Server: analytics/valuation_inputs.py build | 20 | 0 | 0 | 0 |
 | Server: analytics/vol_surface.py ET | 1 | 0 | 0 | 0 |
+| Server: analytics/vol_surface.py _unknown_timing_words | 2 | 0 | 0 | 0 |
 | Server: analytics/vol_surface.py apply_clock | 1 | 0 | 0 | 0 |
 | Server: analytics/vol_surface.py build | 2 | 0 | 0 | 0 |
 | Server: analytics/vol_surface.py constant_maturity | 3 | 0 | 0 | 0 |
@@ -532,11 +574,13 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: auth/routes.py reset_password | 2 | 0 | 0 | 0 |
 | Server: auth/routes.py revoke_session | 1 | 0 | 0 | 0 |
 | Server: auth/routes.py verify_email | 1 | 0 | 0 | 0 |
+| Server: billing.py NOT_ON_SALE | 1 | 0 | 0 | 0 |
 | Server: billing.py _stripe | 2 | 0 | 0 | 0 |
 | Server: billing.py cancel_for_deletion | 1 | 0 | 0 | 0 |
-| Server: billing.py checkout | 3 | 0 | 0 | 0 |
+| Server: billing.py checkout | 4 | 0 | 0 | 0 |
+| Server: billing.py health | 2 | 0 | 0 | 0 |
 | Server: billing.py portal | 1 | 0 | 0 | 0 |
-| Server: billing.py status | 4 | 0 | 0 | 0 |
+| Server: billing.py status | 2 | 0 | 0 | 0 |
 | Server: billing.py webhook | 4 | 0 | 0 | 0 |
 | Server: brief.py ET | 1 | 0 | 0 | 0 |
 | Server: brief.py GROUP_LABELS | 4 | 0 | 0 | 0 |
@@ -667,12 +711,27 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: catalysts.py _ticker_catalysts | 7 | 0 | 0 | 0 |
 | Server: catalysts.py refresh | 1 | 0 | 0 | 0 |
 | Server: catalysts.py search | 1 | 0 | 0 | 0 |
+| Server: chart_routes.py SOURCE | 1 | 0 | 0 | 0 |
+| Server: chart_routes.py _health | 1 | 0 | 0 | 0 |
+| Server: chart_routes.py _name | 1 | 0 | 0 | 0 |
+| Server: chart_routes.py check_layout | 3 | 0 | 0 | 0 |
+| Server: chart_routes.py delete_chart_layout | 2 | 0 | 0 | 0 |
+| Server: chart_routes.py history_limit | 3 | 0 | 0 | 0 |
+| Server: chart_routes.py put_intervals | 1 | 0 | 0 | 0 |
+| Server: chart_routes.py save_chart_layout | 2 | 0 | 0 | 0 |
 | Server: contracts.py CAVEAT | 1 | 0 | 0 | 0 |
 | Server: contracts.py FIELDS | 4 | 0 | 0 | 0 |
 | Server: contracts.py _award_row | 4 | 0 | 0 | 0 |
 | Server: contracts.py _post | 1 | 0 | 0 | 0 |
 | Server: contracts.py for_company | 3 | 0 | 0 | 0 |
 | Server: contracts.py recent | 2 | 0 | 0 | 0 |
+| Server: delays.py BY_EXCHANGE | 2 | 0 | 0 | 0 |
+| Server: delays.py EXCHANGE_NAMES | 4 | 0 | 0 | 0 |
+| Server: delays.py chain_sentence | 2 | 0 | 0 | 0 |
+| Server: delays.py quote_label | 1 | 0 | 0 | 0 |
+| Server: delays.py quote_sentence | 1 | 0 | 0 | 0 |
+| Server: delays.py quotes_up_to | 1 | 0 | 0 | 0 |
+| Server: delays.py sources | 6 | 0 | 0 | 0 |
 | Server: desk/assemble.py _number_item | 8 | 0 | 0 | 0 |
 | Server: desk/assemble.py build | 34 | 0 | 0 | 0 |
 | Server: desk/check.py check_number | 3 | 0 | 0 | 0 |
@@ -756,29 +815,103 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: feeds.py load_filings | 2 | 0 | 0 | 0 |
 | Server: feeds.py load_ics | 1 | 0 | 0 | 0 |
 | Server: feeds.py load_source | 1 | 0 | 0 | 0 |
+| Server: figures/compute.py SEC_NAME | 1 | 0 | 0 | 0 |
+| Server: figures/compute.py YAHOO_NAME | 1 | 0 | 0 | 0 |
+| Server: figures/compute.py _annual_period | 1 | 0 | 0 | 0 |
+| Server: figures/compute.py _fcf | 3 | 0 | 0 | 0 |
+| Server: figures/compute.py _from_filings | 3 | 0 | 0 | 0 |
+| Server: figures/compute.py _net_debts | 7 | 0 | 0 | 0 |
+| Server: figures/compute.py _net_margin | 3 | 0 | 0 | 0 |
+| Server: figures/compute.py _ocf | 2 | 0 | 0 | 0 |
+| Server: figures/compute.py _ttm_period | 1 | 0 | 0 | 0 |
+| Server: figures/compute.py _when | 1 | 0 | 0 | 0 |
+| Server: figures/compute.py _yahoo_source | 1 | 0 | 0 | 0 |
+| Server: figures/compute.py forward_pe | 9 | 0 | 0 | 0 |
+| Server: figures/compute.py load | 1 | 0 | 0 | 0 |
+| Server: figures/compute.py load_via | 2 | 0 | 0 | 0 |
+| Server: figures/compute.py resolve | 4 | 0 | 0 | 0 |
+| Server: figures/periods.py BADGE_MEANS | 5 | 0 | 0 | 0 |
+| Server: figures/periods.py SOURCE | 1 | 0 | 0 | 0 |
+| Server: figures/periods.py UNAVAILABLE | 1 | 0 | 0 | 0 |
+| Server: figures/periods.py _change | 6 | 0 | 0 | 0 |
+| Server: figures/periods.py _next | 2 | 0 | 0 | 0 |
+| Server: figures/periods.py _year_end_words | 3 | 0 | 0 | 0 |
+| Server: figures/periods.py calendar | 2 | 0 | 0 | 0 |
+| Server: figures/periods.py describe | 7 | 0 | 0 | 0 |
+| Server: figures/periods.py from_filing_list | 2 | 0 | 0 | 0 |
+| Server: figures/periods.py in_words | 1 | 0 | 0 | 0 |
+| Server: figures/registry.py PERIODS | 4 | 0 | 0 | 0 |
+| Server: figures/registry.py TTM_RULE | 1 | 0 | 0 | 0 |
+| Server: figures/registry.py _CONCEPTS | 36 | 0 | 0 | 0 |
+| Server: figures/registry.py _ENTRIES | 53 | 0 | 0 | 0 |
 | Server: fred.py SERIES_MAP | 10 | 0 | 0 | 0 |
 | Server: fred.py _present | 1 | 0 | 0 | 0 |
 | Server: fred.py for_release | 1 | 0 | 0 | 0 |
 | Server: frontend.py v2_access | 1 | 0 | 0 | 0 |
 | Server: horizon.py catalogue | 2 | 0 | 0 | 0 |
 | Server: horizon.py prompt_for | 2 | 0 | 0 | 0 |
+| Server: indicator_registry.py PRICE_SOURCE | 1 | 0 | 0 | 0 |
+| Server: indicator_registry.py _against | 2 | 0 | 0 | 0 |
+| Server: indicator_registry.py _what | 2 | 0 | 0 | 0 |
+| Server: indicator_registry.py clean_reading | 2 | 0 | 0 | 0 |
+| Server: indicator_registry.py describe | 15 | 0 | 0 | 0 |
+| Server: indicator_registry.py header_lines | 8 | 0 | 0 | 0 |
+| Server: insider_fill.py _row | 2 | 0 | 0 | 0 |
+| Server: insider_fill.py history | 2 | 0 | 0 | 0 |
 | Server: insiders.py BLIND | 1 | 0 | 0 | 0 |
 | Server: insiders.py CODES | 10 | 0 | 0 | 0 |
 | Server: insiders.py METHOD | 1 | 0 | 0 | 0 |
 | Server: insiders.py index | 7 | 0 | 0 | 0 |
 | Server: insiders.py parse_filing | 4 | 0 | 0 | 0 |
+| Server: investigation.py DISCLAIMER | 1 | 0 | 0 | 0 |
+| Server: investigation.py INVESTIGATION_PROMPT | 1 | 0 | 0 | 0 |
+| Server: investigation.py PEER_RULE | 2 | 0 | 0 | 0 |
+| Server: investigation.py SEG_SOURCE | 1 | 0 | 0 | 0 |
+| Server: investigation.py SHARE_FORMULA | 1 | 0 | 0 | 0 |
+| Server: investigation.py STEPS | 21 | 0 | 0 | 0 |
+| Server: investigation.py _segment_facts | 5 | 0 | 0 | 0 |
+| Server: investigation.py business_facts | 16 | 0 | 0 | 0 |
+| Server: investigation.py event_facts | 12 | 0 | 0 | 0 |
+| Server: investigation.py health_facts | 5 | 0 | 0 | 0 |
+| Server: investigation.py peer_facts | 13 | 0 | 0 | 0 |
+| Server: investigation.py plan | 4 | 0 | 0 | 0 |
+| Server: investigation.py prompt_for | 6 | 0 | 0 | 0 |
+| Server: investigation.py risk_facts | 8 | 0 | 0 | 0 |
+| Server: investigation.py segments_facts | 5 | 0 | 0 | 0 |
+| Server: investigation.py summary_text | 1 | 0 | 0 | 0 |
+| Server: investor.py | 2 | 0 | 0 | 0 |
+| Server: investor.py FUTURES_NOTE | 1 | 0 | 0 | 0 |
+| Server: investor.py QUESTIONS | 23 | 0 | 0 | 0 |
+| Server: investor.py WHY | 3 | 0 | 0 | 0 |
+| Server: investor.py clean_group | 1 | 0 | 0 | 0 |
+| Server: investor.py owner_report | 4 | 0 | 0 | 0 |
+| Server: investor.py session_days | 3 | 0 | 0 | 0 |
+| Server: investor_routes.py _owner_only | 3 | 0 | 0 | 0 |
+| Server: investor_routes.py level_questions_decide | 1 | 0 | 0 | 0 |
+| Server: investor_routes.py markets_calendar | 2 | 0 | 0 | 0 |
+| Server: investor_routes.py portfolio_risk_positions | 2 | 0 | 0 | 0 |
 | Server: iv_history.py ET | 1 | 0 | 0 | 0 |
 | Server: iv_history.py VOL_INDEX | 10 | 0 | 0 | 0 |
 | Server: iv_history.py _dolthub_rank | 2 | 0 | 0 | 0 |
 | Server: iv_history.py rank_for | 5 | 0 | 0 | 0 |
 | Server: knowledge.py PREVIEW_FACT | 1 | 0 | 0 | 0 |
 | Server: knowledge.py catalogue | 3 | 0 | 0 | 0 |
+| Server: knowledge.py definition_instruction | 1 | 0 | 0 | 0 |
+| Server: layouts.py _name | 1 | 0 | 0 | 0 |
+| Server: layouts.py check_body | 4 | 0 | 0 | 0 |
+| Server: layouts.py delete_layout | 1 | 0 | 0 | 0 |
+| Server: layouts.py save_layout | 1 | 0 | 0 | 0 |
 | Server: legal.py AREAS | 6 | 0 | 0 | 0 |
 | Server: legal.py FOOTER_LINE | 1 | 0 | 0 | 0 |
-| Server: legal.py LABELS | 5 | 0 | 0 | 0 |
+| Server: legal.py LABELS | 4 | 0 | 0 | 0 |
 | Server: legal.py PAGE_AREAS | 16 | 0 | 0 | 0 |
 | Server: legal.py SHORT | 1 | 0 | 0 | 0 |
 | Server: legal.py TRACKER_SIMULATED | 1 | 0 | 0 | 0 |
+| Server: legal_text.py CHECKOUT_REFUSAL | 1 | 0 | 0 | 0 |
+| Server: legal_text.py PENDING | 1 | 0 | 0 | 0 |
+| Server: library.py _LIST_COLUMNS | 1 | 0 | 0 | 0 |
+| Server: library.py default_name | 1 | 0 | 0 | 0 |
+| Server: library.py save_item | 1 | 0 | 0 | 0 |
 | Server: live_mirror.py why | 2 | 0 | 0 | 0 |
 | Server: main.py | 1 | 0 | 0 | 0 |
 | Server: main.py CSP_ENFORCED | 1 | 0 | 0 | 0 |
@@ -799,8 +932,11 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: main.py _build_shortlist | 1 | 0 | 0 | 0 |
 | Server: main.py _building_reason | 3 | 0 | 0 | 0 |
 | Server: main.py _chain_unusable | 2 | 0 | 0 | 0 |
+| Server: main.py _compare_payload | 1 | 0 | 0 | 0 |
 | Server: main.py _cooldown_refusal | 1 | 0 | 0 | 0 |
 | Server: main.py _desk_sources | 1 | 0 | 0 | 0 |
+| Server: main.py _investigation_facts | 3 | 0 | 0 | 0 |
+| Server: main.py _investigation_owned | 1 | 0 | 0 | 0 |
 | Server: main.py _logo_fetch | 1 | 0 | 0 | 0 |
 | Server: main.py _market_block | 3 | 0 | 0 | 0 |
 | Server: main.py _milo_portfolio | 4 | 0 | 0 | 0 |
@@ -812,13 +948,14 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: main.py _owner_session_guard | 3 | 0 | 0 | 0 |
 | Server: main.py _portfolio_summary | 2 | 0 | 0 | 0 |
 | Server: main.py _rate_path_for | 1 | 0 | 0 | 0 |
+| Server: main.py _read_request | 2 | 0 | 0 | 0 |
 | Server: main.py _research_deps | 1 | 0 | 0 | 0 |
 | Server: main.py _served_while_rebuilt | 1 | 0 | 0 | 0 |
 | Server: main.py _setup_directions | 1 | 0 | 0 | 0 |
 | Server: main.py _setup_overrides | 3 | 0 | 0 | 0 |
 | Server: main.py _setup_timeframe | 2 | 0 | 0 | 0 |
 | Server: main.py _spend_guard | 6 | 0 | 0 | 0 |
-| Server: main.py _swing_snapshot | 10 | 0 | 0 | 0 |
+| Server: main.py _swing_snapshot | 11 | 0 | 0 | 0 |
 | Server: main.py _tool_assessment | 2 | 0 | 0 | 0 |
 | Server: main.py _tool_compare | 1 | 0 | 0 | 0 |
 | Server: main.py _tool_earnings | 1 | 0 | 0 | 0 |
@@ -831,6 +968,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: main.py _tool_valuation | 1 | 0 | 0 | 0 |
 | Server: main.py _unbuilt_reason | 1 | 0 | 0 | 0 |
 | Server: main.py _with_framework | 1 | 0 | 0 | 0 |
+| Server: main.py _without_unknown_page_symbol | 1 | 0 | 0 | 0 |
 | Server: main.py _write_guard | 3 | 0 | 0 | 0 |
 | Server: main.py _ws_benchmark | 1 | 0 | 0 | 0 |
 | Server: main.py _ws_market_ref | 1 | 0 | 0 | 0 |
@@ -841,8 +979,9 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: main.py asset_digest | 1 | 0 | 0 | 0 |
 | Server: main.py catalyst_library | 1 | 0 | 0 | 0 |
 | Server: main.py catalyst_refresh | 2 | 0 | 0 | 0 |
-| Server: main.py chat | 2 | 0 | 0 | 0 |
+| Server: main.py chat | 1 | 0 | 0 | 0 |
 | Server: main.py company_logo | 1 | 0 | 0 | 0 |
+| Server: main.py company_timeline | 4 | 0 | 0 | 0 |
 | Server: main.py compare_tickers | 1 | 0 | 0 | 0 |
 | Server: main.py congress_trades | 7 | 0 | 0 | 0 |
 | Server: main.py daily_bars | 1 | 0 | 0 | 0 |
@@ -853,17 +992,24 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: main.py earnings_week_calendar | 3 | 0 | 0 | 0 |
 | Server: main.py evaluate_signal | 1 | 0 | 0 | 0 |
 | Server: main.py federal_contracts | 2 | 0 | 0 | 0 |
+| Server: main.py figures_for | 1 | 0 | 0 | 0 |
 | Server: main.py framework_forecasts | 2 | 0 | 0 | 0 |
 | Server: main.py framework_panel | 1 | 0 | 0 | 0 |
 | Server: main.py indicator_panel | 9 | 0 | 0 | 0 |
+| Server: main.py insider_history | 3 | 0 | 0 | 0 |
 | Server: main.py insiders_latest | 1 | 0 | 0 | 0 |
 | Server: main.py instrument_chart | 3 | 0 | 0 | 0 |
 | Server: main.py intraday | 9 | 0 | 0 | 0 |
+| Server: main.py investigation_get | 1 | 0 | 0 | 0 |
+| Server: main.py investigation_plan | 1 | 0 | 0 | 0 |
+| Server: main.py investigation_start | 3 | 0 | 0 | 0 |
+| Server: main.py investigation_step | 4 | 0 | 0 | 0 |
+| Server: main.py investigation_update | 1 | 0 | 0 | 0 |
 | Server: main.py list_alerts | 1 | 0 | 0 | 0 |
 | Server: main.py list_digest | 1 | 0 | 0 | 0 |
 | Server: main.py list_snapshots | 1 | 0 | 0 | 0 |
 | Server: main.py options_analyze | 11 | 0 | 0 | 0 |
-| Server: main.py options_picker | 3 | 0 | 0 | 0 |
+| Server: main.py options_picker | 2 | 0 | 0 | 0 |
 | Server: main.py options_research | 4 | 0 | 0 | 0 |
 | Server: main.py pair_peers | 4 | 0 | 0 | 0 |
 | Server: main.py pattern_read | 1 | 0 | 0 | 0 |
@@ -875,23 +1021,27 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: main.py research | 1 | 0 | 0 | 0 |
 | Server: main.py resolve_feedback | 2 | 0 | 0 | 0 |
 | Server: main.py scanner_groups | 1 | 0 | 0 | 0 |
-| Server: main.py screener_ask | 3 | 0 | 0 | 0 |
-| Server: main.py screener_run | 1 | 0 | 0 | 0 |
+| Server: main.py screener_ask | 1 | 0 | 0 | 0 |
+| Server: main.py screener_read | 1 | 0 | 0 | 0 |
+| Server: main.py screener_run | 3 | 0 | 0 | 0 |
 | Server: main.py sector_read | 3 | 0 | 0 | 0 |
 | Server: main.py setups_detail | 6 | 0 | 0 | 0 |
-| Server: main.py setups_options | 4 | 0 | 0 | 0 |
+| Server: main.py setups_options | 3 | 0 | 0 | 0 |
 | Server: main.py setups_scan | 9 | 0 | 0 | 0 |
 | Server: main.py signals_followup | 1 | 0 | 0 | 0 |
 | Server: main.py signals_list | 1 | 0 | 0 | 0 |
+| Server: main.py sparklines | 2 | 0 | 0 | 0 |
 | Server: main.py stage_reading | 1 | 0 | 0 | 0 |
 | Server: main.py stop_check | 1 | 0 | 0 | 0 |
 | Server: main.py submit_feedback | 2 | 0 | 0 | 0 |
+| Server: main.py symbol_check | 1 | 0 | 0 | 0 |
 | Server: main.py symbol_search | 2 | 0 | 0 | 0 |
 | Server: main.py ticker_analysis | 3 | 0 | 0 | 0 |
 | Server: main.py tracker_scan | 1 | 0 | 0 | 0 |
 | Server: main.py tracker_state | 2 | 0 | 0 | 0 |
 | Server: main.py trendlines_panel | 4 | 0 | 0 | 0 |
 | Server: main.py trends_board_panel | 1 | 0 | 0 | 0 |
+| Server: main.py usage_event | 6 | 0 | 0 | 0 |
 | Server: main.py validation_levels | 1 | 0 | 0 | 0 |
 | Server: main.py valuation_comps | 2 | 0 | 0 | 0 |
 | Server: main.py valuation_inputs | 1 | 0 | 0 | 0 |
@@ -904,14 +1054,16 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: main.py weekly_update | 4 | 0 | 0 | 0 |
 | Server: main.py write_earnings_brief | 3 | 0 | 0 | 0 |
 | Server: metrics.py KINDS | 1 | 0 | 0 | 0 |
+| Server: metrics.py QUESTION_DEFINITION | 1 | 0 | 0 | 0 |
 | Server: metrics.py questions_since | 2 | 0 | 0 | 0 |
 | Server: milo_data.py SYMBOL_DIRECTORY | 1 | 0 | 0 | 0 |
 | Server: milo_data.py filings | 4 | 0 | 0 | 0 |
 | Server: milo_data.py financials | 5 | 0 | 0 | 0 |
 | Server: milo_data.py lookup_company | 4 | 0 | 0 | 0 |
 | Server: milo_data.py price_history | 7 | 0 | 0 | 0 |
+| Server: milo_routes.py put_stance | 1 | 0 | 0 | 0 |
 | Server: milo_tools.py Record | 1 | 0 | 0 | 0 |
-| Server: milo_tools.py Toolbox | 6 | 0 | 0 | 0 |
+| Server: milo_tools.py Toolbox | 7 | 0 | 0 | 0 |
 | Server: milo_tools.py UNITS | 10 | 0 | 0 | 0 |
 | Server: milo_tools.py _TICKER_PROP | 1 | 0 | 0 | 0 |
 | Server: milo_tools.py compact_levels | 1 | 0 | 0 | 0 |
@@ -950,11 +1102,12 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: priority.py _session_words | 2 | 0 | 0 | 0 |
 | Server: priority.py build | 6 | 0 | 0 | 0 |
 | Server: providers/overnight.py VENUES | 1 | 0 | 0 | 0 |
-| Server: providers/tradier.py TradierProvider | 3 | 0 | 0 | 0 |
+| Server: providers/tradier.py TradierProvider | 4 | 0 | 0 | 0 |
 | Server: providers/yf.py YFinanceProvider | 2 | 0 | 0 | 0 |
 | Server: providers/yf.py _report_timing | 1 | 0 | 0 | 0 |
 | Server: providers/yf.py _session_hours | 1 | 0 | 0 | 0 |
 | Server: providers/yf.py _stamp_iso | 1 | 0 | 0 | 0 |
+| Server: providers/yf_caches.py _Memory | 1 | 0 | 0 | 0 |
 | Server: rates.py risk_free | 6 | 0 | 0 | 0 |
 | Server: replays.py LIBRARY | 6 | 0 | 0 | 0 |
 | Server: replays.py REVISED | 1 | 0 | 0 | 0 |
@@ -987,6 +1140,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: research/policy.py RULES | 18 | 0 | 0 | 0 |
 | Server: research/policy.py _from_env | 2 | 0 | 0 | 0 |
 | Server: research/policy.py current | 2 | 0 | 0 | 0 |
+| Server: research/quality.py _fy | 1 | 0 | 0 | 0 |
 | Server: research/quality.py accumulation_zones | 5 | 0 | 0 | 0 |
 | Server: research/quality.py business_quality | 3 | 0 | 0 | 0 |
 | Server: research/quality.py cash_component | 11 | 0 | 0 | 0 |
@@ -1012,6 +1166,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: research/service.py LIMITATIONS | 4 | 0 | 0 | 0 |
 | Server: research/service.py SOURCES | 6 | 0 | 0 | 0 |
 | Server: research/service.py _Gather | 1 | 0 | 0 | 0 |
+| Server: research/service.py _delay_words | 2 | 0 | 0 | 0 |
 | Server: research/service.py _earnings | 1 | 0 | 0 | 0 |
 | Server: research/service.py _long_term | 5 | 0 | 0 | 0 |
 | Server: research/service.py agreement | 10 | 0 | 0 | 0 |
@@ -1071,12 +1226,34 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: signal_history.py followup_events | 4 | 0 | 0 | 0 |
 | Server: snapshots.py _copy | 1 | 0 | 0 | 0 |
 | Server: snapshots.py _listing | 1 | 0 | 0 | 0 |
+| Server: sparklines.py FreeFeedSource | 1 | 0 | 0 | 0 |
+| Server: sparklines.py row | 2 | 0 | 0 | 0 |
+| Server: symbol_check.py _CACHE | 1 | 0 | 0 | 0 |
+| Server: symbol_check.py _MISSES | 1 | 0 | 0 | 0 |
+| Server: symbol_check.py _SUGG | 1 | 0 | 0 | 0 |
+| Server: symbol_check.py _from_quote | 1 | 0 | 0 | 0 |
+| Server: symbol_check.py misses | 1 | 0 | 0 | 0 |
+| Server: timeline.py DATES | 6 | 0 | 0 | 0 |
+| Server: timeline.py DATE_LABELS | 2 | 0 | 0 | 0 |
+| Server: timeline.py EMPTY | 6 | 0 | 0 | 0 |
+| Server: timeline.py HOUSE_NOTE | 1 | 0 | 0 | 0 |
+| Server: timeline.py SOURCES | 5 | 0 | 0 | 0 |
+| Server: timeline.py _FAILED_FILINGS | 3 | 0 | 0 | 0 |
+| Server: timeline.py analyst_events | 10 | 0 | 0 | 0 |
+| Server: timeline.py build | 2 | 0 | 0 | 0 |
+| Server: timeline.py congress_events | 14 | 0 | 0 | 0 |
+| Server: timeline.py earnings_events | 21 | 0 | 0 | 0 |
+| Server: timeline.py filing_events | 3 | 0 | 0 | 0 |
+| Server: timeline.py insider_events | 14 | 0 | 0 | 0 |
+| Server: timeline.py news_events | 5 | 0 | 0 | 0 |
+| Server: timeline.py page | 1 | 0 | 0 | 0 |
 | Server: universe.py INSTRUMENT_ALIASES | 2 | 0 | 0 | 0 |
 | Server: universe.py UNIVERSES | 3 | 0 | 0 | 0 |
 | Server: universe.py _ANSWERS | 1 | 0 | 0 | 0 |
 | Server: universe.py _fetch | 1 | 0 | 0 | 0 |
 | Server: universe.py nasdaq_symbols | 5 | 0 | 0 | 0 |
 | Server: universe.py search_with_status | 1 | 0 | 0 | 0 |
+| Server: usage.py signals | 3 | 0 | 0 | 0 |
 | Server: valuation/analysis.py TORNADO | 6 | 0 | 0 | 0 |
 | Server: valuation/analysis.py reverse_dcf | 10 | 0 | 0 | 0 |
 | Server: valuation/analysis.py sensitivity | 5 | 0 | 0 | 0 |
@@ -1136,78 +1313,99 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | Server: weekly.py earnings_this_week | 1 | 0 | 0 | 0 |
 | Server: weekly.py index_levels | 2 | 0 | 0 | 0 |
 | v2 Analysts (#/T/analysts) | 37 | 0 | 0 | 0 |
-| v2 Brokerage (#/brokerage) | 388 | 0 | 0 | 0 |
-| v2 Chart (#/T/chart) | 220 | 0 | 0 | 0 |
-| v2 Chart side widgets (#/T/chart) | 223 | 0 | 0 | 0 |
+| v2 Brokerage (#/brokerage) | 390 | 0 | 0 | 0 |
+| v2 Chart (#/T/chart) | 254 | 0 | 0 | 0 |
+| v2 Chart side widgets (#/T/chart) | 228 | 0 | 0 | 0 |
 | v2 Chart toolbar (#/T/chart) | 16 | 0 | 0 | 0 |
 | v2 Classic bridge | 4 | 0 | 0 | 0 |
 | v2 Command palette | 85 | 0 | 0 | 0 |
-| v2 Compare (#/compare) | 115 | 0 | 0 | 0 |
-| v2 Component: align | 1 | 0 | 0 | 0 |
+| v2 Compare (#/compare) | 120 | 0 | 0 | 0 |
+| v2 Component: align | 3 | 0 | 0 | 0 |
 | v2 Component: art | 3 | 0 | 0 | 0 |
 | v2 Component: bars | 7 | 0 | 0 | 0 |
-| v2 Component: chart | 11 | 0 | 0 | 0 |
+| v2 Component: chart | 13 | 0 | 0 | 0 |
 | v2 Component: chartread | 26 | 0 | 0 | 0 |
-| v2 Component: company | 46 | 0 | 0 | 0 |
-| v2 Component: finfigs | 71 | 0 | 0 | 0 |
+| v2 Component: company | 47 | 0 | 0 | 0 |
+| v2 Component: figure | 29 | 0 | 0 | 0 |
+| v2 Component: finfigs | 70 | 0 | 0 | 0 |
+| v2 Component: inview | 2 | 0 | 0 | 0 |
+| v2 Component: levelcontrol | 12 | 0 | 0 | 0 |
+| v2 Component: library | 36 | 0 | 0 | 0 |
+| v2 Component: milo-activity | 7 | 0 | 0 | 0 |
+| v2 Component: milo-context | 12 | 0 | 0 | 0 |
+| v2 Component: milo-inline | 53 | 0 | 0 | 0 |
+| v2 Component: miloprompt | 9 | 0 | 0 | 0 |
 | v2 Component: motion | 1 | 0 | 0 | 0 |
+| v2 Component: period | 1 | 0 | 0 | 0 |
 | v2 Component: pricechart | 48 | 0 | 0 | 0 |
-| v2 Component: scenarios | 33 | 0 | 0 | 0 |
-| v2 Component: sections | 25 | 0 | 0 | 0 |
+| v2 Component: scenarios | 32 | 0 | 0 | 0 |
+| v2 Component: sections | 29 | 0 | 0 | 0 |
 | v2 Component: shortcuts | 22 | 0 | 0 | 0 |
+| v2 Component: showmore | 3 | 0 | 0 | 0 |
 | v2 Component: strips | 4 | 0 | 0 | 0 |
 | v2 Component: studies | 1 | 0 | 0 | 0 |
 | v2 Component: table | 1 | 0 | 0 | 0 |
 | v2 Component: tabset | 1 | 0 | 0 | 0 |
 | v2 Component: timeaxis | 1 | 0 | 0 | 0 |
+| v2 Component: timeline | 46 | 0 | 0 | 0 |
+| v2 Component: treemap | 24 | 0 | 0 | 0 |
 | v2 Component: wavetrend | 10 | 0 | 0 | 0 |
 | v2 Discover: Shortlist (#/scan) | 37 | 0 | 0 | 0 |
-| v2 Dossier Overview, Simple (#/T) | 170 | 0 | 0 | 0 |
-| v2 Dossier header (#/T/*) | 21 | 0 | 0 | 0 |
+| v2 Dossier Overview, Simple (#/T) | 177 | 0 | 0 | 0 |
+| v2 Dossier header (#/T/*) | 20 | 0 | 0 | 0 |
 | v2 Dossier start (no symbol) | 12 | 0 | 0 | 0 |
-| v2 Dossier tabs | 3 | 0 | 0 | 0 |
+| v2 Dossier tabs | 4 | 0 | 0 | 0 |
 | v2 Drawers | 3 | 0 | 0 | 0 |
-| v2 Financials (#/T/financials) | 214 | 0 | 0 | 0 |
+| v2 Financials (#/T/financials) | 278 | 0 | 0 | 0 |
 | v2 Glossary marks | 6 | 0 | 0 | 0 |
 | v2 Glossary terms | 40 | 0 | 0 | 1 |
-| v2 Home (#/) | 105 | 0 | 0 | 0 |
+| v2 Home (#/) | 110 | 0 | 0 | 0 |
 | v2 Instrument (#/instrument/X) | 24 | 0 | 0 | 0 |
 | v2 Knowledge level slider | 14 | 0 | 0 | 0 |
-| v2 Loading, empty and error states | 13 | 0 | 0 | 0 |
+| v2 Loading, empty and error states | 14 | 0 | 0 | 0 |
 | v2 Markets shared panels | 15 | 0 | 0 | 0 |
 | v2 Markets: Earnings this week (#/earnings-week) | 31 | 0 | 0 | 0 |
-| v2 Markets: Explore (#/explore) | 39 | 0 | 0 | 0 |
+| v2 Markets: Explore (#/explore) | 38 | 0 | 0 | 0 |
 | v2 Markets: Indices (#/indices) | 23 | 0 | 0 | 0 |
 | v2 Markets: Macro (#/macro) | 130 | 0 | 0 | 0 |
 | v2 Options (#/T/options) | 185 | 0 | 0 | 0 |
 | v2 Positions: Paper Desk (#/paper) | 187 | 0 | 0 | 0 |
 | v2 Positions: Replays (#/paper) | 62 | 0 | 0 | 0 |
 | v2 Retirement (#/retirement) | 58 | 0 | 0 | 0 |
-| v2 Saved research (#/saved) | 29 | 0 | 0 | 0 |
 | v2 Search box | 4 | 0 | 0 | 0 |
 | v2 Setups (#/T/setups) | 91 | 0 | 0 | 0 |
-| v2 Sheet (#/T/sheet) | 78 | 0 | 0 | 0 |
-| v2 Shell: sidebar, top bar, phone bar | 42 | 0 | 0 | 0 |
+| v2 Sheet (#/T/sheet) | 75 | 0 | 0 | 0 |
+| v2 Shell: sidebar, top bar, phone bar | 45 | 0 | 0 | 0 |
 | v2 Signals (#/T/signals) | 44 | 0 | 0 | 0 |
-| v2 Thesis (#/T/thesis) | 63 | 0 | 0 | 0 |
+| v2 Thesis (#/T/thesis) | 65 | 0 | 0 | 0 |
 | v2 Valuation scenarios (#/T/valuation) | 39 | 0 | 0 | 0 |
-| v2 Watchlist (#/watchlist) | 122 | 0 | 0 | 0 |
-| v2 app shell | 61 | 0 | 0 | 0 |
+| v2 Watchlist (#/watchlist) | 124 | 0 | 0 | 0 |
+| v2 app shell | 70 | 0 | 0 | 0 |
+| v2 chart-grid | 25 | 0 | 0 | 0 |
+| v2 chart-options | 29 | 0 | 0 | 0 |
+| v2 investigate | 93 | 0 | 0 | 0 |
+| v2 levelquiz | 23 | 0 | 0 | 0 |
 | v2 page shell (index.html) | 3 | 0 | 0 | 0 |
-| v2 shared: api | 19 | 0 | 0 | 0 |
+| v2 shared: allalerts | 8 | 0 | 0 | 0 |
+| v2 shared: api | 20 | 0 | 0 | 0 |
 | v2 shared: authlinks | 15 | 0 | 0 | 0 |
 | v2 shared: build | 6 | 0 | 0 | 0 |
 | v2 shared: congress | 2 | 0 | 0 | 0 |
 | v2 shared: dcf-fields | 34 | 0 | 0 | 0 |
+| v2 shared: delays | 14 | 0 | 0 | 0 |
 | v2 shared: device | 3 | 0 | 0 | 0 |
 | v2 shared: dom | 2 | 0 | 0 | 0 |
-| v2 shared: finviz | 24 | 0 | 0 | 0 |
+| v2 shared: figures | 1 | 0 | 0 | 0 |
+| v2 shared: finviz | 25 | 0 | 0 | 0 |
 | v2 shared: format | 8 | 0 | 0 | 0 |
+| v2 shared: insider | 11 | 0 | 0 | 0 |
 | v2 shared: journal | 22 | 0 | 0 | 0 |
+| v2 shared: library | 11 | 0 | 0 | 0 |
 | v2 shared: market-questions | 43 | 0 | 0 | 0 |
-| v2 shared: marketTime | 8 | 0 | 0 | 0 |
-| v2 shared: milo-text | 60 | 0 | 0 | 0 |
+| v2 shared: marketTime | 6 | 0 | 0 | 0 |
+| v2 shared: milo-text | 61 | 0 | 0 | 0 |
 | v2 shared: passkey | 5 | 0 | 0 | 0 |
+| v2 shared: periods | 26 | 0 | 0 | 0 |
 | v2 shared: poll | 1 | 0 | 0 | 0 |
 | v2 shared: prefs | 25 | 0 | 0 | 0 |
 | v2 shared: reports | 2 | 0 | 0 | 0 |
@@ -1216,6 +1414,7 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 | v2 shared: resolve | 2 | 0 | 0 | 0 |
 | v2 shared: status | 6 | 0 | 0 | 0 |
 | v2 shared: store | 8 | 0 | 0 | 0 |
+| v2 shared: symbolcheck | 10 | 0 | 0 | 0 |
 | v2 shared: track | 23 | 0 | 0 | 0 |
 | v2 shared: unread | 1 | 0 | 0 | 0 |
 | v2 shared: watches | 4 | 0 | 0 | 0 |
@@ -1225,60 +1424,75 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 - `static/v2/js/core/glossary.js:9` F2 (warn): "sophisticated". Cut it, or replace it with the measurement
 - `static/v2/js/core/legal.js:13` A1 (warn): "It is not financial, investment, tax or legal advice, and nothing in it is a recommendation, solicitation or offer to bu". Split it, or cut the clauses that do not change the meaning
 - `static/v2/js/core/legal.js:14` A1 (warn): "If you link a brokerage account, Optic shows and describes those holdings read-only, but it does not know or assess your". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/alerts.js:114` X6 (warn): "y ,". Remove the space
-- `static/v2/js/pages/alerts.js:278` X6 (warn): "e .". Remove the space
+- `static/v2/js/pages/alerts.js:117` X6 (warn): "y ,". Remove the space
+- `static/v2/js/pages/alerts.js:308` X6 (warn): "e .". Remove the space
+- `static/v2/js/pages/calendar.js:54` X6 (warn): "k .". Remove the space
+- `static/v2/js/pages/calendar.js:57` X6 (warn): "k .". Remove the space
+- `static/v2/js/pages/calendar.js:62` X6 (warn): "d .". Remove the space
 - `static/v2/js/pages/chart-studies.js:39` A1 (warn): "Colours each candle by where it opened and closed against the 10, 20, 50, 100 and 200-bar simple averages: green above a". Split it, or cut the clauses that do not change the meaning
 - `static/v2/js/pages/chart-studies.js:40` A1 (warn): "LazyBear\'s oscillator: the typical price against its 9-bar EMA in units of its average distance from it, smoothed over ". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/dcf.js:312` A1 (warn): "Bear, base and bull The cases move growth, margins, capex and the long run together, by the same amount in each directio". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/dcf.js:401` X6 (warn): "g :". Remove the space
-- `static/v2/js/pages/dcf.js:401` X6 (warn): "e :". Remove the space
-- `static/v2/js/pages/dcf.js:401` X6 (warn): "t :". Remove the space
-- `static/v2/js/pages/dossier.js:190` X6 (warn): "r ,". Remove the space
-- `static/v2/js/pages/earnings.js:86` X5 (warn): "EPS EPS". Delete one
-- `static/v2/js/pages/earnings.js:165` X5 (warn): "EPS EPS". Delete one
-- `static/v2/js/pages/earnings.js:165` X5 (warn): "Revenue Revenue". Delete one
-- `static/v2/js/pages/earnings.js:173` X5 (warn): "buy Buy". Delete one
+- `static/v2/js/pages/dcf.js:318` A1 (warn): "Bear, base and bull The cases move growth, margins, capex and the long run together, by the same amount in each directio". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/dcf.js:407` X6 (warn): "g :". Remove the space
+- `static/v2/js/pages/dcf.js:407` X6 (warn): "e :". Remove the space
+- `static/v2/js/pages/dcf.js:407` X6 (warn): "t :". Remove the space
+- `static/v2/js/pages/dossier.js:222` X6 (warn): "r ,". Remove the space
+- `static/v2/js/pages/dossier.js:485` A1 (warn): "Investigate this company Six steps, each one Milo answer from figures Optic has already read, with their sources: what i". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/earnings.js:104` X5 (warn): "EPS EPS". Delete one
+- `static/v2/js/pages/earnings.js:183` A1 (warn): "Estimate revisions by period: the current estimate, its change over 30 and 90 days, and how many analysts raised or cut ". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/earnings.js:223` X5 (warn): "EPS EPS". Delete one
+- `static/v2/js/pages/earnings.js:223` X5 (warn): "Revenue Revenue". Delete one
+- `static/v2/js/pages/earnings.js:232` X5 (warn): "buy Buy". Delete one
 - `static/v2/js/pages/insiders.js:103` X6 (warn): "c :". Remove the space
 - `static/v2/js/pages/insiders.js:103` X6 (warn): "i :". Remove the space
 - `static/v2/js/pages/insiders.js:103` X6 (warn): "r :". Remove the space
 - `static/v2/js/pages/insiders.js:111` X6 (warn): "e ?". Remove the space
 - `static/v2/js/pages/insiders.js:112` X6 (warn): "n ?". Remove the space
-- `static/v2/js/pages/investing.js:222` X5 (warn): "year Year". Delete one
-- `static/v2/js/pages/legalpages.js:38` A1 (warn): "Kept only in your browser, never on Optic\'s servers: your Milo conversations, paper trades, chart drawings and notes, r". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/legalpages.js:49` A1 (warn): "In the classic app, company logos are loaded from Google, unavatar.io, favicone.com, Parqet and Financial Modeling Prep,". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/legalpages.js:65` B1 (warn): "Optic gives Stripe your account identifi / Optic keeps only your plan, its status,  / Optic never sees your card number.". Vary the openings or merge them
-- `static/v2/js/pages/legalpages.js:74` A1 (warn): "Optic is operated from the United States, and some of the services named here (Anthropic, Stripe, SnapTrade, Google and ". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/legalpages.js:89` A1 (warn): "Depending on where you live, for example in the European Union, the United Kingdom or California, you may have further r". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/legalpages.js:102` A1 (warn): "It is not financial, investment, tax or legal advice, and nothing in it is a recommendation, solicitation or offer to bu". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/legalpages.js:137` A1 (warn): "To the extent the law allows, Optic is not liable for indirect, incidental, special or consequential losses, or for lost". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/legalpages.js:165` X6 (warn): "e .". Remove the space
-- `static/v2/js/pages/legalpages.js:165` X6 (warn): "y .". Remove the space
+- `static/v2/js/pages/investing.js:226` X5 (warn): "year Year". Delete one
+- `static/v2/js/pages/legalpages.js:39` A1 (warn): "Kept only in your browser, never on Optic\'s servers: your Milo conversations, paper trades, chart drawings and notes, r". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/legalpages.js:50` A1 (warn): "In the classic app, company logos are loaded from Google, unavatar.io, favicone.com, Parqet and Financial Modeling Prep,". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/legalpages.js:66` B1 (warn): "Optic gives Stripe your account identifi / Optic keeps only your plan, its status,  / Optic never sees your card number.". Vary the openings or merge them
+- `static/v2/js/pages/legalpages.js:75` A1 (warn): "Optic is operated from the United States, and some of the services named here (Anthropic, Stripe, SnapTrade, Google and ". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/legalpages.js:90` A1 (warn): "Depending on where you live, for example in the European Union, the United Kingdom or California, you may have further r". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/legalpages.js:103` A1 (warn): "It is not financial, investment, tax or legal advice, and nothing in it is a recommendation, solicitation or offer to bu". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/legalpages.js:138` A1 (warn): "To the extent the law allows, Optic is not liable for indirect, incidental, special or consequential losses, or for lost". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/legalpages.js:201` X6 (warn): "e .". Remove the space
+- `static/v2/js/pages/legalpages.js:201` X6 (warn): "y .". Remove the space
 - `static/v2/js/pages/news.js:57` J1 (warn): "overall,". End on the last new fact or delete
+- `static/v2/js/pages/notfound.js:43` X6 (warn): "h .". Remove the space
 - `static/v2/js/pages/options-panels.js:146` X5 (warn): "expiry Expiry". Delete one
-- `static/v2/js/pages/options-picker.js:62` X6 (warn): "y ,". Remove the space
-- `static/v2/js/pages/overview-research.js:620` A1 (warn): "How this is calculated The model adds and subtracts points for the 200-week and 40-week price trends, the five-year retu". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/overview-research.js:620` G1 (warn): "How this is calculated The model adds and subtracts points for the 200-week and 40-week price trends, the five-year retu". Split it or cut it
-- `static/v2/js/pages/overview-research.js:649` X6 (warn): "d ,". Remove the space
-- `static/v2/js/pages/overview-research.js:669` X6 (warn): "k ,". Remove the space
-- `static/v2/js/pages/overview-research.js:677` X6 (warn): "n ,". Remove the space
-- `static/v2/js/pages/overview-research.js:754` G1 (warn): "The wording uses fixed cut-offs, chosen for plain language rather than taken from research: business changes under 1% ei". Split it or cut it
-- `static/v2/js/pages/read.js:248` X6 (warn): "0 :". Remove the space
-- `static/v2/js/pages/read.js:249` X6 (warn): "e :". Remove the space
-- `static/v2/js/pages/read.js:249` X6 (warn): "y ?". Remove the space
-- `static/v2/js/pages/read.js:249` X6 (warn): "w ?". Remove the space
-- `static/v2/js/pages/read.js:257` X6 (warn): "h ?". Remove the space
-- `static/v2/js/pages/read.js:257` X6 (warn): ") :". Remove the space
-- `static/v2/js/pages/read.js:257` X6 (warn): "h ?". Remove the space
-- `static/v2/js/pages/read.js:260` X6 (warn): "n ?". Remove the space
-- `static/v2/js/pages/read.js:260` X6 (warn): "y ?". Remove the space
-- `static/v2/js/pages/read.js:260` X6 (warn): "d ?". Remove the space
+- `static/v2/js/pages/options-picker.js:64` X6 (warn): "y ,". Remove the space
+- `static/v2/js/pages/overview-research.js:631` A1 (warn): "How this is calculated The model adds and subtracts points for the 200-week and 40-week price trends, the five-year retu". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/overview-research.js:631` G1 (warn): "How this is calculated The model adds and subtracts points for the 200-week and 40-week price trends, the five-year retu". Split it or cut it
+- `static/v2/js/pages/overview-research.js:660` X6 (warn): "d ,". Remove the space
+- `static/v2/js/pages/overview-research.js:680` X6 (warn): "k ,". Remove the space
+- `static/v2/js/pages/overview-research.js:688` X6 (warn): "n ,". Remove the space
+- `static/v2/js/pages/overview-research.js:765` G1 (warn): "The wording uses fixed cut-offs, chosen for plain language rather than taken from research: business changes under 1% ei". Split it or cut it
+- `static/v2/js/pages/portfolio.js:63` X6 (warn): "e .". Remove the space
+- `static/v2/js/pages/portfolio.js:75` X6 (warn): "e .". Remove the space
+- `static/v2/js/pages/portfolio.js:84` X6 (warn): "s .". Remove the space
+- `static/v2/js/pages/portfolio.js:103` X6 (warn): "t .". Remove the space
+- `static/v2/js/pages/read.js:269` X6 (warn): "0 :". Remove the space
+- `static/v2/js/pages/read.js:270` X6 (warn): "e :". Remove the space
+- `static/v2/js/pages/read.js:270` X6 (warn): "y ?". Remove the space
+- `static/v2/js/pages/read.js:270` X6 (warn): "w ?". Remove the space
+- `static/v2/js/pages/read.js:278` X6 (warn): "h ?". Remove the space
+- `static/v2/js/pages/read.js:278` X6 (warn): ") :". Remove the space
+- `static/v2/js/pages/read.js:278` X6 (warn): "h ?". Remove the space
+- `static/v2/js/pages/read.js:281` X6 (warn): "n ?". Remove the space
+- `static/v2/js/pages/read.js:281` X6 (warn): "y ?". Remove the space
+- `static/v2/js/pages/read.js:281` X6 (warn): "d ?". Remove the space
 - `static/v2/js/pages/reports.js:74` X5 (warn): "feature Feature". Delete one
-- `static/v2/js/pages/reports.js:124` X5 (warn): "asked Asked". Delete one
-- `static/v2/js/pages/reports.js:127` X5 (warn): "feature Feature". Delete one
-- `static/v2/js/pages/reports.js:130` X5 (warn): "plan Plan". Delete one
-- `static/v2/js/pages/scan.js:182` X5 (warn): "bucket Bucket". Delete one
-- `static/v2/js/pages/settings.js:142` X6 (warn): "s ?". Remove the space
-- `static/v2/js/pages/settings.js:173` A1 (warn): "Recent symbols, Milo chats, drawings and notes stay in this browser, kept apart for each account, and signing out puts y". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/reports.js:163` X5 (warn): "asked Asked". Delete one
+- `static/v2/js/pages/reports.js:166` X5 (warn): "feature Feature". Delete one
+- `static/v2/js/pages/reports.js:169` X5 (warn): "plan Plan". Delete one
+- `static/v2/js/pages/reports.js:216` X6 (warn): "e .". Remove the space
+- `static/v2/js/pages/saved.js:94` A1 (warn): "Press Save on a company\'s Dossier, on a comparison in Compare, on a research sheet, on a screen in Scan, or in Milo\'s ". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/saved.js:114` X6 (warn): "h ,". Remove the space
+- `static/v2/js/pages/scan.js:247` X5 (warn): "bucket Bucket". Delete one
+- `static/v2/js/pages/settings.js:113` X6 (warn): "e ,". Remove the space
+- `static/v2/js/pages/settings.js:113` X6 (warn): "y .". Remove the space
+- `static/v2/js/pages/settings.js:186` X6 (warn): "s ?". Remove the space
+- `static/v2/js/pages/settings.js:217` A1 (warn): "Recent symbols, Milo chats, drawings and notes stay in this browser, kept apart for each account, and signing out puts y". Split it, or cut the clauses that do not change the meaning
 - `static/v2/js/pages/signin.js:66` X6 (warn): "y .". Remove the space
 - `static/v2/js/pages/tracker.js:125` A1 (warn): "They differ in what changes a risk profile: how selective the entry bar is, how much is risked per trade, how much the b". Split it, or cut the clauses that do not change the meaning
 - `static/v2/js/pages/tracker.js:147` X6 (warn): "s ,". Remove the space
@@ -1288,50 +1502,53 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 - `static/v2/js/pages/tracker.js:191` X6 (warn): "d ,". Remove the space
 - `static/v2/js/pages/tracker.js:197` X5 (warn): "closed Closed". Delete one
 - `static/v2/js/pages/tracker.js:353` A1 (warn): "Each trading day after the close every setup on the list is checked, and anything watching, armed or triggered is stored". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/tracker.js:367` X6 (warn): "k .". Remove the space
-- `static/v2/js/pages/tracker.js:369` X6 (warn): "e ,". Remove the space
-- `static/v2/js/pages/workspace.js:323` A1 (warn): "Your watchlist and holdings, the latest completed session against the one before, item by item: a price past a level, a ". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/workspace.js:343` A1 (warn): "SPY, QQQ, IWM and the eleven SPDR sector funds, each against the prior completed session\'s high and low: above the high". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/workspace.js:417` A1 (warn): "The 11 sector funds, coloured by their move over the chosen period: green rose, red fell, and the stronger the colour th". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/workspace.js:502` X6 (warn): "t .". Remove the space
-- `static/v2/js/pages/workspace.js:673` A1 (warn): "Seven measures of the linked company\'s business, each graded A to F from its filings: returns on capital, margins, grow". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/pages/workspace.js:726` X6 (warn): "d .". Remove the space
-- `static/v2/js/ui/milo.js:324` X4 (warn): "o!". Use a full stop
-- `static/v2/js/ui/milo.js:520` X6 (warn): "h ?". Remove the space
-- `static/v2/js/ui/milo.js:536` X6 (warn): ") ?". Remove the space
-- `static/v2/js/ui/milo.js:542` X6 (warn): ") :". Remove the space
-- `static/v2/js/ui/milo.js:542` X6 (warn): "m ?". Remove the space
-- `static/v2/js/ui/milo.js:544` X6 (warn): "0 ?". Remove the space
-- `static/v2/js/ui/milo.js:544` X6 (warn): "0 ?". Remove the space
-- `static/v2/js/ui/milo.js:560` X6 (warn): ") :". Remove the space
-- `static/v2/js/ui/milo.js:560` A1 (warn): "Its words * are Classic's. */ const EXAMPLE_FOR = { brokerage: 'Where am I concentrated?', paper: 'How concentrated am I". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/ui/milo.js:560` G1 (warn): "Its words * are Classic's. */ const EXAMPLE_FOR = { brokerage: 'Where am I concentrated?', paper: 'How concentrated am I". Split it or cut it
-- `static/v2/js/ui/milo.js:567` X6 (warn): "S :". Remove the space
-- `static/v2/js/ui/milo.js:567` A1 (warn): "; return (scope === 'auto' && EXAMPLE_FOR[r.view]) // 'What is moving the market today?'; } /* Follow-ups above the box ". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/ui/milo.js:567` G1 (warn): "; return (scope === 'auto' && EXAMPLE_FOR[r.view]) // 'What is moving the market today?'; } /* Follow-ups above the box ". Split it or cut it
-- `static/v2/js/ui/milo.js:597` A1 (warn): "}, ]; if (r.view === 'brokerage') return [ { id: 'attention', label: 'What needs attention', text: 'What deserves my att". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/ui/milo.js:597` A1 (warn): "Separate what you measured from headlines that only match the timing.' }, { id: 'earnings', label: 'My earnings', text: ". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/ui/milo.js:597` G1 (warn): "Separate what you measured from headlines that only match the timing.' }, { id: 'earnings', label: 'My earnings', text: ". Split it or cut it
-- `static/v2/js/ui/milo.js:611` A1 (warn): "}, ]; } if (r.view === 'scan') return [ { id: 'screen', label: 'Explain these results', text: 'What do the names on this". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/ui/milo.js:611` A1 (warn): "Which are worth a closer look?' }, ]; return [ { id: 'quick', label: 'Market read', text: 'What is driving the market to". Split it, or cut the clauses that do not change the meaning
-- `static/v2/js/ui/milo.js:611` G1 (warn): "}, ]; } if (r.view === 'scan') return [ { id: 'screen', label: 'Explain these results', text: 'What do the names on this". Split it or cut it
-- `static/v2/js/ui/milo.js:611` G1 (warn): "Which are worth a closer look?' }, ]; return [ { id: 'quick', label: 'Market read', text: 'What is driving the market to". Split it or cut it
-- `static/v2/js/ui/milo.js:630` X6 (warn): "b ?". Remove the space
-- `static/v2/js/ui/milo.js:631` X5 (warn): "btn btn". Delete one
-- `static/v2/js/ui/milo.js:631` X6 (warn): "t ?". Remove the space
-- `static/v2/js/ui/milo.js:631` X6 (warn): "m ?". Remove the space
-- `app/ai.py:147` A1 (warn): "Before discussing direction, lead with how the thesis could be tested: whether it is falsifiable, what evidence would pr". Split it, or cut the clauses that do not change the meaning
-- `app/ai.py:147` A1 (warn): "Describe how risk is commonly measured (for example, the distance to a level that breaks the read, as a percentage) with". Split it, or cut the clauses that do not change the meaning
-- `app/ai.py:1547` A1 (warn): "The regular session is open, so nothing has closed today: today's latest daily bar, and anything computed on it, is the ". Split it, or cut the clauses that do not change the meaning
-- `app/ai.py:2387` X6 (warn): "d .". Remove the space
-- `app/ai.py:3274` A1 (warn): "Written from this brief's figures as they stood when it was written, and nothing else: the same index levels, sector mov". Split it, or cut the clauses that do not change the meaning
-- `app/ai.py:3274` B1 (warn): "It is model-written prose, not a mechani / It is written overnight, before the open / It is not a recommendation to trad". Vary the openings or merge them
-- `app/ai.py:1229` X1 (warn): "unexpected error". Say what failed and what to do next, without apologising
-- `app/ai_policy.py:323` A1 (warn): "Do not get around the policy with a shortlist of picks, a ranking for action, an allocation, a share count, an entry or ". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/tracker.js:369` X6 (warn): "k .". Remove the space
+- `static/v2/js/pages/tracker.js:372` X6 (warn): "e ,". Remove the space
+- `static/v2/js/pages/workspace.js:430` A1 (warn): "Your watchlist and holdings, the latest completed session against the one before, item by item: a price past a level, a ". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/workspace.js:450` A1 (warn): "SPY, QQQ, IWM and the eleven SPDR sector funds, each against the prior completed session\'s high and low: above the high". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/workspace.js:549` A1 (warn): "The 11 sector funds, largest move first, coloured by their move over the chosen period: green rose, red fell, and the st". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/workspace.js:549` G1 (warn): "The 11 sector funds, largest move first, coloured by their move over the chosen period: green rose, red fell, and the st". Split it or cut it
+- `static/v2/js/pages/workspace.js:659` X6 (warn): "t .". Remove the space
+- `static/v2/js/pages/workspace.js:836` X6 (warn): "w .". Remove the space
+- `static/v2/js/pages/workspace.js:946` A1 (warn): "Seven measures of the linked company\'s business, each graded A to F from its filings: returns on capital, margins, grow". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/pages/workspace.js:999` X6 (warn): "d .". Remove the space
+- `static/v2/js/ui/milo.js:404` X4 (warn): "o!". Use a full stop
+- `static/v2/js/ui/milo.js:708` X6 (warn): "h ?". Remove the space
+- `static/v2/js/ui/milo.js:725` X6 (warn): ") ?". Remove the space
+- `static/v2/js/ui/milo.js:731` X6 (warn): ") :". Remove the space
+- `static/v2/js/ui/milo.js:731` X6 (warn): "m ?". Remove the space
+- `static/v2/js/ui/milo.js:733` X6 (warn): "0 ?". Remove the space
+- `static/v2/js/ui/milo.js:733` X6 (warn): "0 ?". Remove the space
+- `static/v2/js/ui/milo.js:737` A1 (warn): "'The indicator reading to explain' : String(k).replace(/_/g, ' ')).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (x)". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/ui/milo.js:751` X6 (warn): ") :". Remove the space
+- `static/v2/js/ui/milo.js:751` A1 (warn): "Its words * are Classic's. */ const EXAMPLE_FOR = { brokerage: 'Where am I concentrated?', paper: 'How concentrated am I". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/ui/milo.js:751` G1 (warn): "Its words * are Classic's. */ const EXAMPLE_FOR = { brokerage: 'Where am I concentrated?', paper: 'How concentrated am I". Split it or cut it
+- `static/v2/js/ui/milo.js:758` X6 (warn): "S :". Remove the space
+- `static/v2/js/ui/milo.js:758` A1 (warn): "; return (scope === 'auto' && EXAMPLE_FOR[r.view]) // 'What is moving the market today?'; } /* Follow-ups above the box ". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/ui/milo.js:758` G1 (warn): "; return (scope === 'auto' && EXAMPLE_FOR[r.view]) // 'What is moving the market today?'; } /* Follow-ups above the box ". Split it or cut it
+- `static/v2/js/ui/milo.js:788` A1 (warn): "}, ]; if (r.view === 'brokerage') return [ { id: 'attention', label: 'What needs attention', text: 'What deserves my att". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/ui/milo.js:788` A1 (warn): "Separate what you measured from headlines that only match the timing.' }, { id: 'earnings', label: 'My earnings', text: ". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/ui/milo.js:788` G1 (warn): "Separate what you measured from headlines that only match the timing.' }, { id: 'earnings', label: 'My earnings', text: ". Split it or cut it
+- `static/v2/js/ui/milo.js:802` A1 (warn): "}, ]; } if (r.view === 'scan') return [ { id: 'screen', label: 'Explain these results', text: 'What do the names on this". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/ui/milo.js:802` A1 (warn): "Which are worth a closer look?' }, ]; return [ { id: 'quick', label: 'Market read', text: 'What is driving the market to". Split it, or cut the clauses that do not change the meaning
+- `static/v2/js/ui/milo.js:802` G1 (warn): "}, ]; } if (r.view === 'scan') return [ { id: 'screen', label: 'Explain these results', text: 'What do the names on this". Split it or cut it
+- `static/v2/js/ui/milo.js:802` G1 (warn): "Which are worth a closer look?' }, ]; return [ { id: 'quick', label: 'Market read', text: 'What is driving the market to". Split it or cut it
+- `static/v2/js/ui/milo.js:821` X6 (warn): "b ?". Remove the space
+- `static/v2/js/ui/milo.js:822` X5 (warn): "btn btn". Delete one
+- `static/v2/js/ui/milo.js:822` X6 (warn): "t ?". Remove the space
+- `static/v2/js/ui/milo.js:822` X6 (warn): "m ?". Remove the space
+- `app/ai.py:158` A1 (warn): "Before discussing direction, lead with how the thesis could be tested: whether it is falsifiable, what evidence would pr". Split it, or cut the clauses that do not change the meaning
+- `app/ai.py:158` A1 (warn): "Describe how risk is commonly measured (for example, the distance to a level that breaks the read, as a percentage) with". Split it, or cut the clauses that do not change the meaning
+- `app/ai.py:1875` A1 (warn): "The regular session is open, so nothing has closed today: today's latest daily bar, and anything computed on it, is the ". Split it, or cut the clauses that do not change the meaning
+- `app/ai.py:2718` X6 (warn): "d .". Remove the space
+- `app/ai.py:3605` A1 (warn): "Written from this brief's figures as they stood when it was written, and nothing else: the same index levels, sector mov". Split it, or cut the clauses that do not change the meaning
+- `app/ai.py:3605` B1 (warn): "It is model-written prose, not a mechani / It is written overnight, before the open / It is not a recommendation to trad". Vary the openings or merge them
+- `app/ai.py:1343` X1 (warn): "unexpected error". Say what failed and what to do next, without apologising
+- `app/ai_policy.py:551` A1 (warn): "Do not get around the policy with a shortlist of picks, a ranking for action, an allocation, a share count, an entry or ". Split it, or cut the clauses that do not change the meaning
 - `app/alerts.py:137` X6 (warn): "T ?". Remove the space
 - `app/analytics/cases.py:210` X6 (warn): "y .". Remove the space
 - `app/analytics/cases.py:192` X6 (warn): ") .". Remove the space
-- `app/analytics/compare.py:59` G1 (warn): "Five-year annualised price return and that rate per unit of the same five years' volatility, how far it sits below its h". Split it or cut it
+- `app/analytics/compare.py:61` G1 (warn): "Five-year annualised price return and that rate per unit of the same five years' volatility, how far it sits below its h". Split it or cut it
 - `app/analytics/contract_picker.py:252` G1 (warn): "Calls when screening for a rise, puts for a fall; an expiry at least … days after the end of your window; a two-sided qu". Split it or cut it
 - `app/analytics/defence.py:117` X6 (warn): "e .". Remove the space
 - `app/analytics/dispersion.py:52` G1 (warn): "Wide gaps came before 10% drawdowns somewhat more often (13 to 16% of days in the upper three quintiles, about 6% in the". Split it or cut it
@@ -1342,6 +1559,8 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 - `app/analytics/forex.py:146` A1 (warn): "Canada is a net exporter, so higher oil pushes this pair DOWN, plus the Bank of Canada against the Fed, and tariff news,". Split it, or cut the clauses that do not change the meaning
 - `app/analytics/fundamentals.py:33` X5 (warn): "Cash Cash". Delete one
 - `app/analytics/fundamentals.py:37` X5 (warn): "Cash Cash". Delete one
+- `app/analytics/fundamentals.py:750` A1 (warn): "Open-market purchases and sales (Form 4 codes P and S) by officers, directors and 10% owners in the last six months, fro". Split it, or cut the clauses that do not change the meaning
+- `app/analytics/fundamentals.py:750` G1 (warn): "Open-market purchases and sales (Form 4 codes P and S) by officers, directors and 10% owners in the last six months, fro". Split it or cut it
 - `app/analytics/pattern_stats.py:238` A1 (warn): "The first bar a reader could have acted on, and measured against … over the identical dates AND against the ticker's own". Split it, or cut the clauses that do not change the meaning
 - `app/analytics/pattern_stats.py:238` G1 (warn): "The first bar a reader could have acted on, and measured against … over the identical dates AND against the ticker's own". Split it or cut it
 - `app/analytics/portfolio_risk.py:314` A1 (warn): "Trailing correlation between the names is …, so day to day they are not moving together, but a shock to the sector itsel". Split it, or cut the clauses that do not change the meaning
@@ -1369,32 +1588,38 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 - `app/catalysts.py:510` G1 (warn): "Stories are filed by published rules, not a model: a headline qualifies when it says a government, central bank, regulat". Split it or cut it
 - `app/desk/check.py:32` G1 (warn): "CPI PPI PCE FOMC GDP ETF ETFS EPS OPEC IMF WTI VIX VVIX DXY USD SEC FTC DOJ AI US USA UK EU ECB BOJ FDA IPO CEO CFO NYSE". Split it or cut it
 - `app/feeds.py:434` G1 (warn): "It is WSJ's general op-ed page, not a markets one: on the day it went in it took all six desk slots with a piece on a da". Split it or cut it
+- `app/figures/compute.py:467` X5 (warn): "Cash Cash". Delete one
 - `app/horizon.py:40` A1 (warn): "Then the intraday structure the data actually has: the prior close and day range, pivots and the nearest computed suppor". Split it, or cut the clauses that do not change the meaning
 - `app/horizon.py:58` A1 (warn): "Name every scheduled event inside the window (earnings, macro releases, ex-dividend, expiry) with its date, because a ho". Split it, or cut the clauses that do not change the meaning
-- `app/knowledge.py:70` A1 (warn): "Every caveat, every risk, every note that data is delayed, estimated or inferred, and every statement that something is ". Split it, or cut the clauses that do not change the meaning
-- `app/knowledge.py:70` B1 (warn): "Every figure, calculation and date is th / Every source is named the same way. / Every caveat, every risk, every note th". Vary the openings or merge them
-- `app/knowledge.py:179` G1 (warn): "Where a figure is a proxy or an assumption, label it in a word rather than a sentence, and keep it labelled: density is ". Split it or cut it
-- `app/legal.py:27` A1 (warn): "It is not financial, investment, tax or legal advice, and nothing in it is a recommendation, solicitation or offer to bu". Split it, or cut the clauses that do not change the meaning
-- `app/legal.py:27` A1 (warn): "If you link a brokerage account, Optic shows and describes those holdings read-only, but it does not know or assess your". Split it, or cut the clauses that do not change the meaning
-- `app/legal.py:51` A1 (warn): "Simulated results have inherent limitations: they are prepared with the benefit of hindsight, assume fills at the mid pr". Split it, or cut the clauses that do not change the meaning
-- `app/main.py:7245` A1 (warn): "The terminal's own screen, ranked by trend and momentum score, enriched with sector, market-cap bucket, valuation multip". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:87` A1 (warn): "Call it when the question is about levels, a trend, a breakout, or where a stock could find support, and CONTEXT has no ". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:102` A1 (warn): "Optic's long-term model for one company: the holding view and its conviction, revenue and earnings growth, profit margin". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:102` G1 (warn): "Optic's long-term model for one company: the holding view and its conviction, revenue and earnings growth, profit margin". Split it or cut it
-- `app/milo_tools.py:113` A1 (warn): "Optic's fair-value workspace for one company: the deterministic DCF value per share against the price, its scenarios and". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:124` A1 (warn): "The earnings panel for one company: the next report date and timing, the consensus, estimate revisions, the surprise rec". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:157` A1 (warn): "Optic's research framework for one company in one mode: long_term (quality and valuation grades, conviction, loss paths)". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:207` A1 (warn): "Find the ticker for a company, fund, index, rate, currency or crypto from its name, an alias or part of a symbol, from t". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:217` A1 (warn): "Daily or weekly price bars for one symbol over a named window, from the same Yahoo Finance history the charts draw, with". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:217` A1 (warn): "Call it whenever the question asks how something has moved or performed over a period ("the last three months", "this ye". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:232` A1 (warn): "The company's recent notable SEC filings, newest first (annual and quarterly reports, current reports with their item nu". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:506` A1 (warn): "It does not observe who bought or sold (no trade tape), whether a trade opened or closed a position, or who holds it. `p". Split it, or cut the clauses that do not change the meaning
-- `app/milo_tools.py:506` G1 (warn): "It does not observe who bought or sold (no trade tape), whether a trade opened or closed a position, or who holds it. `p". Split it or cut it
+- `app/indicator_registry.py:61` A1 (warn): "Wilder's RSI, period 14, on closes: RS = SMMA14(gains) / SMMA14(losses), RSI = 100 - 100/(1 + RS), seeded with simple me". Split it, or cut the clauses that do not change the meaning
+- `app/knowledge.py:73` A1 (warn): "Every caveat, every risk, every note that data is delayed, estimated or inferred, and every statement that something is ". Split it, or cut the clauses that do not change the meaning
+- `app/knowledge.py:73` B1 (warn): "Every figure, calculation and date is th / Every source is named the same way. / Every caveat, every risk, every note th". Vary the openings or merge them
+- `app/knowledge.py:182` G1 (warn): "Where a figure is a proxy or an assumption, label it in a word rather than a sentence, and keep it labelled: density is ". Split it or cut it
+- `app/legal.py:29` A1 (warn): "It is not financial, investment, tax or legal advice, and nothing in it is a recommendation, solicitation or offer to bu". Split it, or cut the clauses that do not change the meaning
+- `app/legal.py:29` A1 (warn): "If you link a brokerage account, Optic shows and describes those holdings read-only, but it does not know or assess your". Split it, or cut the clauses that do not change the meaning
+- `app/legal.py:53` A1 (warn): "Simulated results have inherent limitations: they are prepared with the benefit of hindsight, assume fills at the mid pr". Split it, or cut the clauses that do not change the meaning
+- `app/library.py:358` X6 (warn): "E ?". Remove the space
+- `app/library.py:358` X6 (warn): "E ?". Remove the space
+- `app/library.py:358` X6 (warn): "E ?". Remove the space
+- `app/library.py:358` B1 (warn): "ESCAPE '\' OR lower(COALESCE(tickers, sy / ESCAPE '\' OR lower(substr(content, 1, 2 / ESCAPE '\')". Vary the openings or merge them
+- `app/main.py:7609` A1 (warn): "The terminal's own screen, ranked by trend and momentum score, enriched with sector, market-cap bucket, valuation multip". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:90` A1 (warn): "Call it when the question is about levels, a trend, a breakout, or where a stock could find support, and CONTEXT has no ". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:105` A1 (warn): "Optic's long-term model for one company: the holding view and its conviction, revenue and earnings growth, profit margin". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:105` G1 (warn): "Optic's long-term model for one company: the holding view and its conviction, revenue and earnings growth, profit margin". Split it or cut it
+- `app/milo_tools.py:116` A1 (warn): "Optic's fair-value workspace for one company: the deterministic DCF value per share against the price, its scenarios and". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:127` A1 (warn): "The earnings panel for one company: the next report date and timing, the consensus, estimate revisions, the surprise rec". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:160` A1 (warn): "Optic's research framework for one company in one mode: long_term (quality and valuation grades, conviction, loss paths)". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:210` A1 (warn): "Find the ticker for a company, fund, index, rate, currency or crypto from its name, an alias or part of a symbol, from t". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:220` A1 (warn): "Daily or weekly price bars for one symbol over a named window, from the same Yahoo Finance history the charts draw, with". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:220` A1 (warn): "Call it whenever the question asks how something has moved or performed over a period ("the last three months", "this ye". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:235` A1 (warn): "The company's recent notable SEC filings, newest first (annual and quarterly reports, current reports with their item nu". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:516` A1 (warn): "It does not observe who bought or sold (no trade tape), whether a trade opened or closed a position, or who holds it. `p". Split it, or cut the clauses that do not change the meaning
+- `app/milo_tools.py:516` G1 (warn): "It does not observe who bought or sold (no trade tape), whether a trade opened or closed a position, or who holds it. `p". Split it or cut it
 - `app/paper.py:2027` X6 (warn): "T ?". Remove the space
 - `app/paper.py:700` X6 (warn): "t .". Remove the space
 - `app/priority.py:414` G1 (warn): "Before the open or after the close comes from Yahoo's quote for a date Yahoo has confirmed, used only when the report's ". Split it or cut it
 - `app/priority.py:414` G1 (warn): "Revenue comes from Yahoo's quarterly statement or the SEC filing, which arrive a day to a few weeks after the press rele". Split it or cut it
-- `app/replays.py:41` A1 (warn): "No news, results, analyst changes or option flow are shown, because Optic does not hold them as they stood on each day, ". Split it, or cut the clauses that do not change the meaning
+- `app/replays.py:42` A1 (warn): "No news, results, analyst changes or option flow are shown, because Optic does not hold them as they stood on each day, ". Split it, or cut the clauses that do not change the meaning
 - `app/research/earnings_view.py:310` A1 (warn): "Unusual options volume is a reason to look closer, not evidence of an informed bet: it can be a hedge, one leg of a spre". Split it, or cut the clauses that do not change the meaning
 - `app/research/forecasts.py:156` X6 (warn): "T ?". Remove the space
 - `app/research/milo.py:15` A1 (warn): "Keep the judgments apart: business quality, valuation, the swing setup, earnings expectations and event risk are separat". Split it, or cut the clauses that do not change the meaning
@@ -1404,31 +1629,32 @@ row-per-text table is `text_inventory.csv` (route, file and line, kind, words, p
 - `app/research/milo.py:86` A1 (warn): "When the reader asks for your take on the stock (thoughts on it, near or long term), write it in the take shape of the b". Split it, or cut the clauses that do not change the meaning
 - `app/research/milo.py:86` A1 (warn): "Otherwise each assessment on its own first, in a short paragraph (long term, swing, earnings), then where they agree or ". Split it, or cut the clauses that do not change the meaning
 - `app/research/milo.py:86` G1 (warn): "When the reader asks for your take on the stock (thoughts on it, near or long term), write it in the take shape of the b". Split it or cut it
-- `app/research/quality.py:45` G1 (warn): "4 with net cash, or net debt at most 1x EBITDA with interest covered 8x; 3 at 2x and 5x; 2 within the policy limits (lev". Split it or cut it
-- `app/research/quality.py:53` G1 (warn): "Moat evidence, four measurable tests, one point each: returns above the cost of capital in at least 80% of the years rea". Split it or cut it
-- `app/research/quality.py:62` A1 (warn): "Base-case value per share from the model that fits this business (the DCF, or residual income for a bank) against the pr". Split it, or cut the clauses that do not change the meaning
-- `app/research/quality.py:65` A1 (warn): "Today's P/E against the P/E of each fiscal year in the feed (that year's average price over its diluted EPS, usually fou". Split it, or cut the clauses that do not change the meaning
-- `app/research/quality.py:65` G1 (warn): "Today's P/E against the P/E of each fiscal year in the feed (that year's average price over its diluted EPS, usually fou". Split it or cut it
-- `app/research/quality.py:69` A1 (warn): "Free cash flow to equity over market value (an equity measure over an equity value), against the 10-year Treasury yield:". Split it, or cut the clauses that do not change the meaning
-- `app/research/quality.py:73` A1 (warn): "Growth the price implies (reverse DCF) against the company's own revenue record: 4 when it implies 5 points a year less ". Split it, or cut the clauses that do not change the meaning
+- `app/research/quality.py:47` G1 (warn): "4 with net cash, or net debt at most 1x EBITDA with interest covered 8x; 3 at 2x and 5x; 2 within the policy limits (lev". Split it or cut it
+- `app/research/quality.py:55` G1 (warn): "Moat evidence, four measurable tests, one point each: returns above the cost of capital in at least 80% of the years rea". Split it or cut it
+- `app/research/quality.py:64` A1 (warn): "Base-case value per share from the model that fits this business (the DCF, or residual income for a bank) against the pr". Split it, or cut the clauses that do not change the meaning
+- `app/research/quality.py:67` A1 (warn): "Today's P/E against the P/E of each fiscal year in the feed (that year's average price over its diluted EPS, usually fou". Split it, or cut the clauses that do not change the meaning
+- `app/research/quality.py:67` G1 (warn): "Today's P/E against the P/E of each fiscal year in the feed (that year's average price over its diluted EPS, usually fou". Split it or cut it
+- `app/research/quality.py:71` A1 (warn): "Free cash flow to equity over market value (an equity measure over an equity value), against the 10-year Treasury yield:". Split it, or cut the clauses that do not change the meaning
+- `app/research/quality.py:75` A1 (warn): "Growth the price implies (reverse DCF) against the company's own revenue record: 4 when it implies 5 points a year less ". Split it, or cut the clauses that do not change the meaning
 - `app/research_book.py:91` A1 (warn): "A strong positive earnings reaction looked like a lead on 40 of today's large caps, but on every S&P 500 member of 2019-". Split it, or cut the clauses that do not change the meaning
 - `app/shortlist.py:319` A1 (warn): "A forward record: setups listed before their outcome was known, … sessions later, from the evaluation close, before cost". Split it, or cut the clauses that do not change the meaning
 - `app/signal_history.py:357` X6 (warn): "T ?". Remove the space
+- `app/symbol_check.py:205` X6 (warn): "d .". Remove the space
 - `app/valuation/defaults.py:232` A1 (warn): "Starting growth above … fades to the long-run rate by year …, not over the whole forecast: very high growth rarely persi". Split it, or cut the clauses that do not change the meaning
-- `app/watch_runner.py:310` X6 (warn): "T ?". Remove the space
+- `app/watch_runner.py:321` X6 (warn): "T ?". Remove the space
 
 ## Terminology
 
-- `static/v2/js/pages/chart-widgets.js:259` "year on year": Optic says 'year over year'
+- `static/v2/js/pages/chart-widgets.js:266` "year on year": Optic says 'year over year'
 - `static/v2/js/pages/home.js:103` "Year on year": Optic says 'year over year'
-- `static/v2/js/pages/investing.js:218` "year on year": Optic says 'year over year'
-- `app/ai.py:1354` "login": Optic says 'sign in'
-- `app/ai.py:3598` "login": Optic says 'sign in'
-- `app/ai.py:3804` "login": Optic says 'sign in'
+- `static/v2/js/pages/investing.js:222` "year on year": Optic says 'year over year'
+- `app/ai.py:1468` "login": Optic says 'sign in'
+- `app/ai.py:4016` "login": Optic says 'sign in'
+- `app/ai.py:4353` "login": Optic says 'sign in'
 - `app/analytics/stockmaps.py:66` "Year-on-year": Optic says 'year over year'
-- `app/main.py:6914` "Premarket": Optic says 'pre-market'
-- `app/main.py:6914` "premarket": Optic says 'pre-market'
-- `app/milo_tools.py:244` "year-on-year": Optic says 'year over year'
+- `app/main.py:7179` "Premarket": Optic says 'pre-market'
+- `app/main.py:7179` "premarket": Optic says 'pre-market'
+- `app/milo_tools.py:247` "year-on-year": Optic says 'year over year'
 
 ## Written out in more than one file
 

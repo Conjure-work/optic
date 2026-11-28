@@ -37,6 +37,11 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 ENV PYTHONUNBUFFERED=1
 
+# Two malloc arenas, not one per thread. The memory soak (tests/support/soak, see
+# docs/operations/memory-and-open-files.md) measured 110 to 140 MB less resident
+# memory on this image with it; check allocation-heavy threads after a deploy.
+ENV MALLOC_ARENA_MAX=2
+
 # Where the ledger, the symbol directory and the screener cache live. Declared so
 # a plain `docker run` behaves like the deploy, and so the entrypoint has one
 # place to look.

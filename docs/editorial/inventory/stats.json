@@ -1,48 +1,48 @@
 {
  "by_kind": {
-  "client": 12758,
-  "legal": 125,
-  "prompt": 18,
-  "server": 5135
+  "client": 13991,
+  "legal": 127,
+  "prompt": 21,
+  "server": 5826
  },
  "by_rule": {
-  "A1": 83,
-  "B1": 3,
+  "A1": 89,
+  "B1": 4,
   "D5": 3,
   "E2": 3,
   "F2": 3,
-  "G1": 36,
+  "G1": 38,
   "J1": 1,
   "X1": 4,
   "X4": 1,
-  "X5": 19,
-  "X6": 89,
+  "X5": 20,
+  "X6": 106,
   "X7": 3,
   "X8": 1
  },
  "by_zone": {
-  "classic": 5505,
-  "server": 5153,
-  "v2": 7378
+  "classic": 5509,
+  "server": 5847,
+  "v2": 8609
  },
- "duplicates": 462,
+ "duplicates": 470,
  "files": {
-  "client_files": 123,
+  "client_files": 152,
   "html_files": 2,
-  "server_files": 196
+  "server_files": 221
  },
  "findings": {
   "error": 3,
   "info": 3,
-  "warn": 243
+  "warn": 270
  },
  "status": {
   "flagged": 43,
-  "legal": 125,
-  "open": 147,
-  "prompt": 18,
-  "reviewed": 17703
+  "legal": 127,
+  "open": 168,
+  "prompt": 21,
+  "reviewed": 19606
  },
  "terminology": 10,
- "texts": 18036
+ "texts": 19965
 }
