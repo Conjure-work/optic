@@ -151,6 +151,45 @@ analyst actions, +2.2 MB).
   Python overhead twice in places and a text cell at its full size; they are not used above. The frame-buffer figures and
   resident memory are.
 
+### With real feeds: what the host held (2026-11-28)
+
+The soak above uses a synthetic source and found about 1 MB a symbol. The host, walked from outside (Home plus the ten
+per-symbol reads of `memprobe.PER_SYMBOL` for three new sets of 40 real symbols, then the first set again, eight at a
+time), held about 22 MB a symbol: 940 MB at the start, 1,841, 2,820 and 3,618 MB after the sets, 3,628 MB on the
+repeat, flat on repeat. `python -m tests.support.soak.real sets --out DIR` runs the same walk against a local server
+with the real feeds (network; by hand, never from a test) and the census hooks loaded; `real endpoints` walks one kind
+of read at a time over fresh symbols.
+
+- **Measured: the cause is `app.feeds._MEM`, not the provider cache.** After the four sets the census found 403 entries in
+  `_MEM` holding 2,314 MB of a 2,497 MB process (image, the deployed code: 3,278 MB). Each `sec:facts:<CIK>` entry, EDGAR's
+  companyfacts for one filer, is 5 MB of JSON and 25 to 38 MB parsed; about 100 of them were held. `_MEM` had no ceiling
+  and the disk cache's sixty entries are held parsed too; `tracemalloc` attributes the bytes to `json/decoder.py` called
+  from `app/analytics/sec_facts.py` through `app/valuation/inputs.py` (98 MB after one or two symbols). By kind of read, over
+  eight fresh symbols each: `/api/figures` (+485 MB) and `/api/ticker` (+650 MB, which reads the filings) account for it; the
+  quote, daily-bars, news, session, earnings, symbol-check and sparklines reads move memory by under 70 MB each.
+- **Measured: the provider cache's ceiling was working and was not the problem.** The frames it holds were 97 to 100 MB with
+  real data, counted the same shallow and deep (object columns and nested dicts add under 1 MB); it holds about 120 MB of
+  other objects besides (entries by prefix: none above 12 MB), which its ceiling does not count.
+- **Fix (`app/feeds.py`):** a JSON document of 512 KB or more (`FEED_BIG_BYTES`) is written as a gzip file in
+  `feed_big/` beside the disk cache and parsed on demand into a cache of four (`FEED_PARSED_MAX`), not stored in `_MEM` or
+  the disk cache's dict; an older disk cache's large entries are moved out when it is read (a restart no longer reads
+  gigabytes back); `_MEM` is capped at 300 entries (`FEED_MEM_MAX`), the oldest fetched going first.
+- **Before and after, same walk** (resident MB after each set; set 4 is set 1 again):
+
+  | | Set 1 | Set 2 | Set 3 | Set 4 (repeat) | `_MEM` after |
+  | --- | --- | --- | --- | --- | --- |
+  | Host, c95f3be (as reported) | 1,841 | 2,820 | 3,618 | 3,628 | |
+  | Image, c95f3be, `MALLOC_ARENA_MAX=2` | 1,470 | 2,424 | 3,272 | 3,278 | 402 entries, 2,314 MB |
+  | Image, this fix | 726 | 882 | 944 | 967 | 277 entries, 130 MB |
+  | Local (macOS), before | 1,547 | 2,162 | 2,708 | 2,497 | 403 entries, 2,314 MB |
+  | Local (macOS), this fix | 795 | 883 | 1,020 | 1,036 | 277 entries, 130 MB |
+
+  What remains (about 600 MB over the start) is the provider cache at its ceiling (about 220 MB), the entries of `_MEM`
+  (130 MB), the valuation cache (24 MB), and allocator slack; it stopped growing by the third set. Reports are in
+  `Conjure/customers/optic/audit-response-2026-11-27/evidence/memory-real/`.
+- **Not established:** whether the host's per-set figures differ from the image's (940 MB at the start there, 327 MB in
+  the image) because of the evaluator's own state; the walk's order and symbols were the host's.
+
 ## How it is checked
 
 - `tests/test_pass3_memory.py`: the app in a subprocess, 200 mixed requests, open files within 60 of boot and
@@ -159,6 +198,8 @@ analyst actions, +2.2 MB).
   client is shared per configuration and per loop.
 - `tests/test_audit_memory_cache_ceiling.py`: the provider cache drops its oldest frames past `YF_CACHE_MAX_MB`, counts a
   shared frame once, and counts a batch and a list of rows.
+- `tests/test_audit_memory_feeds_big.py`: a large feed document is kept as a file and parsed on demand, a second read does
+  not fetch again, an older disk cache's large entry is moved out, `_MEM` has a ceiling.
 - `tests/test_audit_memory_soak.py`: a small soak runs, writes its report, names the provider cache, and phase A does not
   grow between its last two cycles by more than a stated band.
 - On a deployment: open files and resident memory from inside the container (`ls /proc/1/fd | wc -l`, `VmRSS` in

@@ -29,9 +29,10 @@ if _IN_SERVER and os.environ.get("SOAK_OUT"):
     import synthetic                                              # noqa: E402
     import yfinance as _yf                                        # noqa: E402
 
-    _yf.Ticker = synthetic.Ticker
-    _yf.download = synthetic.download
-    _yf.Search = synthetic.Search
+    if os.environ.get("SOAK_REAL") != "1":                        # SOAK_REAL=1: the real feeds, for a measurement by hand
+        _yf.Ticker = synthetic.Ticker
+        _yf.download = synthetic.download
+        _yf.Search = synthetic.Search
     _OUT = os.environ["SOAK_OUT"]
     _TRACE = os.environ.get("SOAK_TRACE") == "1"
     _seq = {"snap": 0, "trim": 0}
@@ -51,31 +52,39 @@ if _IN_SERVER and os.environ.get("SOAK_OUT"):
         return int(subprocess.run(["ps", "-o", "rss=", "-p", str(os.getpid())], capture_output=True, text=True).stdout.strip() or 0)
 
     def _deep(obj, seen, depth=0) -> int:
-        """Bytes held by `obj` and what it holds, each object once per `seen`. Frames and arrays by their buffers."""
-        if id(obj) in seen or depth > 6:
-            return 0
-        seen.add(id(obj))
+        """Bytes held by `obj` and what it holds, each object once per `seen`, to any depth (a parsed EDGAR document is
+        nested well past six levels). Frames and arrays by their buffers."""
         try:
             import numpy as np
             import pandas as pd
-            if isinstance(obj, pd.DataFrame):
-                return int(obj.memory_usage(deep=True, index=True).sum()) + sys.getsizeof(obj)
-            if isinstance(obj, pd.Series):
-                return int(obj.memory_usage(deep=True, index=True)) + sys.getsizeof(obj)
-            if isinstance(obj, np.ndarray):
-                return int(obj.nbytes) + sys.getsizeof(obj)
         except Exception:                                         # noqa: BLE001
-            pass
-        size = sys.getsizeof(obj)
-        if isinstance(obj, dict):
-            for k, v in list(obj.items()):
-                size += _deep(k, seen, depth + 1) + _deep(v, seen, depth + 1)
-        elif isinstance(obj, (list, tuple, set, frozenset)):
-            for v in list(obj):
-                size += _deep(v, seen, depth + 1)
-        elif hasattr(obj, "__dict__") and not isinstance(obj, type):
-            size += _deep(vars(obj), seen, depth + 1)
-        return size
+            np = pd = None
+        total = 0
+        stack = [obj]
+        while stack:
+            o = stack.pop()
+            if id(o) in seen:
+                continue
+            seen.add(id(o))
+            if pd is not None and isinstance(o, pd.DataFrame):
+                total += int(o.memory_usage(deep=True, index=True).sum()) + sys.getsizeof(o)
+                continue
+            if pd is not None and isinstance(o, pd.Series):
+                total += int(o.memory_usage(deep=True, index=True)) + sys.getsizeof(o)
+                continue
+            if np is not None and isinstance(o, np.ndarray):
+                total += int(o.nbytes) + sys.getsizeof(o)
+                continue
+            total += sys.getsizeof(o)
+            if isinstance(o, dict):
+                for k, v in list(o.items()):
+                    stack.append(k)
+                    stack.append(v)
+            elif isinstance(o, (list, tuple, set, frozenset)):
+                stack.extend(list(o))
+            elif hasattr(o, "__dict__") and not isinstance(o, type):
+                stack.append(vars(o))
+        return total
 
     def _caches() -> list:
         out = []
@@ -119,7 +128,7 @@ if _IN_SERVER and os.environ.get("SOAK_OUT"):
             row["entries"] += 1
             row["bytes"] += _deep(entry, set())                   # standalone: what the prefix would hold alone
             unique += _deep(entry, seen)                          # each shared object once across the whole cache
-        frames, held = set(), 0                                   # frame buffers by shallow size, each frame once: what a
+        frames, held, deep_held = set(), 0, 0                                   # frame buffers by shallow size, each frame once: what a
         for entry in list(cache.values()):                        # byte ceiling on the cache would count
             value = entry[1] if isinstance(entry, tuple) and len(entry) == 2 else None
             try:
@@ -130,10 +139,30 @@ if _IN_SERVER and os.environ.get("SOAK_OUT"):
                     if id(f) not in frames:
                         frames.add(id(f))
                         held += int(f.memory_usage(deep=False, index=True).sum())
+                        deep_held += int(f.memory_usage(deep=True, index=True).sum())
             except Exception:                                     # noqa: BLE001
                 pass
-        return {"frame_bytes_shallow_unique": held, "frames_held": len(frames), "by_prefix": by, "standalone_bytes_total": sum(r["bytes"] for r in by.values()),
+        return {"frame_bytes_shallow_unique": held, "frame_bytes_deep_unique": deep_held, "frames_held": len(frames), "by_prefix": by, "standalone_bytes_total": sum(r["bytes"] for r in by.values()),
                 "unique_bytes_total": unique, "entries": len(cache), "max": getattr(mod, "CACHE_MAX", None)}
+
+    def _feeds() -> dict:
+        """app.feeds._MEM and the disk copy it shares entries with, by key, deep."""
+        mod = sys.modules.get("app.feeds")
+        if mod is None:
+            return {}
+        out: dict = {}
+        seen: set = set()
+        rows = []
+        for name in ("_MEM",):
+            for k, v in list(getattr(mod, name, {}).items()):
+                rows.append((k, _deep(v, seen)))
+        disk = {}
+        for path, d in list(getattr(mod, "_DISK", {}).items()):
+            disk = d
+        drows = [(k, _deep(v, seen)) for k, v in list(disk.items())]
+        by = lambda r: sorted(r, key=lambda x: -x[1])[:25]
+        return {"mem_entries": len(rows), "mem_bytes": sum(b for _, b in rows), "disk_entries": len(drows),
+                "disk_bytes_not_in_mem": sum(b for _, b in drows), "mem_top": by(rows), "disk_top": by(drows)}
 
     def _frames() -> dict:
         try:
@@ -166,6 +195,7 @@ if _IN_SERVER and os.environ.get("SOAK_OUT"):
         rec.update(_frames())
         rec["caches"] = _caches()
         rec["provider_cache"] = _provider_cache()
+        rec["feeds"] = _feeds()
         rec["took_s"] = round(time.time() - t0, 2)
         tmp = os.path.join(_OUT, "snap-%03d.json.tmp" % n)
         with open(tmp, "w") as f:
