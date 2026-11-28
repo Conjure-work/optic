@@ -54,6 +54,7 @@ def test_the_history_merges_sec_form4_trades_before_yahoo_and_says_which_is_whic
     assert ("2026-09-01", "yahoo") in by and ("2023-05-18", "sec") in by
     assert all(r["action"] in ("purchase", "sale") for r in h["rows"]), "awards are not trades"
     assert h["coverage"]["sec_rows"] == 1 and h["coverage"]["cik"] == "731766" and h["coverage"]["sec_unread"] == 0
+    assert h["coverage"]["state"] == "complete" and h["coverage"]["covered_from"] == h["since"] and h["coverage"]["none"] is False
     assert kept == [] or all(a[2] == 5 * 365 for a in kept if len(a) > 2)
 
 
@@ -61,6 +62,8 @@ def test_filings_not_yet_read_are_counted_and_start_the_reader_for_the_span_aske
     form4_store.save_list("UNH", "731766", [["0000731766-22-000001", "2022-03-01"]], "2010-01-01")
     h = F.history("UNH", _yahoo([_row("2026-09-01", "sale")]), 10, today=TODAY)
     assert h["coverage"]["sec_unread"] == 1 and h["coverage"]["complete"] is False
+    assert h["coverage"]["state"] == "reading" and h["coverage"]["covered_from"] == (TODAY - dt.timedelta(days=730)).isoformat(), \
+        "no filing read yet: only the two years a short Yahoo list covers"
     assert kept and kept[-1][0] == "UNH" and kept[-1][2] == 10 * 365
 
 
