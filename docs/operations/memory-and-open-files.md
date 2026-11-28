@@ -166,7 +166,7 @@ of read at a time over fresh symbols.
   and the disk cache's sixty entries are held parsed too; `tracemalloc` attributes the bytes to `json/decoder.py` called
   from `app/analytics/sec_facts.py` through `app/valuation/inputs.py` (98 MB after one or two symbols). By kind of read, over
   eight fresh symbols each: `/api/figures` (+485 MB) and `/api/ticker` (+650 MB, which reads the filings) account for it; the
-  quote, daily-bars, news, session, earnings, symbol-check and sparklines reads move memory by under 60 MB each.
+  quote, daily-bars, news, session, earnings, symbol-check and sparklines reads move memory by under 70 MB each.
 - **Measured: the provider cache's ceiling was working and was not the problem.** The frames it holds were 97 to 100 MB with
   real data, counted the same shallow and deep (object columns and nested dicts add under 1 MB); it holds about 120 MB of
   other objects besides (entries by prefix: none above 12 MB), which its ceiling does not count.
