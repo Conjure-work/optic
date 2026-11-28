@@ -209,7 +209,8 @@ def filing_url(cik: str, accn: Optional[str]) -> Optional[str]:
 def retrieved_at(key: str) -> Optional[str]:
     """When the cached copy of a feed was fetched, as an ISO date-time."""
     try:
-        hit = feeds._MEM.get(key) or feeds._load_disk().get(key)        # noqa: SLF001
+        hit = (feeds._MEM.get(key) or feeds._load_disk().get(key)           # noqa: SLF001
+               or feeds.big_entry(key))
     except Exception:                                                   # noqa: BLE001
         hit = None
     at = (hit or {}).get("at")

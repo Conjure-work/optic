@@ -27,6 +27,8 @@ assuming RSS silently yields zero rows on half the set.
 
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 import os
 import re
@@ -595,6 +597,102 @@ def _fetch(url: str, accept: str, user_agent: Optional[str] = None,
 
 # ------------------------------------------------------------------ disk cache
 
+# ---------------------------------------------------------------- large documents
+#
+# EDGAR's companyfacts for one filer is 5 MB of JSON and 25 to 38 MB once parsed (measured 2026-11-28 with real feeds:
+# 403 entries in _MEM held 2.3 GB of a 2.5 GB process after 160 symbols, 100 of them companyfacts, about 25 MB for every
+# new symbol and nothing for a symbol asked again). _MEM had no ceiling, and the disk cache's sixty entries are held
+# parsed too. A document this large is kept as a gzip file beside the disk cache instead, and parsed on demand into
+# a small cache of a few parsed documents, so a reader who walks many symbols holds a few, not all.
+BIG_JSON_BYTES = int(os.environ.get("FEED_BIG_BYTES", str(512 * 1024)))
+_PARSED_MAX = int(os.environ.get("FEED_PARSED_MAX", "4"))
+_PARSED = None          # created on first use: boundcache imports nothing from here
+
+
+def _parsed_cache():
+    global _PARSED
+    if _PARSED is None:
+        from .boundcache import BoundedCache
+        _PARSED = BoundedCache(maxsize=max(_PARSED_MAX, 1), max_age=600.0)
+    return _PARSED
+
+
+def _big_path(key: str) -> str:
+    return os.path.join(os.path.dirname(CACHE_PATH), "feed_big",
+                        hashlib.sha1(key.encode("utf-8")).hexdigest() + ".json.gz")
+
+
+def big_entry(key: str) -> Optional[Dict[str, Any]]:
+    """`{"at": when it was fetched}` for a large document kept on disk, else None (no parse, no read)."""
+    try:
+        return {"at": os.path.getmtime(_big_path(key))}
+    except OSError:
+        return None
+
+
+def _big_get(key: str, ttl_seconds: Optional[float]) -> Any:
+    """The parsed large document for `key`, if one is kept and younger than `ttl_seconds` (None: any age)."""
+    path = _big_path(key)
+    try:
+        at = os.path.getmtime(path)
+    except OSError:
+        return None
+    if ttl_seconds is not None and time.time() - at >= ttl_seconds:
+        return None
+    cache = _parsed_cache()
+    hit = cache.get(key)
+    if hit is not None and hit[0] == at:
+        return hit[1]
+    try:
+        with gzip.open(path, "rb") as handle:
+            parsed = json.loads(handle.read().decode("utf-8", "replace"))
+    except (OSError, ValueError, EOFError):
+        return None
+    cache[key] = (at, parsed)
+    return parsed
+
+
+def _big_put(key: str, body: bytes, parsed: Any) -> None:
+    path = _big_path(key)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with gzip.open(tmp, "wb", compresslevel=3) as handle:
+            handle.write(body)
+        os.replace(tmp, path)
+        _parsed_cache()[key] = (os.path.getmtime(path), parsed)
+    except OSError:
+        _parsed_cache()[key] = (time.time(), parsed)       # a read-only data dir: the parsed copy for a while
+
+
+def _migrate_big(data: Dict[str, Any]) -> bool:
+    """Move any entry of an older disk cache whose document is large into the large-document store, so a restart does not
+    read gigabytes back into memory. True when something moved."""
+    moved = False
+    for key in list(data):
+        entry = data.get(key)
+        if not isinstance(entry, dict) or entry.get("json") is None:
+            continue
+        try:
+            body = json.dumps(entry["json"]).encode("utf-8")
+        except (TypeError, ValueError):
+            continue
+        if len(body) < BIG_JSON_BYTES:
+            continue
+        path = _big_path(key)
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with gzip.open(path + ".tmp", "wb", compresslevel=3) as handle:
+                handle.write(body)
+            os.replace(path + ".tmp", path)
+            os.utime(path, (float(entry.get("at", time.time())),) * 2)
+        except OSError:
+            continue
+        data.pop(key, None)
+        moved = True
+    return moved
+
+
 def cached_json(key: str) -> Any:
     """Any cached copy for this key, however old, or None.
 
@@ -604,6 +702,8 @@ def cached_json(key: str) -> Any:
     strictly better than dropping the feature, provided the caller says so.
     """
     hit = _MEM.get(key) or _load_disk().get(key)
+    if hit is None:
+        return _big_get(key, None)
     return (hit or {}).get("json")
 
 
@@ -636,9 +736,16 @@ def fetch_json(url: str, ttl_seconds: float, key: Optional[str] = None) -> Any:
         hit = _load_disk().get(cache_key)
     if hit and (now - float(hit.get("at", 0))) < ttl_seconds and hit.get("json") is not None:
         return hit["json"]
+    if hit is None:
+        kept = _big_get(cache_key, ttl_seconds)
+        if kept is not None:
+            return kept
 
     body = _fetch(url, "application/json, text/json, */*")
     parsed = json.loads(body.decode("utf-8", "replace"))
+    if len(body) >= BIG_JSON_BYTES:
+        _big_put(cache_key, body, parsed)           # not in _MEM or the disk cache: see "large documents"
+        return parsed
     _store(cache_key, {"at": now, "json": parsed, "error": None})
     return parsed
 
@@ -715,6 +822,8 @@ def _load_disk() -> Dict[str, Any]:
             disk = _DISK.get(path)
             if disk is None:
                 disk = _DISK[path] = _read_disk(path)
+                if _migrate_big(disk):
+                    _save_disk(disk)
     return disk
 
 
