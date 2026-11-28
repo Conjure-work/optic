@@ -869,9 +869,17 @@ def _cached(key: str) -> Optional[Dict[str, Any]]:
     return entry
 
 
+# Entries kept in memory (the disk cache keeps its own sixty). Unbounded, _MEM held an entry for every filer's submissions
+# document twice over (sec:sub: and seg:subs:), about 0.8 MB for each new symbol with real feeds (130 MB at 160 symbols).
+FEED_MEM_MAX = int(os.environ.get("FEED_MEM_MAX", "300"))
+
+
 def _store(key: str, entry: Dict[str, Any]) -> None:
     with _LOCK:
         _MEM[key] = entry
+        if len(_MEM) > FEED_MEM_MAX:                      # the oldest fetched go first; they are refetched or read from disk
+            for old in sorted(_MEM, key=lambda k: float((_MEM[k] or {}).get("at", 0)))[:len(_MEM) - FEED_MEM_MAX]:
+                _MEM.pop(old, None)
     disk = _load_disk()
     # Held across the write: two stores at once would otherwise change the
     # dict while the other was serialising it.

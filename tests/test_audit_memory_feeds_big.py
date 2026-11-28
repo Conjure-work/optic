@@ -78,3 +78,11 @@ def test_an_older_disk_cache_with_a_large_entry_is_moved_out_when_it_is_read(tmp
     assert "sec:facts:9" not in json.loads(path.read_text())
     assert feeds.big_entry("sec:facts:9")["at"] == 1_700_000_000.0
     assert feeds.cached_json("sec:facts:9")["pad"] == "y" * 5000
+
+
+def test_the_memory_cache_has_a_ceiling_and_drops_the_oldest(store, monkeypatch):
+    monkeypatch.setattr(feeds, "FEED_MEM_MAX", 3)
+    monkeypatch.setattr(feeds, "BIG_JSON_BYTES", 10 ** 9)
+    for i in range(6):
+        feeds._store("k%d" % i, {"at": 100.0 + i, "json": {"i": i}, "error": None})
+    assert sorted(feeds._MEM) == ["k3", "k4", "k5"]
