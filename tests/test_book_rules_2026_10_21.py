@@ -20,6 +20,7 @@ more than two or three positions may report earnings together.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -214,6 +215,12 @@ def test_a_leveraged_candidate_is_cut_by_its_multiple():
     assert fit["qty"] == 200, "$15,000 of room is $5,000 of a 3x fund"
 
 
+def _days_ago(n: int) -> str:
+    """An entry time relative to now. The literal "2026-10-14" turned the time stop (MAX_HOLD_DAYS, 45) on from
+    2026-11-28, so the position closed before it was marked and mark_delta stayed None."""
+    return (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
+
+
 def test_an_option_mark_records_its_delta(ledger, monkeypatch):
     with paper._connect() as conn:
         conn.execute(
@@ -221,7 +228,7 @@ def test_an_option_mark_records_its_delta(ledger, monkeypatch):
             "entry_spot,entry_at,status,pnl,pnl_pct,risk_dollars,stop,target) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             ("aggressive", "CVX", "option", "long", "call", 230.0, "2099-01-16", 4, 4.7, 221.0,
-             "2026-10-14T14:00:00+00:00", "open", 0.0, 0.0, 1880.0, 206.0, 252.0))
+             _days_ago(10), "open", 0.0, 0.0, 1880.0, 206.0, 252.0))
     monkeypatch.setattr(paper, "mark_option", lambda provider, pos, spot, rate: {
         "price": 5.6, "source": "Live chain mid", "dte": 30, "iv": 0.25})
 
