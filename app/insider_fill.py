@@ -69,18 +69,22 @@ def _plus(day: str, n: int) -> str:
 
 
 def gap(trades: List[Dict[str, Any]], today: Optional[dt.date] = None,
-        days: int = DAYS) -> Optional[Tuple[str, str]]:
+        days: int = DAYS, empty_is_gap: bool = False) -> Optional[Tuple[str, str]]:
     """(since, until) when Yahoo's list starts inside the span asked for: the stretch before its oldest row, which
     it does not cover. None when the list is whole. For the chart's two years only a full list (150 rows) can be
-    cut short; for a longer span (the full history, Pass 2) any list that starts inside it is."""
-    if days <= DAYS and len(trades) < YAHOO_ROWS:
+    cut short; for a longer span (the full history, Pass 2) any list that starts inside it is.
+
+    `empty_is_gap` (the full history, audit 2026-11-27 F01 class): a list with no dated rows is the feed saying
+    nothing, not the feed saying "none", so the whole span is the SEC's to answer at any length. Without it a
+    failed Yahoo request at two years read as a whole, empty list (the chart and the six-month block keep that)."""
+    dates = [str(r.get("date") or "")[:10] for r in trades if r.get("date")]
+    if days <= DAYS and len(trades) < YAHOO_ROWS and not (empty_is_gap and not dates):
         return None
     since = ((today or _today()) - dt.timedelta(days=days)).isoformat()
-    dates = [str(r.get("date") or "")[:10] for r in trades if r.get("date")]
     oldest = min(dates) if dates else ""
     if not oldest:
         # nothing listed at all: with a long span asked for, the whole of it is the SEC's to answer
-        return (since, (today or _today()).isoformat()) if days > DAYS else None
+        return (since, (today or _today()).isoformat()) if (days > DAYS or empty_is_gap) else None
     if oldest <= since:
         return None
     return since, oldest
@@ -113,21 +117,39 @@ def _row(trade: Dict[str, Any], parsed: Dict[str, Any], accession: str) -> Dict[
             "detail": detail, "source": "sec", "accession": accession}
 
 
+# The last reader run per symbol, in memory: a run that failed leaves nothing in the store, so without this every
+# request after a refused list looked like a first visit, started the reader again and read "still being read" for
+# ever (audit 2026-11-27, F01 class: PLTR). {"at": epoch seconds, "ok": bool, "why": None | "not_a_filer" |
+# "sec_unreachable"}.
+_LAST_RUN: Dict[str, Dict[str, Any]] = {}
+# A failed reader is tried again no sooner than this, so a refusing EDGAR is not asked on every page view.
+RETRY_AFTER = 600
+
+
+def _may_start(sym: str) -> bool:
+    last = _LAST_RUN.get(sym)
+    return not last or bool(last.get("ok")) or time.time() - float(last.get("at") or 0) >= RETRY_AFTER
+
+
 def complete(ticker: str, insiders: Dict[str, Any], today: Optional[dt.date] = None,
-             days: int = DAYS) -> Dict[str, Any]:
+             days: int = DAYS, empty_is_gap: bool = False) -> Dict[str, Any]:
     """`insiders` (the provider's answer) with the stretch Yahoo's list leaves out filled from kept Form 4s.
 
     Makes no request. Adds `coverage`, which says how far Yahoo's list reaches and how much of the rest has been
-    read, and starts the background reader when filings are unread or the company's list is stale."""
+    read, and starts the background reader when filings are unread or the company's list is stale (not again for
+    RETRY_AFTER after a run that failed)."""
     trades = list((insiders or {}).get("transactions") or [])
-    stretch = gap(trades, today, days)
+    stretch = gap(trades, today, days, empty_is_gap)
     if stretch is None:
         return insiders
+    sym = (ticker or "").upper().strip()
+    now = today or _today()
     since, until = stretch
     kept = form4_store.load_list(ticker)
     window = _window(kept, since, until) if kept else []
     parsed = form4_store.load_many(acc for acc, _ in window)
     unread = sum(1 for acc, _ in window if acc not in parsed)
+    failed = sum(1 for acc, _ in window if acc in parsed and not (parsed[acc] or {}).get("available"))
     rows: List[Dict[str, Any]] = []
     for acc, _ in window:
         p = parsed.get(acc)
@@ -136,20 +158,59 @@ def complete(ticker: str, insiders: Dict[str, Any], today: Optional[dt.date] = N
             continue
         rows += [_row(t, p, acc) for t in p.get("trades") or [] if since <= t.get("date", "") < until]
     listed = _fresh(kept, since)
-    if ENABLED and (unread or not listed):
+    reaches = (kept or {}).get("reaches")
+    whole = bool(kept) and reaches is not None and reaches <= since
+    with _RUNNING_LOCK:
+        running = sym in _RUNNING
+    started = False
+    if ENABLED and (unread or not listed) and not running and _may_start(sym):
+        started = True
         if days == DAYS:
             start(ticker, until)
         else:
             start(ticker, until, days)
+    reader_on = running or started
+    last = _LAST_RUN.get(sym) or {}
     rows.sort(key=lambda r: r["date"], reverse=True)
     out = dict(insiders)
     out["transactions"] = sorted(trades + rows, key=lambda r: str(r.get("date") or ""), reverse=True)
     out["coverage"] = {
         "since": since, "yahoo_from": until, "yahoo_rows": len(trades), "sec_rows": len(rows),
         "sec_filings": len(window), "sec_unread": unread, "listed": bool(kept),
-        "complete": bool(kept) and kept.get("reaches") is not None and kept["reaches"] <= since and not unread,
+        # a filing whose parse failed is kept as unavailable: it counts as read and contributes no rows, so it is
+        # counted apart and keeps `complete` false
+        "sec_failed": failed,
+        # no list reaching back to `since` yet, and a reader running or just started to fetch it
+        "list_pending": (not whole) and reader_on,
+        "sec_error": (last.get("why") or "sec_unreachable") if (last and not last.get("ok") and not reader_on) else None,
+        "sec_read_from": _read_from(kept, window, parsed, since, whole),
+        "complete": whole and not unread and not failed,
     }
     return out
+
+
+def _read_from(kept: Optional[Dict[str, Any]], window: List[Tuple[str, str]], parsed: Dict[str, Any], since: str,
+               whole: bool) -> Optional[str]:
+    """The earliest date from which the SEC's side is read without a break: walk the window newest first and stop at
+    the first filing that is unread or failed. None when the newest one is, or when nothing is known (no window and
+    the list does not reach back)."""
+    if not kept:
+        return None
+    last = None
+    for acc, filed in sorted(window, key=lambda w: w[1], reverse=True):
+        p = parsed.get(acc)
+        if not p or not p.get("available"):
+            break
+        last = filed
+    else:
+        # the whole window is readable: the list says there is nothing older in it
+        if not window and not whole:
+            return None
+        if whole:
+            return since
+        reaches = kept.get("reaches")
+        return reaches if reaches and reaches != "0000-00-00" else last
+    return last
 
 
 def six_month_rows(ticker: str, today: Optional[dt.date] = None, days: int = 182) -> Tuple[List[Dict[str, Any]], bool]:
@@ -191,14 +252,20 @@ def start(ticker: str, until: str, days: int = DAYS) -> bool:
 
 
 def _run(ticker: str, until: str, days: int = DAYS) -> None:
+    ok, why = True, None
     try:
         with _ONE_AT_A_TIME:
             got = fill(ticker, until, days=days)
         log.info("insider fill %s: %s", ticker, got)
+        if got.get("why"):
+            ok, why = False, got["why"]
     except Exception as exc:                                  # noqa: BLE001
         log.info("insider fill %s failed: %s", ticker, exc)
+        ok, why = False, "sec_unreachable"
     finally:
         with _RUNNING_LOCK:
+            # recorded before the symbol leaves _RUNNING, so there is never a moment with neither
+            _LAST_RUN[ticker] = {"at": time.time(), "ok": ok, "why": why}
             _RUNNING.discard(ticker)
 
 
@@ -274,13 +341,14 @@ def fill(ticker: str, until: str, budget: int = RUN_BUDGET, today: Optional[dt.d
     if not _fresh(kept, since):
         listed = list_filings(ticker, since)
         if listed is None:
-            return {"listed": 0, "read": 0}
+            return {"listed": 0, "read": 0, "why": "not_a_filer"}
         form4_store.save_list(ticker, listed["cik"], listed["filings"], listed["reaches"])
         kept = form4_store.load_list(ticker) or dict(listed, fetched_at="")
     window = _window(kept, since, until)
     have = form4_store.load_many(acc for acc, _ in window)
     todo = [(acc, filed) for acc, filed in window if acc not in have]
     read = failed = refused = 0
+    stopped = False
     for acc, _ in todo[:max(0, int(budget))]:
         try:
             parsed = insiders_mod.parse_filing(
@@ -290,13 +358,17 @@ def fill(ticker: str, until: str, budget: int = RUN_BUDGET, today: Optional[dt.d
             refused += 1
             log.info("insider fill %s: %s not read (%s)", ticker, acc, exc)
             if refused >= 3:                                  # EDGAR is refusing or down: the next visit resumes
+                stopped = True
                 break
             continue
         refused = 0
         form4_store.save(acc, kept["cik"], compact(parsed))
         read += 1
         time.sleep(FILL_GAP_SECONDS)
-    return {"listed": len(kept.get("filings") or []), "window": len(todo), "read": read, "failed": failed}
+    out = {"listed": len(kept.get("filings") or []), "window": len(todo), "read": read, "failed": failed}
+    if stopped:
+        out["why"] = "sec_unreachable"
+    return out
 
 
 
@@ -305,14 +377,23 @@ def fill(ticker: str, until: str, budget: int = RUN_BUDGET, today: Optional[dt.d
 HISTORY_YEARS = (2, 5, 10)
 
 
-def history(ticker: str, insiders: Dict[str, Any], years: int, today: Optional[dt.date] = None) -> Dict[str, Any]:
+def history(ticker: str, insiders: Dict[str, Any], years: int, today: Optional[dt.date] = None,
+            yahoo_failed: bool = False) -> Dict[str, Any]:
     """The company's open-market purchases and sales over `years`, from Yahoo's latest rows and, before them, the
     SEC's own Form 4 filings (Pass 2, 2026-11-17: "the full insider history from the SEC rather than the last batch
     the free feed lists"). Every row says where it came from; `coverage` says how far each source reaches and how
-    many filings are still being read, so a history still filling is never shown as complete."""
+    many filings are still being read, so a history still filling is never shown as complete.
+
+    `coverage.state` is the one reading of the period (audit 2026-11-27, F01 class; the page words it):
+    `reading` (filings or the SEC's list still being read), `complete` (every day covered: the SEC's list reaches
+    back to the start and every Form 4 in it was read), `partial` (something was read, not everything) or
+    `unavailable` (nothing was). "None found" is only ever `complete` with no rows: `coverage.none`. An empty
+    Yahoo list is the feed saying nothing, so it asks the SEC for the whole period (`empty_is_gap`)."""
     days = int(years) * 365
-    full = complete(ticker, insiders or {}, today, days=days)
-    since = ((today or _today()) - dt.timedelta(days=days)).isoformat()
+    now = today or _today()
+    full = complete(ticker, insiders or {}, today, days=days, empty_is_gap=True)
+    since = (now - dt.timedelta(days=days)).isoformat()
+    yahoo_rows = [t for t in (insiders or {}).get("transactions") or [] if t.get("date")]
     rows = []
     for t in full.get("transactions") or []:
         day = str(t.get("date") or "")[:10]
@@ -320,9 +401,35 @@ def history(ticker: str, insiders: Dict[str, Any], years: int, today: Optional[d
             continue
         rows.append(dict(t, date=day, source="sec" if t.get("source") == "sec" else "yahoo"))
     cov = dict(full.get("coverage") or {})
+    # a short list is whole for the two years the provider asks for; a full one only back to its oldest row
+    if yahoo_rows:
+        oldest = min(str(t["date"])[:10] for t in yahoo_rows)
+        two_years = (now - dt.timedelta(days=DAYS)).isoformat()
+        yahoo_whole = oldest if len(insiders.get("transactions") or []) >= YAHOO_ROWS else max(since, two_years)
+    else:
+        yahoo_whole = None
     if not cov:
+        # Yahoo's own list covers the whole span: nothing for the SEC to fill
         cov = {"since": since, "yahoo_rows": len((insiders or {}).get("transactions") or []), "sec_rows": 0,
-               "sec_unread": 0, "complete": True}
+               "sec_filings": 0, "sec_unread": 0, "sec_failed": 0, "list_pending": False, "sec_error": None,
+               "sec_read_from": None, "complete": True}
+    cov["yahoo_whole_from"] = yahoo_whole
+    cov["yahoo_answered"] = bool(yahoo_rows) and not yahoo_failed
+    cov["yahoo_failed"] = bool(yahoo_failed)
+    cov["covered_to"] = now.isoformat()
+    starts = [d for d in (cov.get("sec_read_from"), yahoo_whole) if d]
+    if cov.get("sec_unread", 0) > 0 or cov.get("list_pending"):
+        cov["state"], cov["covered_from"] = "reading", (min(starts) if starts else None)
+    elif cov.get("complete"):
+        cov["state"], cov["covered_from"] = "complete", since
+    elif rows or starts:
+        cov["state"], cov["covered_from"] = "partial", (min(starts) if starts else None)
+    else:
+        cov["state"], cov["covered_from"] = "unavailable", None
+    cov["none"] = cov["state"] == "complete" and not rows
+    cov["why"] = None
+    if cov["state"] in ("partial", "unavailable"):
+        cov["why"] = "filings_unreadable" if cov.get("sec_failed") else cov.get("sec_error")
     cov["years"] = int(years)
     cov["cik"] = (form4_store.load_list(ticker) or {}).get("cik")
     return {"ticker": ticker.upper(), "years": int(years), "since": since, "rows": rows, "coverage": cov,
