@@ -112,7 +112,7 @@ def test_ground_note_counts_and_names_the_outcome(n, kind, start):
     assert note.startswith(start) and note.endswith("Every figure it gives comes from the page or a lookup listed under the answer.")
     assert ("rewrote the answer from the figures that remain" in note) == (kind == "rewritten")
     assert ("says above what it could not support" in note) == (kind == "limited")
-    assert "—" not in note and "–" not in note
+    assert "\u2014" not in note and "\u2013" not in note
     assert len(note) < 260
 
 
