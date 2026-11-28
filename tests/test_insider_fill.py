@@ -77,7 +77,8 @@ def test_the_stretch_before_yahoos_list_is_filled_from_kept_filings(store):
     dates = [r["date"] for r in got["transactions"]]
     assert dates == sorted(dates, reverse=True) and len(got["transactions"]) == 152, "Yahoo's rows kept as they were"
     assert got["coverage"] == {"since": SINCE, "yahoo_from": "2025-06-24", "yahoo_rows": 150, "sec_rows": 2,
-                               "sec_filings": 3, "sec_unread": 0, "listed": True, "complete": True}, \
+                               "sec_filings": 3, "sec_unread": 0, "listed": True, "complete": True, "sec_failed": 0,
+                                   "list_pending": False, "sec_error": None, "sec_read_from": SINCE}, \
         "the 2024-10-01 filing is before the two years and not counted"
     assert store == [], "a fresh list, every filing in the stretch read: nothing to start"
 
@@ -93,7 +94,9 @@ def test_unread_filings_or_a_missing_list_start_the_reader_and_a_whole_fresh_one
     store.clear()
     form4_store.save("0000731766-25-000150", "731766", {"available": False, "reason": "no ownership document"})
     got = F.complete("UNH", yahoo(), TODAY)
-    assert got["coverage"]["complete"] is True and store == [], "every filing read, a failure kept as read"
+    # audit 2026-11-27 (F01 class): a failed parse is read but contributes nothing, so it no longer reads as complete
+    assert got["coverage"]["complete"] is False and got["coverage"]["sec_failed"] == 1 and store == [], \
+        "every filing read, a failure kept as read and counted, so the period is not complete"
 
 
 def test_complete_makes_no_request(monkeypatch):

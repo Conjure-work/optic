@@ -7250,11 +7250,12 @@ async def insider_history(ticker: str, years: int = Query(5, description="2, 5 o
         raise HTTPException(status_code=422, detail="years must be 2, 5 or 10.")
 
     def build() -> Dict[str, Any]:
+        failed = False
         try:
             raw = YF_PROVIDER.insiders(sym)
         except Exception:                                    # noqa: BLE001 - the feed down; the SEC may still answer
-            raw = {}
-        out = insider_fill.history(sym, raw or {}, years)
+            raw, failed = {}, True
+        out = insider_fill.history(sym, raw or {}, years, yahoo_failed=failed)
         out["yahoo_answered"] = bool((raw or {}).get("transactions"))
         return out
     return await _run(build)
