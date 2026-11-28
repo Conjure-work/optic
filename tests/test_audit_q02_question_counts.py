@@ -140,7 +140,7 @@ def test_the_definition_is_in_both_payloads_and_is_the_same_object():
     assert metrics.QUESTION_DEFINITION == (
         "A question to Milo is one request that passed the allowance, through chat, deep research, an earnings brief, "
         "a scan request, an investigation step or a portfolio briefing. Your own are left out.")
-    assert "—" not in metrics.QUESTION_DEFINITION and "–" not in metrics.QUESTION_DEFINITION
+    assert "\u2014" not in metrics.QUESTION_DEFINITION and "\u2013" not in metrics.QUESTION_DEFINITION
 
 
 def test_each_of_the_six_routes_calls_the_one_write_path_once():
