@@ -155,7 +155,7 @@ def test_mrt04_deep_research_sends_the_readers_blocks_only_with_a_question_about
         seen.append(context or {})
         yield ai._sse("done", {})
     monkeypatch.setattr(m, "_spend_guard", lambda request: None)
-    monkeypatch.setattr(m, "_count_question", lambda request, kind: None)
+    monkeypatch.setattr(m, "_count_question", lambda request, kind, payload=None: None)
     monkeypatch.setattr(m.ai, "deep_research", capture)
     ctx = {"focus": {"scope": "auto", "view": "paper"}, "reader_holdings": [{"ticker": "CNRYQ", "qty": 7}],
            "journal": "journal " + CANARY, "roth": {"note": CANARY}}

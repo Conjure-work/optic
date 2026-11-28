@@ -91,6 +91,10 @@ def test_counts_leave_the_owner_out_and_retention_needs_a_return_after_28_days(o
     q = {k["kind"]: k for k in body["questions"]["by_kind"]}
     assert q["chat"]["last_7_days"] == 3 and q["research"]["last_7_days"] == 1, "the guest's counts, the owner's not"
     assert body["questions"]["owner_questions_left_out"] == 1
+    tot = body["questions"]["total"]
+    assert (tot["label"], tot["last_7_days"], tot["last_30_days"], tot["all"]) == ("All questions", 4, 4, 4)
+    assert body["questions"]["definition"] == metrics.QUESTION_DEFINITION
+    assert metrics.KINDS["investigation"] == "Investigation steps"
     assert body["questions"]["askers_7_days"] == 2 and body["questions"]["guest_questions_7_days"] == 1
     assert {p["plan"]: p["accounts"] for p in body["plans"]} == {"free": 3, "pro": 1}
     this_week = body["weeks"][-1]
@@ -107,8 +111,9 @@ def test_a_page_load_records_the_day_and_every_milo_entry_counts_its_question(ow
     reader.get("/api/auth/me")
     assert accounts.row("SELECT COUNT(*) AS n FROM activity_days WHERE user_id = ?", (uid,))["n"] == 1, "once a day"
     src = (ROOT / "app/main.py").read_text()
-    for kind in ("chat", "research", "scan", "portfolio"):
-        assert '_count_question(request, "{}")'.format(kind) in src, kind
+    for kind in ("chat", "research", "scan", "portfolio", "earnings_brief", "investigation"):
+        assert '_count_question(request, "{}"'.format(kind) in src, kind
+    assert "_usage_milo" not in src, "one write path: the usage event is written with the row (audit round, Q02)"
 
 
 def test_recording_never_breaks_the_request(monkeypatch):

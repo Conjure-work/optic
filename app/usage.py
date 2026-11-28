@@ -161,6 +161,11 @@ def returned_within_week(rows: List[Dict[str, Any]], now: Optional[datetime] = N
     return came_back, eligible
 
 
+# The day the headline's Milo question row began to cover every kind of question; before it, only chat and deep
+# research wrote a usage event, so the distinct-reader count is not comparable across it (audit round, Q02).
+READERS_ALL_KINDS_FROM = "2026-11-27"
+
+
 def signals(now: Optional[datetime] = None) -> Dict[str, Any]:
     """Raw counts of the three signals: today, the last 7 days, the last 30 days and everything kept."""
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -174,12 +179,19 @@ def signals(now: Optional[datetime] = None) -> Dict[str, Any]:
         skip = " AND NOT (actor_kind = 'signed_in' AND actor_ref IN ({}))".format(",".join("?" * len(owners))) if owners else ""
         first = db.row("SELECT MIN(occurred_at) AS at FROM usage_event WHERE 1 = 1" + skip, tuple(owners))
         out["since"] = (first or {}).get("at")
+        # The headline's question count is the Metrics table's: the same rows, by the same function. `readers` stays
+        # the distinct readers in the usage ledger.
+        qs = metrics.question_totals(now, since_all=out["since"])
+        names = {"today": "today", "week": "last_7_days", "month": "last_30_days", "all": "all"}
+        out["definition"] = metrics.QUESTION_DEFINITION
+        out["readers_all_kinds_from"] = READERS_ALL_KINDS_FROM
         for name, since in windows.items():
             w: Dict[str, Any] = {}
             for ev in ("home_stock_open", "milo_question"):
                 r = db.row("SELECT COUNT(*) AS n, COUNT(DISTINCT actor_ref) AS who FROM usage_event "
                            "WHERE event = ? AND occurred_at >= ?" + skip, (ev, since, *owners))
                 w[ev] = {"events": int(r["n"] or 0), "readers": int(r["who"] or 0)}
+            w["milo_question"]["events"] = qs[names[name]]
             r = db.row("SELECT COUNT(*) AS n, COUNT(DISTINCT actor_ref) AS who, "
                        "SUM(CASE WHEN actor_kind = 'visitor' THEN 1 ELSE 0 END) AS guests FROM usage_event "
                        "WHERE event = 'visit' AND occurred_at >= ?" + skip, (since, *owners))

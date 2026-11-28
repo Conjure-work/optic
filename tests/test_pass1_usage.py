@@ -169,6 +169,14 @@ def test_with_no_owner_configured_nobody_reads_the_counts():
     assert client.get("/api/admin/usage-signals", headers={"X-Optic-CSRF": csrf}).status_code == 403
 
 
+def ask(actor, now, **kw):
+    """One question to Milo as the route now writes it (app/main.py _count_question): the usage event and the
+    milo_questions row the headline and the Metrics table both count (audit round, Q02)."""
+    usage.record("milo_question", actor, now=now, **kw)
+    db.execute("INSERT INTO milo_questions (at, user_id, kind) VALUES (?, ?, 'chat')",
+               (now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), actor[2]))
+
+
 def test_the_owner_reads_raw_counts_of_the_three_signals(monkeypatch):
     now = datetime.now(timezone.utc)
     a, b = ("visitor", V1, None), ("visitor", V2, None)
@@ -178,7 +186,7 @@ def test_the_owner_reads_raw_counts_of_the_three_signals(monkeypatch):
     usage.record("visit", b, now=now)
     usage.record("home_stock_open", a, symbol="AAPL", now=now)
     usage.record("home_stock_open", a, symbol="MSFT", now=now)
-    usage.record("milo_question", a, source_screen="overview", now=now - timedelta(days=2))
+    ask(a, now - timedelta(days=2), source_screen="overview")
     monkeypatch.setenv(admin.ENV_NAME, OWNER)
     csrf = register(OWNER)
     store.mark_verified(store.get_user_by_email(OWNER)["id"])
@@ -210,7 +218,7 @@ def test_the_owners_own_signed_in_activity_is_left_out_of_every_signal(monkeypat
         usage.record("visit", who, now=now - timedelta(days=10))
         usage.record("visit", who, now=now - timedelta(days=8))
         usage.record("home_stock_open", who, symbol="AAPL", now=now)
-        usage.record("milo_question", who, source_screen="overview", now=now)
+        ask(who, now, source_screen="overview")
     # the owner's own page load, through the real endpoint, is left out too
     assert send({"event": "visit", "visitor": V2}, csrf=csrf).json()["recorded"] is True
     d = client.get("/api/admin/usage-signals", headers={"X-Optic-CSRF": csrf}).json()
@@ -229,7 +237,7 @@ def test_with_no_owner_configured_nobody_is_left_out():
     now = datetime.now(timezone.utc)
     register("reader@example.com")
     reader = store.get_user_by_email("reader@example.com")["id"]
-    usage.record("milo_question", ("signed_in", reader, reader), now=now)
+    ask(("signed_in", reader, reader), now)
     d = usage.signals(now)
     assert d["owners_left_out"] == 0 and d["windows"]["today"]["milo_question"]["events"] == 1
 

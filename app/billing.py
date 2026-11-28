@@ -435,6 +435,14 @@ def _period_end(sub: Dict[str, Any]) -> Optional[str]:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(end)))
 
 
+def _cancel_at(sub: Dict[str, Any]) -> Optional[str]:
+    """The time Stripe has scheduled the subscription to end (`cancel_at`, epoch seconds), ISO, or None."""
+    at = sub.get("cancel_at")
+    if not at:
+        return None
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(at)))
+
+
 def _write(user_id: str, created: int, **fields: Any) -> bool:
     """Apply fields to the user's subscription row if this event is newer than
     the last one applied. Returns whether anything was written."""
@@ -489,7 +497,8 @@ def apply_event(event: Dict[str, Any]) -> str:
                        provider="stripe", provider_status=stripe_status,
                        provider_customer_id=obj.get("customer"), provider_subscription_id=obj.get("id"),
                        cancel_at_period_end=1 if obj.get("cancel_at_period_end") else 0,
-                       current_period_end=_period_end(obj))
+                       current_period_end=_period_end(obj),
+                       cancel_at=None if etype == "customer.subscription.deleted" else _cancel_at(obj))
         if wrote:
             brokerage.on_plan_change(uid)
         return (ours if entitled else "free") if wrote else "stale"

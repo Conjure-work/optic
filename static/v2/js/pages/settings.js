@@ -59,7 +59,7 @@ function account() {
       <p class="section-sub">Keep more than one way in. If a device is lost, another method is how you get back to this account, and Optic will not let you remove the last one.</p>
       ${security()}</section>
     <section class="section" aria-labelledby="pl-h"><h2 class="t-h2" id="pl-h">Plan</h2>
-      ${row(plan.label || 'Free', html`${lim.watchlists !== undefined ? `${lim.watchlists} watchlists, ${lim.saved_research} saved items, ${lim.ai_calls_per_day} assistant messages a day${lim.ai_calls_per_month ? ` (${lim.ai_calls_per_month} in any 30 days)` : ''}.` : ''}${plan.cancel_at_period_end && plan.current_period_end ? ` Ends on ${prefs.stamp(plan.current_period_end).split(',').slice(0, 2).join(',')}; it will not renew.` : ''}`, billing(), tag(true, plan.status || 'active'))}
+      ${row(plan.label || 'Free', html`${lim.watchlists !== undefined ? `${lim.watchlists} watchlists, ${lim.saved_research} saved items, ${lim.ai_calls_per_day} assistant messages a day${lim.ai_calls_per_month ? ` (${lim.ai_calls_per_month} in any 30 days)` : ''}.` : ''}${endingNote(plan) ? ` ${endingNote(plan)}` : ''}`, billing(), tag(true, plan.status || 'active'))}
       ${ladder()}
       ${D.flash ? html`<p class="stale" role="status">${D.flash}</p>` : ''}
       ${D.brokerage ? row('Linked brokerages', 'Read-only connections, what they can see, and how to disconnect or delete the data.', html`<a class="btn btn-sm" href="#/brokerage/connections">Manage</a>`) : ''}</section>
@@ -73,6 +73,16 @@ function account() {
           <p class="form-error" role="alert">${ui.delErr || ''}</p>
           <div class="cluster"><button type="submit" class="btn btn-danger">Delete the account</button><button type="button" class="btn" data-v2-set-del-cancel>Cancel</button></div></form>`
         : html`<button type="button" class="btn btn-danger" data-v2-set-del>Delete this account</button>`}</section>`;
+}
+
+// A cancellation Stripe has scheduled, by `cancel_at` or by the period end (audit round, Q01): said in one sentence with
+// its date, and the paid-through date when the two differ by more than a day. Nothing for a plan that is not ending.
+const dayOf = (iso) => prefs.stamp(iso).split(',').slice(0, 2).join(',');
+export function endingNote(plan, fmt = dayOf) {
+  if (!plan || !plan.cancels || !plan.ends_on) return '';
+  const said = `Cancellation scheduled. ${plan.label || 'Your plan'} stays active through ${fmt(plan.ends_on)}; it will not renew.`;
+  const a = Date.parse(plan.ends_on), b = Date.parse(plan.current_period_end);
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) > 86400000 ? `${said} Paid through ${fmt(plan.current_period_end)}.` : said;
 }
 
 function billing() {
@@ -176,11 +186,11 @@ function preferences() {
       ${row('Shortcuts', 'Every key the terminal answers to, in one list. Press ? anywhere outside a field to open it.', html`<button type="button" class="btn btn-sm" data-v2-shortcuts>Show the shortcuts</button>`)}</section>
     <!-- two settings, kept apart (Phase 04, D-019): what a page shows, and how Milo explains it -->
     <section class="section" aria-labelledby="dn-h"><h2 class="t-h2" id="dn-h">How much each page shows</h2>
-      <p class="section-sub">Simple leads with each page's main finding and folds the specialist research one press away. Advanced opens it, and Home shows every panel of its layout.</p>
-      ${row('View', 'The Dossier\'s "Show advanced analysis" switch is the same setting. It does not change how Milo explains things.', seg('View', [['simple', 'Simple'], ['advanced', 'Advanced']], prefs.density(), 'density'))}</section>
+      <p class="section-sub">Simple leads with each page's main finding and folds the specialist research one press away. Advanced opens it. Home and a stock's page follow the level below instead.</p>
+      ${row('View', 'It does not change how Milo explains things.', seg('View', [['simple', 'Simple'], ['advanced', 'Advanced']], prefs.density(), 'density'))}</section>
     <!-- the knowledge level (Phase 05): one slider, the same one Home's first visit and Milo's Response settings show -->
     <section class="section" aria-labelledby="hm-h"><h2 class="t-h2" id="hm-h">How Optic explains things</h2>
-      <p class="section-sub">Milo's answers, deep research and the written portfolio briefing are worded for this level, and terms on the pages explain themselves to match. It changes the words, never the figures, sources or caveats, and it does not change what a page shows. ${store.signedIn() ? 'Saved to your account.' : 'Kept in this browser; sign in to keep it on your account.'}</p>
+      <p class="section-sub">Milo's answers, deep research and the written portfolio briefing are worded for this level, and terms on the pages explain themselves to match. On Home and a stock's page it also sets how much the screen shows. It never changes a figure, a source, a caveat or a disclosure. ${store.signedIn() ? 'Saved to your account.' : 'Kept in this browser; sign in to keep it on your account.'}</p>
       ${levelSlider({ id: 'set-lvl', label: 'Explain things for' })}</section>
     <section class="section" aria-labelledby="tz-h"><h2 class="t-h2" id="tz-h">Time zone</h2>
       <p class="section-sub"><b>US market hours are defined in Eastern Time and don't move.</b> This setting only changes the clock they're displayed against, so you can see when the open and close land where you are.</p>

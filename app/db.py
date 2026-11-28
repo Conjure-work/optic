@@ -1087,6 +1087,11 @@ MIGRATION_27 = [
 ]
 
 
+# Audit round (2026-11-27, Q01): a cancellation Stripe schedules with `cancel_at` (not `cancel_at_period_end`) has a
+# date of its own. Add only.
+MIGRATION_28 = ["ALTER TABLE subscriptions ADD COLUMN cancel_at TEXT"]
+
+
 MIGRATIONS: List[Tuple[int, str, List[str]]] = [
     (1, "accounts", MIGRATION_1),
     (2, "oauth_pkce", MIGRATION_2),
@@ -1115,6 +1120,7 @@ MIGRATIONS: List[Tuple[int, str, List[str]]] = [
     (25, "preferences_round_three", MIGRATION_25),
     (26, "chart_layouts", MIGRATION_26),
     (27, "watch_delivery", MIGRATION_27),
+    (28, "subscription_cancel_at", MIGRATION_28),
 ]
 
 
