@@ -18,7 +18,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Dict, Iterator, List, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
 CLOSED = "http://127.0.0.1:9"
@@ -115,16 +115,19 @@ def server_env(data: Path, port: int, anthropic_url: str = CLOSED) -> Dict[str, 
 class Server:
     """The app under uvicorn in a subprocess, on a free port and a fresh data directory."""
 
-    def __init__(self, data: Path, anthropic_url: str = CLOSED):
+    def __init__(self, data: Path, anthropic_url: str = CLOSED, extra_env: Optional[Dict[str, str]] = None,
+                 start_timeout: float = 60):
         self.data = data
         self.port = _free_port()
         self.base = "http://127.0.0.1:{}".format(self.port)
         self._log = open(data / "server.log", "w")
+        env = server_env(data, self.port, anthropic_url)
+        env.update(extra_env or {})                               # the soak's PYTHONPATH and hooks; none for the suite
         self.proc = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(self.port)],
-            cwd=str(ROOT), env=server_env(data, self.port, anthropic_url), stdout=self._log,
+            cwd=str(ROOT), env=env, stdout=self._log,
             stderr=subprocess.STDOUT)
-        deadline = time.time() + 60
+        deadline = time.time() + start_timeout
         while time.time() < deadline:
             try:
                 with urllib.request.urlopen(self.base + "/healthz", timeout=2) as r:
