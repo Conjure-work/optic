@@ -247,7 +247,19 @@ SPECS: List[Dict[str, Any]] = [
         "description": ("Quarterly revenue and diluted EPS exactly as the company filed them in XBRL with the SEC, "
                         "with trailing twelve months and year-on-year growth, for up to the last 12 quarters. Call "
                         "it when the question needs reported results over time (\"how has revenue grown\", \"what "
-                        "did they earn last quarter\") rather than Optic's long-term model (get_fundamentals)."),
+                        "did they earn last quarter\") rather than Optic's long-term model (get_fundamentals). For cash "
+                        "flow, call get_cash_flow."),
+        "input_schema": {"type": "object", "properties": {"ticker": _TICKER_PROP},
+                         "required": ["ticker"], "additionalProperties": False},
+    },
+    {
+        "name": "get_cash_flow",
+        "description": ("Operating cash flow, capital expenditure and free cash flow for one company, by fiscal "
+                        "quarter (each quarter alone, up to the last 8) and by fiscal year, from its cash flow "
+                        "statements as Yahoo Finance carries them, with how the quarters were checked against the "
+                        "fiscal year. Call it for any question about cash flow, capital spending, capex or free "
+                        "cash flow in a quarter or a year. A quarter the statements do not reconcile for comes "
+                        "back null: say it is unavailable."),
         "input_schema": {"type": "object", "properties": {"ticker": _TICKER_PROP},
                          "required": ["ticker"], "additionalProperties": False},
     },
@@ -363,6 +375,7 @@ def status_words(name: str, args: Dict[str, Any]) -> str:
         "get_price_history": "Reading {}'s price history".format(t),
         "get_filings": "Reading {}'s SEC filings".format(t),
         "get_financials": "Reading {}'s reported results".format(t),
+        "get_cash_flow": "Reading {}'s cash flow".format(t),
     }.get(name, "Looking that up")
 
 
@@ -685,6 +698,10 @@ UNITS: Dict[str, Dict[str, str]] = {
     "get_valuation": {"value_per_share and price": "the quote currency", "rates": "decimals unless labelled percent"},
     "get_earnings": {"eps": "the quote currency per share", "moves": "percent"},
     "get_financials": {"revenue": "USD as filed", "eps": "USD per diluted share as filed", "yoy": "percent"},
+    "get_cash_flow": {"operating_cash_flow, capital_expenditure, capital_spending, free_cash_flow":
+                      "whole amounts in the company's reporting currency (`currency`), USD for a US filer",
+                      "capital_expenditure": "negative, cash out", "capital_spending": "the same amount, positive",
+                      "periods": "fiscal quarters and fiscal years as the company names them"},
     "get_market": {"levels": "each instrument's own units", "changes": "percent"},
     "compare": {"returns": "percent", "scores": "0 to 100"},
     "get_filings": {}, "get_news": {}, "lookup_company": {},
@@ -803,6 +820,7 @@ class Record:
                 "lookup_company": "symbol lookup",
                 "get_price_history": "price history ({}, {})".format(self.args.get("period"), self.args.get("interval")),
                 "get_filings": "SEC filings", "get_financials": "reported revenue and EPS",
+                "get_cash_flow": "cash flow by quarter and year",
                 }.get(self.tool, self.tool)
 
     def label(self) -> str:
@@ -932,7 +950,7 @@ def _as_of(result: Any) -> Optional[str]:
 # here, so a new page has to be placed on purpose.
 MARKET_TOOLS = ("get_quote", "get_options", "get_chart_levels", "get_fundamentals", "get_valuation", "get_earnings",
                 "get_news", "get_market", "compare", "get_assessment", "screen_stocks", "lookup_company",
-                "get_price_history", "get_filings", "get_financials")
+                "get_price_history", "get_filings", "get_financials", "get_cash_flow")
 PERSONAL_TOOLS = ("get_my_watchlists", "get_my_portfolio")
 GENERAL_TOOLS = ("lookup_company", "get_quote", "get_market", "get_news")
 _RESEARCH_VIEWS = ("home", "overview", "swing", "long", "earnings", "financials", "news", "chart", "brief", "market",

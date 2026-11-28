@@ -69,8 +69,8 @@ def snapshot(**over):
 # ------------------------------------------------------------------------------------- definitions
 def test_every_tool_is_typed_closed_and_says_when_to_call_it():
     names = [s["name"] for s in milo_tools.SPECS]
-    # 13, and the four data tools of post-demo Phase 08 (app/milo_data.py)
-    assert len(names) == len(set(names)) == 17
+    # 13, the four data tools of post-demo Phase 08 (app/milo_data.py), and get_cash_flow (audit 2026-11-27, F04)
+    assert len(names) == len(set(names)) == 18
     for spec in milo_tools.SPECS:
         schema = spec["input_schema"]
         assert schema["type"] == "object" and schema["additionalProperties"] is False, spec["name"]

@@ -217,6 +217,134 @@ def financials(sec_history: Callable[..., Dict[str, Any]], ticker: str, quarters
     return body
 
 
+# ------------------------------------------------------------------------------------- cash flow
+
+CASH_SOURCE = ("The company's cash flow statements as Yahoo Finance carries them; each quarter checked against the "
+               "fiscal year by Optic")
+CASH_FIELDS = ("Every money field is a whole amount in `currency`, not thousands or millions. Each quarter is one "
+               "fiscal quarter alone, three months, not the year to date. capital_expenditure is negative (cash out); "
+               "capital_spending is the same amount as a positive number. free_cash_flow is operating_cash_flow plus "
+               "capital_expenditure and is not a GAAP line. A null field is unavailable for that period: say so, "
+               "never work it out.")
+_CASH_LINES = ("operating_cash_flow", "capital_expenditure", "free_cash_flow")
+
+
+def _is_number(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v == v
+
+
+def _cash_at(lines: Any, i: int) -> Any:
+    seq = lines or []
+    v = seq[i] if i < len(seq) else None
+    return float(v) if _is_number(v) else None
+
+
+def _cash_row(period: Any, end: Any, values: Dict[str, Any]) -> Dict[str, Any]:
+    capex = values["capital_expenditure"]
+    # capital_spending is the same amount with the sign turned. Prose says "capital spending of $2.2 billion", a
+    # positive figure, and grounding reads that as +2.2e9; the evidence holds -2218000000 for capital_expenditure,
+    # so without this twin the figure could not be supported (measured, audit 2026-11-27 F04).
+    return {"period": period or end, "period_end": end, "operating_cash_flow": values["operating_cash_flow"],
+            "capital_expenditure": capex, "capital_spending": abs(capex) if capex is not None else None,
+            "free_cash_flow": values["free_cash_flow"]}
+
+
+def cash_flow(statements: Callable[..., Dict[str, Any]], quote: Callable[..., Dict[str, Any]], ticker: str,
+              quarters: int = 8, years: int = 4) -> Dict[str, Any]:
+    """Operating cash flow, capital expenditure and free cash flow by fiscal quarter and fiscal year (audit
+    2026-11-27, F04 follow-up). Nothing is recomputed here: the quarters are `quarterly_cash` from
+    `fundamentals.analyse_financials`, already one quarter alone and already null where free cash flow does not
+    reconcile, and the basis is `quarterly_cash_basis`. A provider exception is left to Toolbox.run."""
+    from .analytics import fundamentals
+    fin = fundamentals.analyse_financials(statements(ticker))
+    if fin.get("available") is not True:
+        return {"status": "unavailable", "source": CASH_SOURCE, "ticker": ticker,
+                "error": "Yahoo Finance returned no financial statements for {}. Funds and indexes have none.".format(ticker)}
+    try:
+        currency = str((quote(ticker) or {}).get("financial_currency") or "USD").upper()
+    except Exception:
+        currency = "USD"
+
+    annual = fin.get("annual") or {}
+    a_periods = list(fin.get("annual_periods") or [])
+    a_fiscal = list(fin.get("annual_fiscal") or [])
+    fiscal_years = []
+    for i, end in enumerate(a_periods[:years]):
+        vals = {k: _cash_at(annual.get(k), i) for k in _CASH_LINES}
+        if any(v is not None for v in vals.values()):
+            fiscal_years.append(_cash_row(a_fiscal[i] if i < len(a_fiscal) else None, end, vals))
+
+    qc = fin.get("quarterly_cash") or {}
+    q_periods = list(fin.get("quarterly_periods") or [])
+    q_fiscal = list(fin.get("quarterly_fiscal") or [])
+    basis = fin.get("quarterly_cash_basis") or {}
+    has_quarters = any(_cash_at(qc.get("operating_cash_flow"), i) is not None for i in range(len(q_periods)))
+    if not has_quarters and not fiscal_years:
+        return {"status": "unavailable", "source": CASH_SOURCE, "ticker": ticker,
+                "error": "The statements Yahoo Finance carries for {} have no cash flow lines.".format(ticker)}
+
+    body: Dict[str, Any] = {"status": "ok", "source": CASH_SOURCE, "ticker": ticker, "currency": currency}
+    if not has_quarters:
+        body.update({"as_of": fiscal_years[0]["period_end"], "quarters": [], "quarterly_available": False,
+                     "missing": ["quarterly cash flow statement"],
+                     "quarterly_note": "The feed carries no quarterly cash flow statement for {}. Fiscal-year figures "
+                                       "only.".format(ticker),
+                     "fiscal_years": fiscal_years, "fields": CASH_FIELDS})
+        return body
+
+    gone = set(basis.get("fcf_unavailable") or [])
+    rows: List[Any] = []
+    for i, end in enumerate(q_periods[:quarters]):
+        vals = {k: _cash_at(qc.get(k), i) for k in _CASH_LINES}
+        row = _cash_row(q_fiscal[i] if i < len(q_fiscal) else None, end, vals)
+        # an all-null row outside the run of figures is dropped, unless the server has a reason to give for it (a
+        # year-to-date quarter with no quarter before it): that quarter is one the reader may ask about
+        row["_has"] = any(v is not None for v in vals.values())
+        row["_why"] = False
+        missing = [k for k in _CASH_LINES if vals[k] is None]
+        if missing:
+            row["unavailable"] = missing
+            # the year-to-date reason is the more specific one, so it comes before the reconciliation note
+            if basis.get("basis") == "year_to_date" and vals["operating_cash_flow"] is None:
+                row["note"] = ("Unavailable for this quarter: the statements give it year to date and the quarter "
+                               "before it is not on hand to take it from.")
+                row["_why"] = True
+            elif i in gone:
+                row["note"] = ("Free cash flow is unavailable for this quarter: operating cash flow, capital "
+                               "expenditure and free cash flow do not reconcile on the feed.")
+            else:
+                row["note"] = "The feed has no figure for this quarter."
+        rows.append(row)
+    kept = [j for j, r in enumerate(rows) if r["_has"]]
+    first, last = (kept[0], kept[-1]) if kept else (0, -1)
+    rows = [r for j, r in enumerate(rows) if first <= j <= last or r["_why"]]
+    for r in rows:
+        r.pop("_has")
+        r.pop("_why")
+
+    fy_date = basis.get("fiscal_year")
+    fy_label = a_fiscal[a_periods.index(fy_date)] if fy_date in a_periods and a_periods.index(fy_date) < len(a_fiscal) else None
+    kind = basis.get("basis")
+    if kind == "discrete":
+        said = ("The four quarters of {} add up to the fiscal year's operating cash flow, so each figure is one "
+                "fiscal quarter alone.".format(fy_label or "the fiscal year"))
+    elif kind == "year_to_date":
+        said = ("The statements give these year to date; each quarter here is that figure less the quarter before "
+                "it in the same fiscal year.")
+    else:
+        said = ("As Yahoo Finance reports each quarter; there are not four quarters of one fiscal year on hand to "
+                "check them against the year's total.")
+    with_numbers = [r["period_end"] for r in rows if any(r[k] is not None for k in _CASH_LINES)]
+    body.update({
+        "as_of": max(with_numbers) if with_numbers else (fiscal_years[0]["period_end"] if fiscal_years else None),
+        "quarters": rows,
+        "basis": {"basis": kind, "fiscal_year": fy_label, "fiscal_year_end": fy_date,
+                  "quarters_sum_operating_cash_flow": basis.get("sum"),
+                  "fiscal_year_operating_cash_flow": basis.get("annual"), "said": said},
+        "fiscal_years": fiscal_years, "fields": CASH_FIELDS})
+    return body
+
+
 # ------------------------------------------------------------------------------------- wiring
 
 def runners(provider: Any, yf_provider: Any) -> Dict[str, Callable[..., Dict[str, Any]]]:
@@ -231,4 +359,5 @@ def runners(provider: Any, yf_provider: Any) -> Dict[str, Callable[..., Dict[str
             yf_provider.history, provider.quote, ticker, period, interval),
         "get_filings": lambda ticker, limit: filings(filings_mod.recent, ticker, limit),
         "get_financials": lambda ticker: financials(sec_facts_mod.history, ticker),
+        "get_cash_flow": lambda ticker: cash_flow(yf_provider.financials, provider.quote, ticker),
     }
