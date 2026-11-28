@@ -129,6 +129,8 @@ def _state_payload(request: Request) -> Dict[str, Any]:
     payload["admin"] = admin.is_admin(user)
     payload["methods"] = store.auth_methods(user["id"])
     payload["preferences"] = store.preferences(user["id"])
+    from .. import billing        # lazy: billing imports this package
+    billing.backfill_cancellation(user["id"])
     payload["subscription"] = store.subscription(user["id"])
     payload["session_id"] = (session or {}).get("id")
     return payload

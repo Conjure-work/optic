@@ -77,7 +77,12 @@ function account() {
 
 // A cancellation Stripe has scheduled, by `cancel_at` or by the period end (audit round, Q01): said in one sentence with
 // its date, and the paid-through date when the two differ by more than a day. Nothing for a plan that is not ending.
-const dayOf = (iso) => prefs.stamp(iso).split(',').slice(0, 2).join(',');
+// In UTC, as a calendar date: Stripe's portal says "December 25, 2026" for 2026-12-25T04:48Z, and a viewer in New York
+// read "Dec 24" from the local zone (audit, Q01). Billing dates are Stripe's, so they are stated in Stripe's day.
+export const dayOf = (iso) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+};
 export function endingNote(plan, fmt = dayOf) {
   if (!plan || !plan.cancels || !plan.ends_on) return '';
   const said = `Cancellation scheduled. ${plan.label || 'Your plan'} stays active through ${fmt(plan.ends_on)}; it will not renew.`;

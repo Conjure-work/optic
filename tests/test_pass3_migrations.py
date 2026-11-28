@@ -46,8 +46,8 @@ def at_22(tmp_path, monkeypatch):
 
 def test_round_three_migrations_are_numbered_23_to_27_and_follow_22():
     versions = [m[0] for m in accounts_db.MIGRATIONS]
-    assert versions == list(range(1, 29))      # 28 is the audit round's cancel_at column
-    assert tuple(versions[-6:-1]) == ROUND_THREE
+    assert versions == list(range(1, 30))      # 28 and 29 are the audit round's cancel_at and cancel_synced_at columns
+    assert tuple(versions[-7:-2]) == ROUND_THREE
 
 
 def test_round_three_migrations_never_drop_or_rebuild_anything():
@@ -71,7 +71,7 @@ def test_migrating_from_22_keeps_every_existing_value(at_22):
     with sqlite3.connect(db.DB_PATH) as conn:
         before = {t: _dump(conn, t) for t in tables}
     ran = db.migrate()
-    assert ran == list(ROUND_THREE) + [28]
+    assert ran == list(ROUND_THREE) + [28, 29]
     with sqlite3.connect(db.DB_PATH) as conn:
         for t in tables:
             cols_b, rows_b = before[t]
@@ -145,7 +145,25 @@ def test_migration_28_adds_subscriptions_cancel_at_on_a_database_at_27_and_is_id
     with sqlite3.connect(accounts_db.DB_PATH) as c:
         assert "cancel_at" not in [r[1] for r in c.execute("PRAGMA table_info(subscriptions)")]
     monkeypatch.setattr(accounts_db, "MIGRATIONS", full)
-    assert accounts_db.migrate() == [28]
+    assert accounts_db.migrate() == [28, 29]
     assert accounts_db.migrate() == []
     with sqlite3.connect(accounts_db.DB_PATH) as c:
         assert "cancel_at" in [r[1] for r in c.execute("PRAGMA table_info(subscriptions)")]
+
+
+def test_migration_29_adds_only_cancel_synced_at_and_leaves_existing_rows_null(tmp_path, monkeypatch):
+    monkeypatch.setattr(accounts_db, "DB_PATH", str(tmp_path / "accounts.db"))
+    full = list(accounts_db.MIGRATIONS)
+    monkeypatch.setattr(accounts_db, "MIGRATIONS", [m for m in full if m[0] <= 28])
+    accounts_db.migrate()
+    with sqlite3.connect(accounts_db.DB_PATH) as c:
+        c.execute("INSERT INTO users (id, email, created_at, updated_at) VALUES ('u1','a@example.com','t','t')")
+        c.execute("INSERT INTO subscriptions (id, user_id, plan, status, created_at, updated_at) "
+                  "VALUES ('s1','u1','pro','active','t','t')")
+    monkeypatch.setattr(accounts_db, "MIGRATIONS", full)
+    assert accounts_db.migrate() == [29]
+    assert accounts_db.migrate() == []
+    assert accounts_db.MIGRATIONS[-1] == (29, "subscription_cancel_synced",
+                                          ["ALTER TABLE subscriptions ADD COLUMN cancel_synced_at TEXT"])
+    with sqlite3.connect(accounts_db.DB_PATH) as c:
+        assert c.execute("SELECT cancel_synced_at FROM subscriptions WHERE id='s1'").fetchone() == (None,)
